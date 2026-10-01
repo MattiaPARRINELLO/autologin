@@ -5,6 +5,8 @@
 
 const EXECUTION_LOG_KEY = 'executionLogs';
 const MAX_EXECUTION_LOGS = 40;
+const PROGRESS_STORAGE_KEY = 'pointageProgress';
+const PROGRESS_STALE_MS = 5 * 60 * 1000;
 
 document.addEventListener('DOMContentLoaded', () => {
   // --- Références DOM ---
@@ -25,6 +27,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const statusIconWarn = document.getElementById('status-icon-warn');
   const statusIconOk = document.getElementById('status-icon-ok');
   const statusBarText = document.getElementById('status-bar-text');
+  const statusProgress = document.getElementById('status-progress');
+  const statusProgressFill = document.getElementById('status-progress-fill');
   const executionLogList = document.getElementById('execution-log-list');
   const configPanel = document.getElementById('config-panel');
   const updateModal = document.getElementById('update-modal');
@@ -36,6 +40,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let isDrawing = false;
   let signatureData = []; // Tableau de coordonnées [{x, y, type}]
   let hasSignature = false;
+  let derniereProgressionAffichee = null;
 
   // =============================================
   // UTILITAIRE — Formatage date/heure
@@ -320,11 +325,45 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   /**
+   * Affiche la progression du pointage (message + barre) et la masque dès qu'il est terminé.
+   * @param {{message?: string, pourcentage?: number, enCours?: boolean, ts?: number}} progression
+   * @param {boolean} force - Ignore la garde anti-état périmé
+   */
+  function updateProgressBar(progression, force = false) {
+    if (!progression || typeof progression !== 'object') return;
+
+    const perime = !force && progression.enCours && (Date.now() - (progression.ts || 0)) > PROGRESS_STALE_MS;
+    const enCours = !!progression.enCours && !perime;
+
+    if (!enCours) {
+      // L'état final du pointage est appliqué séparément : ne pas réécrire la barre de statut
+      statusProgress.style.display = 'none';
+      statusProgressFill.style.width = '0%';
+      if (derniereProgressionAffichee) {
+        const dernier = derniereProgressionAffichee;
+        derniereProgressionAffichee = null;
+        // Revenir à la dernière action terminée si le message de progression n'a pas déjà été remplacé
+        chrome.storage.local.get(['lastAction'], (result) => {
+          if (statusBarText.textContent === dernier.message && result.lastAction) {
+            statusBarText.textContent = result.lastAction;
+          }
+        });
+      }
+      return;
+    }
+
+    derniereProgressionAffichee = progression;
+    statusProgress.style.display = '';
+    statusProgressFill.style.width = `${Math.max(0, Math.min(100, progression.pourcentage || 0))}%`;
+    statusBarText.textContent = progression.message;
+  }
+
+  /**
    * Charge les données sauvegardées depuis chrome.storage.local
    * et pré-remplit les champs du popup
    */
   function loadSavedData() {
-    chrome.storage.local.get(['username', 'password', 'signatureData', 'lastAction', EXECUTION_LOG_KEY, 'uiCompactMode'], (result) => {
+    chrome.storage.local.get(['username', 'password', 'signatureData', 'lastAction', EXECUTION_LOG_KEY, 'uiCompactMode', PROGRESS_STORAGE_KEY], (result) => {
       // Pré-remplir l'identifiant
       if (result.username) {
         usernameInput.value = result.username;
@@ -352,6 +391,9 @@ document.addEventListener('DOMContentLoaded', () => {
         statusBarText.textContent = result.lastAction;
       }
 
+      // Afficher la progression si un pointage est déjà en cours
+      updateProgressBar(result[PROGRESS_STORAGE_KEY]);
+
       // Initialiser le journal
       renderExecutionLogs(result[EXECUTION_LOG_KEY]);
 
@@ -373,6 +415,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (changes.uiCompactMode) {
       setCompactMode(!!changes.uiCompactMode.newValue, false);
+    }
+
+    if (changes[PROGRESS_STORAGE_KEY]) {
+      updateProgressBar(changes[PROGRESS_STORAGE_KEY].newValue);
     }
   });
 
@@ -500,12 +546,14 @@ document.addEventListener('DOMContentLoaded', () => {
       // Désactiver le bouton pendant l'exécution
       setStartButtonLoading();
       updateStatusBar('Lancement du pointage...');
+      updateProgressBar({ message: 'Lancement du pointage…', pourcentage: 5, enCours: true, ts: Date.now() }, true);
       appendExecutionLog('Pointage', 'Demarrage du pointage', 'info');
 
       // Envoyer le message au background.js pour démarrer le processus
       chrome.runtime.sendMessage({ action: 'lancerPointage' }, (response) => {
         // Réactiver le bouton
         setStartButtonIdle();
+        updateProgressBar({ enCours: false });
 
         if (chrome.runtime.lastError) {
           updateStatusBar('Erreur de communication avec le service worker');

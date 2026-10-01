@@ -1,6 +1,6 @@
 // =============================================
 // Pointage Auto — Content Script (content.js)
-// S'injecte sur https://cesar.emineo-informatique.fr/*
+// S'injecte sur https://cesar.emineo-education.fr/*
 // Fournit les fonctions d'interaction avec le DOM
 // =============================================
 

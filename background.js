@@ -4,14 +4,16 @@
 // =============================================
 
 // --- Constantes ---
-const URL_CONNEXION = 'https://cesar.emineo-informatique.fr/connexion';
-const URL_TABLEAU_BORD = 'https://cesar.emineo-informatique.fr/';
+const URL_CONNEXION = 'https://cesar.emineo-education.fr/connexion';
+const URL_TABLEAU_BORD = 'https://cesar.emineo-education.fr/';
 const TIMEOUT_CHARGEMENT = 30000; // 30 secondes (site lent)
 const TIMEOUT_REDIRECTION = 30000; // 30 secondes (site lent)
 const EXECUTION_LOG_KEY = 'executionLogs';
 const MAX_EXECUTION_LOGS = 40;
 const NOTIFICATION_STATUS_ID = 'checkmate-pointage-status';
+const NOTIFICATION_PROGRESS_ID = 'checkmate-pointage-progress';
 const NOTIFICATION_DEDUPE_MS = 1800;
+const PROGRESS_STORAGE_KEY = 'pointageProgress';
 const GITHUB_REPO = 'MattiaPARRINELLO/CheckMate';
 const GITHUB_API_HEADERS = {
   Accept: 'application/vnd.github+json',
@@ -264,6 +266,63 @@ function afficherNotification(titre, message, options = {}) {
     if (chrome.runtime.lastError) {
       console.warn('Notification échouée:', chrome.runtime.lastError.message);
     }
+  });
+}
+
+let notificationProgressionCreee = false;
+
+/**
+ * Met à jour la notification de progression du pointage.
+ * Une seule notification est créée puis mise à jour à chaque étape (pas de spam).
+ * L'état est aussi publié dans le storage pour que le popup l'affiche en direct.
+ * @param {string} message - Étape en cours
+ * @param {number} pourcentage - Avancement (0-100)
+ */
+function notifierProgression(message, pourcentage) {
+  const progress = Math.max(0, Math.min(100, Math.round(pourcentage)));
+
+  chrome.storage.local.set({
+    [PROGRESS_STORAGE_KEY]: { message, pourcentage: progress, enCours: true, ts: Date.now() }
+  });
+
+  const options = {
+    type: 'progress',
+    iconUrl: 'icons/icon128.png',
+    title: '🕐 Pointage Auto',
+    message: message,
+    progress: progress,
+    silent: true
+  };
+
+  if (notificationProgressionCreee) {
+    chrome.notifications.update(NOTIFICATION_PROGRESS_ID, options, (maj) => {
+      if (chrome.runtime.lastError) return;
+      // La notification a été fermée par l'utilisateur → la recréer
+      if (!maj) {
+        notificationProgressionCreee = false;
+        notifierProgression(message, progress);
+      }
+    });
+    return;
+  }
+
+  chrome.notifications.create(NOTIFICATION_PROGRESS_ID, options, () => {
+    if (chrome.runtime.lastError) {
+      console.warn('Notification de progression échouée:', chrome.runtime.lastError.message);
+      return;
+    }
+    notificationProgressionCreee = true;
+  });
+}
+
+/**
+ * Retire la notification de progression et clôt l'état partagé avec le popup.
+ */
+function terminerProgression() {
+  notificationProgressionCreee = false;
+  chrome.notifications.clear(NOTIFICATION_PROGRESS_ID, () => {});
+  chrome.storage.local.set({
+    [PROGRESS_STORAGE_KEY]: { message: '', pourcentage: 0, enCours: false, ts: Date.now() }
   });
 }
 
@@ -706,9 +765,10 @@ async function lancerPointage() {
 
     // ÉTAPE 1 — Ouvrir la page de connexion
     log('Pointage', 'Démarrage — Étape 1 : ouverture de la page de connexion');
-    afficherNotification('🕐 Pointage Auto', 'Pointage lancé...');
+    notifierProgression('Ouverture de la page de connexion…', 10);
     tabId = await etape1_ouvrirPageConnexion();
     log('Pointage', `Étape 1 terminée — onglet créé (tabId=${tabId})`);
+    notifierProgression('Page de connexion chargée', 20);
 
     // Si version obsolète : bloquer immédiatement dès l'ouverture de la page, avant tout login.
     if (updateInfo.outdated) {
@@ -738,40 +798,48 @@ async function lancerPointage() {
     if (dejaConnecte) {
       // L'utilisateur est déjà connecté → passer directement à la signature
       log('Pointage', 'Session active détectée — étapes 2 et 3 ignorées, passage à la signature');
+      notifierProgression('Session déjà active — connexion ignorée', 50);
     } else {
 
       // ÉTAPE 2 — Remplir le formulaire et le soumettre (uniquement si pas encore connecté)
       log('Pointage', 'Étape 2 — Remplissage du formulaire de connexion...');
+      notifierProgression('Connexion en cours…', 35);
       await etape2_remplirFormulaire(tabId, data.username, data.password);
       log('Pointage', 'Étape 2 terminée — formulaire soumis');
+      notifierProgression('Identifiants envoyés — attente de la redirection…', 45);
 
       // ÉTAPE 3 — Attendre la redirection post-connexion
       log('Pointage', 'Étape 3 — Attente de la redirection post-connexion (timeout 30s)...');
       await etape3_attendreRedirection(tabId);
 
       log('Pointage', 'Étape 3 terminée — redirection détectée, connexion réussie');
+      notifierProgression('Connexion réussie', 55);
     } // fin du else (connexion nécessaire)
 
     // ÉTAPE 4 — Préparer la page de signature (site potentiellement lent)
     log('Pointage', 'Étape 4 — Préparation de la page de signature (attente du bouton)...');
+    notifierProgression('Recherche du bouton de signature…', 70);
     const boutonPret = await attendreSelecteurDansOnglet(tabId, 'button.buttonPresent', 45000, 1000);
     if (!boutonPret) {
       throw new Error('Le bouton de signature est resté introuvable après attente prolongée (45s)');
     }
+    notifierProgression('Bouton de signature détecté', 80);
 
     // ÉTAPE 5 — Lancer la signature automatique via le content script
     // La confirmation utilisateur de version obsolète est gérée DANS ce flux message.
     log('Pointage', `Étape 5 — Envoi du message 'lancerSignature' au content script (tabId=${tabId})...`);
-    afficherNotification('🕐 Pointage Auto', 'Signature en cours...');
+    notifierProgression('Signature en cours…', 85);
 
     let resultatSignature = await lancerSignatureViaContentScript(tabId, updateInfo);
 
     // Retry ciblé: cas fréquent juste après login où le DOM met encore quelques secondes à stabiliser.
     if (!resultatSignature.success && resultatSignature.error && resultatSignature.error.includes('Aucun bouton de signature trouvé')) {
       log('Pointage', 'Étape 5 — Premier essai sans bouton trouvé, attente supplémentaire de 10s puis retry...');
+      notifierProgression('Bouton absent — nouvel essai…', 75);
       await new Promise((resolve) => setTimeout(resolve, 10000));
       const boutonRetryPret = await attendreSelecteurDansOnglet(tabId, 'button.buttonPresent', 20000, 1000);
       if (boutonRetryPret) {
+        notifierProgression('Signature en cours… (2e essai)', 85);
         resultatSignature = await lancerSignatureViaContentScript(tabId, updateInfo);
       }
     }
@@ -783,6 +851,7 @@ async function lancerPointage() {
 
     // Signature réussie — Notification finale
     log('Pointage', 'Étape 5 terminée — Signature validée avec succès !', 'success');
+    terminerProgression();
     afficherNotification('✅ Pointage Auto', 'Présence pointée et signée avec succès !');
 
     return {
@@ -797,6 +866,7 @@ async function lancerPointage() {
   } catch (erreur) {
     log('Pointage', `ERREUR FATALE: ${erreur.message}`, 'error');
     console.error('[Pointage] Stack:', erreur.stack);
+    terminerProgression();
     afficherNotification('❌ Pointage Auto — Erreur', erreur.message);
 
     return {
