@@ -71,17 +71,19 @@ class CesarSession:
         self.page = None
         self._playwright = None
         self._context = None
+        self.headless = config.watcher.headless
 
-    async def open(self) -> None:
+    async def open(self, headless: bool | None = None) -> None:
         from playwright.async_api import async_playwright
 
+        self.headless = self.config.watcher.headless if headless is None else headless
         self.config.watcher.profile_dir.mkdir(parents=True, exist_ok=True)
         self._playwright = await async_playwright().start()
         executable = resolve_executable(self._playwright.chromium, self.config)
         options = {"executable_path": executable} if executable else {}
         self._context = await self._playwright.chromium.launch_persistent_context(
             user_data_dir=str(self.config.watcher.profile_dir),
-            headless=self.config.watcher.headless,
+            headless=self.headless,
             viewport={"width": 1366, "height": 900},
             args=["--no-first-run", "--no-default-browser-check"],
             **options,
@@ -89,7 +91,22 @@ class CesarSession:
         self._context.set_default_timeout(20000)
         pages = self._context.pages
         self.page = pages[0] if pages else await self._context.new_page()
-        logger.info("navigateur demarre (profil %s)", self.config.watcher.profile_dir)
+        mode = "invisible" if self.headless else "visible"
+        logger.info(
+            "navigateur demarre en mode %s (profil %s)",
+            mode,
+            self.config.watcher.profile_dir,
+        )
+
+    async def switch_headless(self, headless: bool) -> None:
+        """Relance le navigateur dans le mode demande.
+
+        Le profil persistant conserve la session, donc aucunlogin n'est necessaire.
+        """
+        if self._context is not None and self.headless == headless:
+            return
+        await self.close()
+        await self.open(headless=headless)
 
     async def close(self) -> None:
         if self._context is not None:

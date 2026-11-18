@@ -160,6 +160,7 @@ def command_check_config(config: Config) -> int:
     print(f"  Deduplication  : {config.watcher.dedupe_ttl}s")
     print(f"  Confirmation   : {config.watcher.confirm_timeout}s")
     print(f"  Auto-signature : {config.watcher.auto_sign}")
+    print(f"  Visible a la signature : {config.watcher.visible_on_sign}")
     print(f"  Profil         : {config.watcher.profile_dir}")
     print(f"  Etat           : {config.watcher.state_file}")
     print(f"  Signature      : {config.signature.file}")

@@ -38,7 +38,8 @@ uv run checkmate-watcher --config ~/.config/checkmate-watcher/emulator.toml run 
 
 Puis ouvre `http://127.0.0.1:8787/admin` et clique sur "Ouvrir l'emargement".
 Au cycle suivant, le watcher detecte le bouton, affiche la notification, et si
-tu acceptes, signe dans le canvas. L'etat passe a "signe" dans `/admin`.
+tu acceptes, ouvre une fenetre visible uniquement pour signer, puis la referme.
+L'etat passe a "signe" dans `/admin`.
 
 ## Test automatique complet
 

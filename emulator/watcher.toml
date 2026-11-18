@@ -14,8 +14,9 @@ dedupe_ttl = 3600
 confirm_timeout = 120
 auto_sign = false
 auto_sign_delay = 5
-# false pour voir le navigateur travailler, true pour un test rapide.
-headless = false
+# Surveillance invisible ; une fenetre s'ouvre seulement pour signer.
+headless = true
+visible_on_sign = true
 # A renseigner si le Chromium de Playwright n'est pas installe.
 # executable_path = "/usr/bin/chromium"
 profile_dir = "~/.local/share/checkmate-watcher/emulator-profile"

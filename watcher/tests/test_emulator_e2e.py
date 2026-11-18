@@ -97,6 +97,7 @@ def test_le_watcher_detecte_et_signe_sur_l_emulateur(tmp_path):
                 auto_sign=True,
                 auto_sign_delay=0,
                 headless=True,
+                visible_on_sign=False,
                 executable_path=executable,
                 profile_dir=tmp_path / "profile",
                 state_file=tmp_path / "state.json",

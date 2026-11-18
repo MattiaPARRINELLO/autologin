@@ -93,6 +93,7 @@ class WatcherConfig:
     auto_sign: bool = False
     auto_sign_delay: int = 20
     headless: bool = False
+    visible_on_sign: bool = True
     executable_path: str | None = None
     profile_dir: Path = Path("~/.local/share/checkmate-watcher/profile")
     state_file: Path = Path("~/.local/share/checkmate-watcher/state.json")
@@ -175,6 +176,7 @@ def load_config(path: str | Path) -> Config:
         auto_sign=bool(watcher_table.get("auto_sign", False)),
         auto_sign_delay=int(watcher_table.get("auto_sign_delay", 20)),
         headless=bool(watcher_table.get("headless", False)),
+        visible_on_sign=bool(watcher_table.get("visible_on_sign", True)),
         executable_path=(
             str(watcher_table["executable_path"])
             if watcher_table.get("executable_path")

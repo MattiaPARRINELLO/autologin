@@ -6,7 +6,13 @@ import asyncio
 import logging
 
 from . import notify
-from .cesar import AttendanceSignal, CesarError, CesarSession, is_success_confirmation
+from .cesar import (
+    AttendanceSignal,
+    CesarError,
+    CesarSession,
+    SignError,
+    is_success_confirmation,
+)
 from .config import Config
 from .signature import load_signature
 from .state import StateStore
@@ -27,6 +33,31 @@ async def _send(
         icon=icon,
         urgency=urgency,
     )
+
+
+async def sign_with_visibility(
+    config: Config,
+    session: CesarSession,
+    points: list,
+) -> str:
+    """Signe en mode invisible, ou en ouvrant une fenetre uniquement pour signer."""
+    if not config.watcher.visible_on_sign:
+        return await session.sign(points)
+
+    logger.info("ouverture du navigateur visible pour la signature")
+    await session.switch_headless(False)
+    try:
+        signal = await session.check()
+        if signal is None:
+            raise SignError(
+                "emargement introuvable a l'ouverture du navigateur visible"
+            )
+        confirmation = await session.sign(points)
+        # Laisser le temps de voir la confirmation avant de refermer.
+        await asyncio.sleep(2)
+        return confirmation
+    finally:
+        await session.switch_headless(True)
 
 
 async def handle_signal(
@@ -118,7 +149,9 @@ async def run_loop(
 
     state = StateStore(config.watcher.state_file, ttl=config.watcher.dedupe_ttl)
     session = CesarSession(config)
-    await session.open()
+    await session.open(
+        headless=True if config.watcher.visible_on_sign else config.watcher.headless
+    )
 
     consecutive_errors = 0
     try:
@@ -144,7 +177,9 @@ async def run_loop(
                         state.mark(signal.key)
                     else:
                         try:
-                            confirmation = await session.sign(points)
+                            confirmation = await sign_with_visibility(
+                                config, session, points
+                            )
                         except CesarError as exc:
                             logger.error("echec de la signature : %s", exc)
                             await _send(

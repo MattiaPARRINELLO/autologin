@@ -86,6 +86,11 @@ journalctl --user -u checkmate-watcher -f
 
 ## Comportement
 
+- Surveillance invisible : le navigateur reste en mode headless pendant l'attente,
+  aucune fenetre ne s'ouvre.
+- `visible_on_sign = true` (defaut) : au moment de signer seulement, le navigateur
+  se relance en mode visible avec le meme profil, fait la signature, affiche la
+  confirmation deux secondes, puis se referme et repasse en invisible.
 - Chaque cycle : `goto` du tableau de bord, attente du rendu JS, recherche de
   `button.buttonPresent`.
 - Si le bouton est la et que l'emargement n'a pas deja ete traite : notification
