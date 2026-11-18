@@ -3,12 +3,25 @@
 from __future__ import annotations
 
 import logging
+import os
 import shutil
 import subprocess
 
 logger = logging.getLogger(__name__)
 
 ZENITY_TIMEOUT_CODE = 5
+
+
+def _clean_env() -> dict[str, str]:
+    """Retire les bibliotheques injectees par l'environnement appelant.
+
+    T3 Code (et d'autres apps Electron) exportent LD_LIBRARY_PATH vers leurs
+    propres bibliotheques, ce qui casse notify-send et zenity du systeme.
+    """
+    env = os.environ.copy()
+    env.pop("LD_LIBRARY_PATH", None)
+    env.pop("LD_PRELOAD", None)
+    return env
 
 
 class NotificationError(Exception):
@@ -57,6 +70,7 @@ def _send_notify_send(
             timeout=15,
             capture_output=True,
             text=True,
+            env=_clean_env(),
         )
     except (OSError, subprocess.SubprocessError) as exc:
         logger.warning("notify-send a echoue : %s", exc)
@@ -110,6 +124,7 @@ def _send_gdbus(
             timeout=15,
             capture_output=True,
             text=True,
+            env=_clean_env(),
         )
     except (OSError, subprocess.SubprocessError) as exc:
         logger.warning("gdbus a echoue : %s", exc)
@@ -178,6 +193,7 @@ def ask(
             timeout=timeout + 15,
             capture_output=True,
             text=True,
+            env=_clean_env(),
         )
     except (OSError, subprocess.SubprocessError) as exc:
         logger.warning("zenity a echoue : %s", exc)

@@ -71,18 +71,28 @@ uv run checkmate-watcher --config ~/.config/checkmate-watcher/config.toml run --
 La premiere execution ouvre un navigateur visible : connecte-toi une fois
 manuellement si besoin, le profil persistant garde la session.
 
-## Service utilisateur
+## Demarrage automatique
+
+Apres avoir cree la config reelle (`~/.config/checkmate-watcher/config.toml`) :
 
 ```bash
-mkdir -p ~/.config/systemd/user
-cp systemd/checkmate-watcher.service ~/.config/systemd/user/
-# adapter le chemin de l'executable si besoin
-ln -sf "$(pwd)/.venv/bin/checkmate-watcher" ~/.local/bin/checkmate-watcher
-systemctl --user import-environment DISPLAY WAYLAND_DISPLAY XDG_RUNTIME_DIR
-systemctl --user daemon-reload
-systemctl --user enable --now checkmate-watcher
-journalctl --user -u checkmate-watcher -f
+./scripts/install-service.sh
 ```
+
+Le script cree le lien dans `~/.local/bin`, installe l'unite systemd
+utilisateur, cree `~/.config/checkmate-watcher/env` pour le mot de passe, puis
+active et demarre le service. Il redemarre a chaque connexion.
+
+```bash
+# suivre les logs
+journalctl --user -u checkmate-watcher -f
+# arreter ou desactiver
+systemctl --user stop checkmate-watcher
+systemctl --user disable checkmate-watcher
+```
+
+Avec le planning active, le service demarre avec la session mais ne lance aucun
+navigateur avant le premier creneau de la journee.
 
 ## Plages horaires
 

@@ -6,6 +6,7 @@ PartOf=graphical-session.target
 [Service]
 Type=simple
 WorkingDirectory=%h
+EnvironmentFile=-%h/.config/checkmate-watcher/env
 ExecStart=%h/.local/bin/checkmate-watcher --config %h/.config/checkmate-watcher/config.toml run
 Restart=always
 RestartSec=10
