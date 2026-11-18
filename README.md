@@ -38,6 +38,8 @@ CheckMate est une extension Chrome conçue pour les apprenants et formateurs uti
 ## 🔔 Veille automatique (optionnel)
 Un script Python autonome dans [`watcher/`](watcher/) surveille CESAR en continu, rafraîchit la page et propose de signer dès que l'émargement s'ouvre, sans garder d'onglet ouvert. Voir [`watcher/README.md`](watcher/README.md).
 
+Un émulateur local indépendant dans [`emulator/`](emulator/) reproduit CESAR (connexion, bouton, canvas, confirmation) pour tester le watcher de bout en bout sans attendre un cours. Voir [`emulator/README.md`](emulator/README.md).
+
 ---
 
 ## 🚀 Installation

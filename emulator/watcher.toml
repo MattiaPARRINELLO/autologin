@@ -1,0 +1,31 @@
+# Configuration watcher pour l'emulateur CESAR local.
+# Copier vers ~/.config/checkmate-watcher/emulator.toml.
+
+[cesar]
+base_url = "http://127.0.0.1:8765"
+login_path = "/connexion"
+dashboard_path = "/"
+username = "demo"
+password = "demo"
+
+[watcher]
+poll_interval = 15
+dedupe_ttl = 3600
+confirm_timeout = 120
+auto_sign = false
+auto_sign_delay = 5
+# false pour voir le navigateur travailler, true pour un test rapide.
+headless = false
+# A renseigner si le Chromium de Playwright n'est pas installe.
+# executable_path = "/usr/bin/chromium"
+profile_dir = "~/.local/share/checkmate-watcher/emulator-profile"
+state_file = "~/.local/share/checkmate-watcher/emulator-state.json"
+
+[signature]
+file = "~/.config/checkmate-watcher/signature.json"
+padding_ratio = 0.9
+
+[notifications]
+app_name = "CheckMate (emulateur)"
+icon = "dialog-information"
+enabled = true

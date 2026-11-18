@@ -63,6 +63,10 @@ async def handle_signal(
             await asyncio.sleep(delay)
         return True
 
+    if not config.notifications.enabled:
+        logger.info("confirmations desactivees, signature refusee")
+        return False
+
     answer = await asyncio.to_thread(
         notify.ask,
         message,

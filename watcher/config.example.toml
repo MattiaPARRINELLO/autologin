@@ -35,6 +35,8 @@ padding_ratio = 0.9
 [notifications]
 app_name = "CheckMate"
 icon = "dialog-information"
+# false = aucune notification ni confirmation (utile pour les tests).
+enabled = true
 
 # Les selecteurs par defaut correspondent au site actuel.
 # A ne modifier que si CESAR change de structure.

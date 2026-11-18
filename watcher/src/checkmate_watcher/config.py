@@ -108,6 +108,7 @@ class SignatureConfig:
 class NotificationConfig:
     app_name: str = "CheckMate"
     icon: str = "dialog-information"
+    enabled: bool = True
 
 
 @dataclass(frozen=True)
@@ -209,6 +210,7 @@ def load_config(path: str | Path) -> Config:
     notifications = NotificationConfig(
         app_name=str(notification_table.get("app_name", "CheckMate")),
         icon=str(notification_table.get("icon", "dialog-information")),
+        enabled=bool(notification_table.get("enabled", True)),
     )
 
     selectors = Selectors.from_dict(selectors_table)

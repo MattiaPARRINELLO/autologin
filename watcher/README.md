@@ -105,8 +105,52 @@ journalctl --user -u checkmate-watcher -f
 - Si le site demande une validation supplementaire (2FA, captcha), la connexion
   automatique echouera et le script le signalera dans les logs.
 
-## Tests
+## Tester
+
+### 1. Sans rien toucher au vrai CESAR
+
+Un emulateur autonome vit dans [`../emulator/`](../emulator/) :
+
+```bash
+python3 emulator/server.py --port 8765
+```
+
+Puis, dans un autre terminal :
+
+```bash
+uv run checkmate-watcher --config ../emulator/watcher.toml run -v
+```
+
+Ouvre `http://127.0.0.1:8765/admin` et clique sur "Ouvrir l'emargement".
+Le cycle suivant doit detecter le bouton et proposer la signature. L'etat passe
+a "signe" dans l'admin.
+
+Test complet automatise (Chromium requis) :
+
+```bash
+CHECKMATE_E2E=1 uv run pytest tests/test_emulator_e2e.py -v
+```
+
+### 2. Contre le vrai CESAR, sans risque
+
+```bash
+uv run checkmate-watcher --config ~/.config/checkmate-watcher/config.toml run --once --dry-run -v
+```
+
+Le mode `--dry-run` se connecte, rafraichit et affiche s'il trouve un bouton,
+sans notifier ni signer.
+
+### 3. Verification des briques
+
+```bash
+uv run checkmate-watcher --config ~/.config/checkmate-watcher/config.toml check-config
+uv run checkmate-watcher --config ~/.config/checkmate-watcher/config.toml test-notification
+uv run checkmate-watcher --config ~/.config/checkmate-watcher/config.toml capture
+```
+
+### 4. Tests unitaires
 
 ```bash
 uv run pytest
 ```
+
