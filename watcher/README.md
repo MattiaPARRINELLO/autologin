@@ -112,7 +112,7 @@ journalctl --user -u checkmate-watcher -f
 Un emulateur autonome vit dans [`../emulator/`](../emulator/) :
 
 ```bash
-python3 emulator/server.py --port 8765
+python3 emulator/server.py --port 8787
 ```
 
 Puis, dans un autre terminal :
@@ -121,7 +121,7 @@ Puis, dans un autre terminal :
 uv run checkmate-watcher --config ../emulator/watcher.toml run -v
 ```
 
-Ouvre `http://127.0.0.1:8765/admin` et clique sur "Ouvrir l'emargement".
+Ouvre `http://127.0.0.1:8787/admin` et clique sur "Ouvrir l'emargement".
 Le cycle suivant doit detecter le bouton et proposer la signature. L'etat passe
 a "signe" dans l'admin.
 

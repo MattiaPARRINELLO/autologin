@@ -14,8 +14,10 @@ Puis configurer le watcher avec base_url = "http://127.0.0.1:8765".
 from __future__ import annotations
 
 import argparse
+import errno
 import json
 import secrets
+import sys
 import threading
 import time
 from dataclasses import dataclass
@@ -503,7 +505,12 @@ def main() -> int:
 
     parser = argparse.ArgumentParser(description="Emulateur local de CESAR Emineo")
     parser.add_argument("--host", default="127.0.0.1")
-    parser.add_argument("--port", type=int, default=8765)
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=8787,
+        help="port d'ecoute (0 = port libre choisi automatiquement)",
+    )
     parser.add_argument("--username", default="demo")
     parser.add_argument("--password", default="demo")
     parser.add_argument(
@@ -517,13 +524,31 @@ def main() -> int:
     if args.open:
         EMULATOR.open_attendance()
 
-    server = ThreadingHTTPServer((args.host, args.port), Handler)
+    try:
+        server = ThreadingHTTPServer((args.host, args.port), Handler)
+    except OSError as exc:
+        if exc.errno == errno.EADDRINUSE:
+            print(f"Port {args.port} deja utilise sur {args.host}.", file=sys.stderr)
+            print("Verifie qui l'occupe :", file=sys.stderr)
+            print(f"  ss -ltnp 'sport = :{args.port}'", file=sys.stderr)
+            print("Ou prends un autre port :", file=sys.stderr)
+            print(
+                f"  python3 emulator/server.py --port {args.port + 1}", file=sys.stderr
+            )
+            print("Ou laisse le systeme en choisir un :", file=sys.stderr)
+            print("  python3 emulator/server.py --port 0", file=sys.stderr)
+            return 1
+        raise
+
     base = f"http://{args.host}:{server.server_address[1]}"
-    print(f"Emulateur CESAR demarre sur {base}")
-    print(f"  connexion : {base}/connexion ({args.username} / {args.password})")
-    print(f"  admin     : {base}/admin")
-    print(f"  etat      : {base}/api/state")
-    print(f'  watcher   : base_url = "{base}"')
+    print(f"Emulateur CESAR demarre sur {base}", flush=True)
+    print(
+        f"  connexion : {base}/connexion ({args.username} / {args.password})",
+        flush=True,
+    )
+    print(f"  admin     : {base}/admin", flush=True)
+    print(f"  etat      : {base}/api/state", flush=True)
+    print(f'  watcher   : base_url = "{base}"', flush=True)
     started = time.time()
     try:
         server.serve_forever()

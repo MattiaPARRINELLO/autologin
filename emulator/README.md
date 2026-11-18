@@ -6,7 +6,7 @@ comme si c'etait le vrai site. Il ne fait aucun appel reseau.
 ## Lancer
 
 ```bash
-python3 emulator/server.py --port 8765
+python3 emulator/server.py --port 8787
 ```
 
 Identifiants par defaut : `demo` / `demo`.
@@ -36,7 +36,7 @@ cd watcher && uv run checkmate-watcher --config ~/.config/checkmate-watcher/emul
 uv run checkmate-watcher --config ~/.config/checkmate-watcher/emulator.toml run -v
 ```
 
-Puis ouvre `http://127.0.0.1:8765/admin` et clique sur "Ouvrir l'emargement".
+Puis ouvre `http://127.0.0.1:8787/admin` et clique sur "Ouvrir l'emargement".
 Au cycle suivant, le watcher detecte le bouton, affiche la notification, et si
 tu acceptes, signe dans le canvas. L'etat passe a "signe" dans `/admin`.
 

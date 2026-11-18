@@ -2,7 +2,7 @@
 # Copier vers ~/.config/checkmate-watcher/emulator.toml.
 
 [cesar]
-base_url = "http://127.0.0.1:8765"
+base_url = "http://127.0.0.1:8787"
 login_path = "/connexion"
 dashboard_path = "/"
 username = "demo"
