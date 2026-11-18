@@ -10,6 +10,7 @@ import sys
 from pathlib import Path
 
 from . import __version__, notify
+from .browser import missing_browser_message, resolve_executable
 from .config import Config, ConfigError, load_config
 from .signature import SignatureError, load_signature, parse_points, save_signature
 from .watcher import run_loop
@@ -184,7 +185,15 @@ async def command_capture(config: Config) -> int:
 
     print("Ouverture de la fenetre de capture...")
     async with async_playwright() as playwright:
-        browser = await playwright.chromium.launch(headless=False)
+        executable = resolve_executable(playwright.chromium, config)
+        options = {"executable_path": executable} if executable else {}
+        try:
+            browser = await playwright.chromium.launch(headless=False, **options)
+        except Exception as exc:
+            if "Executable doesn't exist" in str(exc):
+                print(missing_browser_message())
+                return 1
+            raise
         page = await browser.new_page(viewport={"width": 900, "height": 640})
         await page.set_content(CAPTURE_HTML)
         try:

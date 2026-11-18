@@ -10,6 +10,7 @@ import unicodedata
 from dataclasses import dataclass
 from datetime import date
 
+from .browser import resolve_executable
 from .config import Config
 from .signature import FittedPoint, Point, fit_points
 
@@ -76,16 +77,14 @@ class CesarSession:
 
         self.config.watcher.profile_dir.mkdir(parents=True, exist_ok=True)
         self._playwright = await async_playwright().start()
+        executable = resolve_executable(self._playwright.chromium, self.config)
+        options = {"executable_path": executable} if executable else {}
         self._context = await self._playwright.chromium.launch_persistent_context(
             user_data_dir=str(self.config.watcher.profile_dir),
             headless=self.config.watcher.headless,
             viewport={"width": 1366, "height": 900},
             args=["--no-first-run", "--no-default-browser-check"],
-            **(
-                {"executable_path": self.config.watcher.executable_path}
-                if self.config.watcher.executable_path
-                else {}
-            ),
+            **options,
         )
         self._context.set_default_timeout(20000)
         pages = self._context.pages
