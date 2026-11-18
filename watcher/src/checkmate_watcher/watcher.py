@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from datetime import datetime, timedelta
 
 from . import notify
 from .cesar import (
@@ -30,6 +31,9 @@ DRY_RUN = "dry_run"
 async def _send(
     config: Config, title: str, message: str, *, icon: str, urgency: str = "critical"
 ) -> bool:
+    if not config.notifications.enabled:
+        logger.debug("notification desactivee : %s", title)
+        return False
     return await asyncio.to_thread(
         notify.send,
         title,
@@ -100,8 +104,8 @@ async def handle_signal(
         return SIGN
 
     if not config.notifications.enabled:
-        logger.info("confirmations desactivees, signature refusee")
-        return False
+        logger.info("confirmations desactivees, aucune signature envoyee")
+        return NO_ANSWER
 
     answer = await asyncio.to_thread(
         notify.ask,
@@ -155,14 +159,90 @@ async def run_loop(
 
     state = StateStore(config.watcher.state_file, ttl=config.watcher.dedupe_ttl)
     session = CesarSession(config)
-    await session.open(
-        headless=True if config.watcher.visible_on_sign else config.watcher.headless
-    )
+    poll_headless = True if config.watcher.visible_on_sign else config.watcher.headless
+    schedule = config.schedule
+
+    if schedule.enabled:
+        now = datetime.now()
+        if schedule.active_window(now) is None:
+            wait = schedule.seconds_until_next(now)
+            resume = now + timedelta(seconds=wait)
+            if once:
+                logger.info(
+                    "hors plage de surveillance, prochaine ouverture %s",
+                    resume.strftime("%d/%m %H:%M"),
+                )
+                return 0
+            logger.info(
+                "hors plage (%s), reprise vers %s",
+                schedule.describe(),
+                resume.strftime("%d/%m %H:%M"),
+            )
+            await asyncio.sleep(wait)
+            now = datetime.now()
+
+        current_key = schedule.window_key(now)
+        if current_key and state.window_done(current_key):
+            wait = schedule.seconds_until_next(now)
+            resume = now + timedelta(seconds=wait)
+            if once:
+                logger.info(
+                    "creneau deja signe, prochaine ouverture %s",
+                    resume.strftime("%d/%m %H:%M"),
+                )
+                return 0
+            logger.info(
+                "deja signe sur ce creneau, pause jusqu'a %s",
+                resume.strftime("%d/%m %H:%M"),
+            )
+            await asyncio.sleep(wait)
+
+    await session.open(headless=poll_headless)
 
     consecutive_errors = 0
     prompt_cooldowns: dict[str, float] = {}
+    window_key: str | None = None
     try:
         while True:
+            if schedule.enabled:
+                now = datetime.now()
+                if schedule.active_window(now) is None:
+                    wait = schedule.seconds_until_next(now)
+                    resume = now + timedelta(seconds=wait)
+                    if once:
+                        logger.info(
+                            "hors plage, prochaine ouverture %s",
+                            resume.strftime("%d/%m %H:%M"),
+                        )
+                        return 0
+                    logger.info(
+                        "fin de plage, pause jusqu'a %s",
+                        resume.strftime("%d/%m %H:%M"),
+                    )
+                    await session.close()
+                    await asyncio.sleep(wait)
+                    await session.open(headless=poll_headless)
+                    continue
+
+                window_key = schedule.window_key(now)
+                if window_key and state.window_done(window_key):
+                    wait = schedule.seconds_until_next(now)
+                    resume = now + timedelta(seconds=wait)
+                    if once:
+                        logger.info(
+                            "creneau deja signe, prochaine ouverture %s",
+                            resume.strftime("%d/%m %H:%M"),
+                        )
+                        return 0
+                    logger.info(
+                        "deja signe sur ce creneau, pause jusqu'a %s",
+                        resume.strftime("%d/%m %H:%M"),
+                    )
+                    await session.close()
+                    await asyncio.sleep(wait)
+                    await session.open(headless=poll_headless)
+                    continue
+
             try:
                 signal = await session.check()
                 consecutive_errors = 0
@@ -211,6 +291,8 @@ async def run_loop(
                             )
                         else:
                             state.mark(signal.key)
+                            if window_key:
+                                state.mark_window(window_key)
                             if is_success_confirmation(confirmation):
                                 logger.info("presence signee : %s", confirmation)
                                 await _send(

@@ -22,19 +22,21 @@ def _require(tool: str) -> str:
     return path
 
 
-def send(
+def _gvariant(value: str) -> str:
+    escaped = value.replace("\\", "\\\\").replace("'", "\\'")
+    return f"'{escaped}'"
+
+
+def _send_notify_send(
     title: str,
     message: str,
     *,
-    app_name: str = "CheckMate",
-    icon: str = "dialog-information",
-    urgency: str = "critical",
+    app_name: str,
+    icon: str,
+    urgency: str,
 ) -> bool:
-    """Affiche une notification desktop. Renvoie False si l'envoi echoue."""
-    try:
-        binary = _require("notify-send")
-    except NotificationError as exc:
-        logger.warning("notification impossible : %s", exc)
+    binary = shutil.which("notify-send")
+    if not binary:
         return False
 
     command = [
@@ -50,7 +52,11 @@ def send(
     ]
     try:
         result = subprocess.run(
-            command, check=False, timeout=15, capture_output=True, text=True
+            command,
+            check=False,
+            timeout=15,
+            capture_output=True,
+            text=True,
         )
     except (OSError, subprocess.SubprocessError) as exc:
         logger.warning("notify-send a echoue : %s", exc)
@@ -58,10 +64,83 @@ def send(
 
     if result.returncode != 0:
         logger.warning(
-            "notify-send code %s : %s", result.returncode, result.stderr.strip()
+            "notify-send code %s : %s",
+            result.returncode,
+            (result.stderr or result.stdout).strip(),
         )
         return False
     return True
+
+
+def _send_gdbus(
+    title: str,
+    message: str,
+    *,
+    app_name: str,
+    icon: str,
+) -> bool:
+    """Fallback D-Bus quand notify-send est casse (libnotify incompatible)."""
+    binary = shutil.which("gdbus")
+    if not binary:
+        return False
+
+    command = [
+        binary,
+        "call",
+        "--session",
+        "--dest",
+        "org.freedesktop.Notifications",
+        "--object-path",
+        "/org/freedesktop/Notifications",
+        "--method",
+        "org.freedesktop.Notifications.Notify",
+        _gvariant(app_name),
+        "0",
+        _gvariant(icon),
+        _gvariant(title),
+        _gvariant(message),
+        "[]",
+        "{}",
+        "5000",
+    ]
+    try:
+        result = subprocess.run(
+            command,
+            check=False,
+            timeout=15,
+            capture_output=True,
+            text=True,
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        logger.warning("gdbus a echoue : %s", exc)
+        return False
+
+    if result.returncode != 0:
+        logger.warning("gdbus code %s : %s", result.returncode, result.stderr.strip())
+        return False
+    return True
+
+
+def send(
+    title: str,
+    message: str,
+    *,
+    app_name: str = "CheckMate",
+    icon: str = "dialog-information",
+    urgency: str = "critical",
+) -> bool:
+    """Affiche une notification desktop. Renvoie False si l'envoi echoue."""
+    if _send_notify_send(
+        title,
+        message,
+        app_name=app_name,
+        icon=icon,
+        urgency=urgency,
+    ):
+        return True
+
+    logger.info("notify-send indisponible, tentative via D-Bus")
+    return _send_gdbus(title, message, app_name=app_name, icon=icon)
 
 
 def ask(

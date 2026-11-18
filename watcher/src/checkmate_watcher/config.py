@@ -4,8 +4,17 @@ from __future__ import annotations
 
 import os
 import tomllib
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
+
+from .schedule import (
+    DEFAULT_DAYS,
+    DEFAULT_WINDOWS,
+    Schedule,
+    ScheduleError,
+    parse_days,
+    parse_windows,
+)
 
 
 class ConfigError(Exception):
@@ -120,6 +129,7 @@ class Config:
     signature: SignatureConfig
     notifications: NotificationConfig
     selectors: Selectors
+    schedule: Schedule = field(default_factory=Schedule)
 
 
 def _require(table: dict, key: str, table_name: str) -> str:
@@ -155,6 +165,7 @@ def load_config(path: str | Path) -> Config:
     signature_table = data.get("signature", {})
     notification_table = data.get("notifications", {})
     selectors_table = data.get("selectors", {})
+    schedule_table = data.get("schedule", {})
 
     if not isinstance(cesar_table, dict):
         raise ConfigError("[cesar] doit etre une table TOML")
@@ -219,6 +230,15 @@ def load_config(path: str | Path) -> Config:
 
     selectors = Selectors.from_dict(selectors_table)
 
+    try:
+        schedule = Schedule(
+            enabled=bool(schedule_table.get("enabled", False)),
+            days=parse_days(schedule_table.get("days", DEFAULT_DAYS)),
+            windows=parse_windows(schedule_table.get("windows", DEFAULT_WINDOWS)),
+        )
+    except ScheduleError as exc:
+        raise ConfigError(f"[schedule] {exc}") from exc
+
     if watcher.poll_interval < 15:
         raise ConfigError("[watcher] poll_interval doit etre >= 15 secondes")
     if watcher.confirm_timeout < 10:
@@ -234,4 +254,5 @@ def load_config(path: str | Path) -> Config:
         signature=signature,
         notifications=notifications,
         selectors=selectors,
+        schedule=schedule,
     )

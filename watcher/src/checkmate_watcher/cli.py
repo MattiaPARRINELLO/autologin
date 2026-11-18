@@ -168,6 +168,7 @@ def command_check_config(config: Config) -> int:
     print(f"  Nouvelle demande : {config.watcher.prompt_retry}s")
     print(f"  Auto-signature : {config.watcher.auto_sign}")
     print(f"  Visible a la signature : {config.watcher.visible_on_sign}")
+    print(f"  Plages         : {config.schedule.describe()}")
     print(f"  Profil         : {config.watcher.profile_dir}")
     print(f"  Etat           : {config.watcher.state_file}")
     print(f"  Signature      : {config.signature.file}")

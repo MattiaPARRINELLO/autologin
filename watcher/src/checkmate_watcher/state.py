@@ -15,6 +15,7 @@ class StateStore:
         self.path = path
         self.ttl = ttl
         self._signals: dict[str, float] = {}
+        self._windows: dict[str, float] = {}
         self._load()
 
     def _load(self) -> None:
@@ -32,10 +33,17 @@ class StateStore:
                 for key, value in signals.items()
                 if isinstance(value, (int, float))
             }
+        windows = data.get("windows") if isinstance(data, dict) else None
+        if isinstance(windows, dict):
+            self._windows = {
+                str(key): float(value)
+                for key, value in windows.items()
+                if isinstance(value, (int, float))
+            }
 
     def _save(self) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        payload = {"signals": self._signals}
+        payload = {"signals": self._signals, "windows": self._windows}
         tmp = self.path.with_suffix(".tmp")
         tmp.write_text(
             json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8"
@@ -64,4 +72,16 @@ class StateStore:
     def mark(self, key: str, now: float | None = None) -> None:
         self._signals[key] = time.time() if now is None else now
         self.prune(now)
+        self._save()
+
+    def window_done(self, key: str) -> bool:
+        return key in self._windows
+
+    def mark_window(self, key: str, now: float | None = None) -> None:
+        current = time.time() if now is None else now
+        self._windows[key] = current
+        # Un creneau signe ne sert plus apres une semaine.
+        for old_key, timestamp in list(self._windows.items()):
+            if current - timestamp > 7 * 24 * 3600:
+                del self._windows[old_key]
         self._save()

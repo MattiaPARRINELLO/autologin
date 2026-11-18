@@ -8,6 +8,13 @@ dashboard_path = "/"
 username = "demo"
 password = "demo"
 
+# Desactive pour pouvoir tester a n'importe quelle heure.
+# Mets enabled = true avec une plage couvrant maintenant pour tester le planning.
+[schedule]
+enabled = false
+days = ["mon", "tue", "wed", "thu", "fri"]
+windows = ["09:00-12:00", "13:30-16:30"]
+
 [watcher]
 poll_interval = 15
 dedupe_ttl = 3600

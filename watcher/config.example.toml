@@ -10,6 +10,13 @@ username = "ton.identifiant"
 password_env = "CHECKMATE_PASSWORD"
 # password = "motdepasse-en-clair"
 
+[schedule]
+# Surveillance limitee aux creneaux de cours. Une fois signe sur un creneau,
+# le script ne verifie plus rien jusqu'au creneau suivant.
+enabled = true
+days = ["mon", "tue", "wed", "thu", "fri"]
+windows = ["09:00-12:00", "13:30-16:30"]
+
 [watcher]
 # Le bouton n'apparait qu'apres un rafraichissement : la page est rechargee
 # a chaque cycle. 60 s est un bon compromis, 30 s pour etre plus reactif.

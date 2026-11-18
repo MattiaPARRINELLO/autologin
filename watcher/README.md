@@ -84,6 +84,26 @@ systemctl --user enable --now checkmate-watcher
 journalctl --user -u checkmate-watcher -f
 ```
 
+## Plages horaires
+
+La surveillance ne tourne que sur les creneaux de cours :
+
+```toml
+[schedule]
+enabled = true
+days = ["mon", "tue", "wed", "thu", "fri"]
+windows = ["09:00-12:00", "13:30-16:30"]
+```
+
+- hors plage : aucune verification, le navigateur est ferme, reprise pile au
+  debut du creneau suivant
+- une fois la presence signee dans un creneau, plus aucune verification jusqu'au
+  creneau suivant (memoire persistante, meme apres un redemarrage)
+- un emargement manque ou refuse n'empeche pas de reessayer dans le meme creneau
+- `--once` hors plage se contente d'afficher la prochaine ouverture et sort
+
+Pour desactivee completement le planning : `enabled = false`.
+
 ## Comportement
 
 - Surveillance invisible : le navigateur reste en mode headless pendant l'attente,
@@ -102,6 +122,8 @@ journalctl --user -u checkmate-watcher -f
   traite : la demande revient apres `prompt_retry` (300 s par defaut).
 - Repondre "Absent" marque l'emargement comme traite pour la duree du TTL.
 - Trois erreurs consecutives declenchent un redemarrage du navigateur.
+- Si `notify-send` est casse sur la machine, les notifications basculent
+  automatiquement sur D-Bus (`gdbus`).
 
 ## Limites
 
