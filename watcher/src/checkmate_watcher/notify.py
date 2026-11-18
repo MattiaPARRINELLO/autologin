@@ -93,7 +93,13 @@ def ask(
         "--width=520",
     ]
     try:
-        result = subprocess.run(command, check=False, timeout=timeout + 15)
+        result = subprocess.run(
+            command,
+            check=False,
+            timeout=timeout + 15,
+            capture_output=True,
+            text=True,
+        )
     except (OSError, subprocess.SubprocessError) as exc:
         logger.warning("zenity a echoue : %s", exc)
         return None
@@ -102,5 +108,10 @@ def ask(
         return True
     if result.returncode == ZENITY_TIMEOUT_CODE:
         logger.info("confirmation expiree apres %ss", timeout)
+        return None
+
+    stderr = (result.stderr or "").strip()
+    if stderr:
+        logger.warning("zenity n'a pas pu afficher la confirmation : %s", stderr)
         return None
     return False

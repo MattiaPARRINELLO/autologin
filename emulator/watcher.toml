@@ -12,6 +12,7 @@ password = "demo"
 poll_interval = 15
 dedupe_ttl = 3600
 confirm_timeout = 120
+prompt_retry = 60
 auto_sign = false
 auto_sign_delay = 5
 # Surveillance invisible ; une fenetre s'ouvre seulement pour signer.

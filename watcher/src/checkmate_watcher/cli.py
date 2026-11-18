@@ -128,7 +128,13 @@ def build_parser() -> argparse.ArgumentParser:
         "command",
         nargs="?",
         default="run",
-        choices=["run", "capture", "test-notification", "check-config"],
+        choices=[
+            "run",
+            "capture",
+            "test-notification",
+            "check-config",
+            "reset-state",
+        ],
     )
     parser.add_argument(
         "--config", default=DEFAULT_CONFIG, help="chemin du fichier TOML"
@@ -159,6 +165,7 @@ def command_check_config(config: Config) -> int:
     print(f"  Intervalle     : {config.watcher.poll_interval}s")
     print(f"  Deduplication  : {config.watcher.dedupe_ttl}s")
     print(f"  Confirmation   : {config.watcher.confirm_timeout}s")
+    print(f"  Nouvelle demande : {config.watcher.prompt_retry}s")
     print(f"  Auto-signature : {config.watcher.auto_sign}")
     print(f"  Visible a la signature : {config.watcher.visible_on_sign}")
     print(f"  Profil         : {config.watcher.profile_dir}")
@@ -252,6 +259,14 @@ def main(argv: list[str] | None = None) -> int:
         return command_check_config(config)
     if args.command == "test-notification":
         return command_test_notification(config)
+    if args.command == "reset-state":
+        path = config.watcher.state_file
+        if path.is_file():
+            path.unlink()
+            print(f"Etat reinitialise : {path}")
+        else:
+            print(f"Aucun etat a supprimer : {path}")
+        return 0
     if args.command == "capture":
         return asyncio.run(command_capture(config))
 

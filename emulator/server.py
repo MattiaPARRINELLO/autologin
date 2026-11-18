@@ -39,10 +39,11 @@ class AttendanceState:
 
 
 class Emulator:
-    def __init__(self, username: str, password: str, token: str) -> None:
+    def __init__(self, username: str, password: str, token: str, run_id: str) -> None:
         self.username = username
         self.password = password
         self.token = token
+        self.run_id = run_id
         self.lock = threading.Lock()
         self.state = AttendanceState()
 
@@ -241,7 +242,7 @@ def render_login(error: bool = False) -> bytes:
     return render_page("CESAR - connexion", body)
 
 
-def render_dashboard(state: AttendanceState) -> bytes:
+def render_dashboard(state: AttendanceState, run_id: str) -> bytes:
     if state.signed:
         attendance = (
             '<div class="card"><p class="status open">Presence signee</p>'
@@ -254,7 +255,7 @@ def render_dashboard(state: AttendanceState) -> bytes:
 <div class="card">
   <p class="status open">Emargement ouvert</p>
   <p class="muted">Session {state.session_id}. Le formateur attend ta signature.</p>
-  <button class="buttonPresent success" data-live-action-param="session-{state.session_id}"
+  <button class="buttonPresent success" data-live-action-param="session-{state.session_id}-{run_id}"
           style="margin-top:12px">Signer ma presence</button>
 </div>
 """
@@ -439,7 +440,7 @@ class Handler(BaseHTTPRequestHandler):
             if not self.is_authenticated():
                 self.redirect("/connexion")
                 return
-            self.send_html(render_dashboard(self.emulator.state))
+            self.send_html(render_dashboard(self.emulator.state, self.emulator.run_id))
             return
 
         self.send_html(b"<h1>404</h1>", status=404)
@@ -520,7 +521,12 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    EMULATOR = Emulator(args.username, args.password, secrets.token_urlsafe(24))
+    EMULATOR = Emulator(
+        args.username,
+        args.password,
+        secrets.token_urlsafe(24),
+        secrets.token_hex(3),
+    )
     if args.open:
         EMULATOR.open_attendance()
 

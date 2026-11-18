@@ -21,6 +21,11 @@ logger = logging.getLogger(__name__)
 
 MAX_CONSECUTIVE_ERRORS = 3
 
+SIGN = "sign"
+ABSENT = "absent"
+NO_ANSWER = "no_answer"
+DRY_RUN = "dry_run"
+
 
 async def _send(
     config: Config, title: str, message: str, *, icon: str, urgency: str = "critical"
@@ -66,8 +71,8 @@ async def handle_signal(
     *,
     dry_run: bool,
     auto: bool,
-) -> bool:
-    """Notifie et, si l'utilisateur accepte, signe. Renvoie True si signe."""
+) -> str:
+    """Notifie et renvoie la decision : sign, absent, no_answer ou dry_run."""
     message = (
         f"{signal.label}\n\n"
         "Une fenetre de confirmation s'ouvre. Choisis 'Je suis present' "
@@ -76,7 +81,7 @@ async def handle_signal(
 
     if dry_run:
         logger.info("[dry-run] emargement detecte : %s", signal.label)
-        return False
+        return DRY_RUN
 
     await _send(config, "Emargement ouvert", message, icon=config.notifications.icon)
 
@@ -92,7 +97,7 @@ async def handle_signal(
         )
         if delay:
             await asyncio.sleep(delay)
-        return True
+        return SIGN
 
     if not config.notifications.enabled:
         logger.info("confirmations desactivees, signature refusee")
@@ -106,7 +111,7 @@ async def handle_signal(
     )
     if answer is True:
         logger.info("utilisateur present : signature demandee")
-        return True
+        return SIGN
     if answer is False:
         logger.info("utilisateur absent : aucune signature")
         await _send(
@@ -116,16 +121,17 @@ async def handle_signal(
             icon=config.notifications.icon,
             urgency="normal",
         )
-    else:
-        logger.info("aucune reponse a la confirmation")
-        await _send(
-            config,
-            "Emargement en attente",
-            "Pas de reponse. Aucune signature envoyee.",
-            icon=config.notifications.icon,
-            urgency="normal",
-        )
-    return False
+        return ABSENT
+
+    logger.info("aucune reponse a la confirmation, nouvelle tentative plus tard")
+    await _send(
+        config,
+        "Emargement en attente",
+        "Pas de reponse. Une nouvelle demande sera faite dans quelques minutes.",
+        icon=config.notifications.icon,
+        urgency="normal",
+    )
+    return NO_ANSWER
 
 
 async def run_loop(
@@ -154,6 +160,7 @@ async def run_loop(
     )
 
     consecutive_errors = 0
+    prompt_cooldowns: dict[str, float] = {}
     try:
         while True:
             try:
@@ -164,17 +171,27 @@ async def run_loop(
                     logger.debug("rien a signer")
                 elif state.seen(signal.key):
                     logger.debug("emargement deja traite : %s", signal.key)
+                elif (
+                    prompt_cooldowns.get(signal.key, 0)
+                    > asyncio.get_running_loop().time()
+                ):
+                    logger.debug("nouvelle demande en attente pour %s", signal.key)
                 else:
-                    accepted = await handle_signal(
+                    decision = await handle_signal(
                         config,
                         signal,
                         dry_run=dry_run,
                         auto=auto,
                     )
-                    if dry_run:
+                    if decision == DRY_RUN:
                         pass
-                    elif not accepted:
+                    elif decision == ABSENT:
                         state.mark(signal.key)
+                    elif decision == NO_ANSWER:
+                        prompt_cooldowns[signal.key] = (
+                            asyncio.get_running_loop().time()
+                            + config.watcher.prompt_retry
+                        )
                     else:
                         try:
                             confirmation = await sign_with_visibility(
@@ -182,6 +199,10 @@ async def run_loop(
                             )
                         except CesarError as exc:
                             logger.error("echec de la signature : %s", exc)
+                            prompt_cooldowns[signal.key] = (
+                                asyncio.get_running_loop().time()
+                                + config.watcher.prompt_retry
+                            )
                             await _send(
                                 config,
                                 "Echec du pointage",

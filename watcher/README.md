@@ -98,6 +98,9 @@ journalctl --user -u checkmate-watcher -f
 - Sur "Present" : clic, tracé de la signature au clavier/souris Playwright,
   validation, lecture de la confirmation.
 - Deduplication par identifiant d'emargement et date, TTL configurable.
+- Si personne ne repond a la confirmation, l'emargement n'est pas marque comme
+  traite : la demande revient apres `prompt_retry` (300 s par defaut).
+- Repondre "Absent" marque l'emargement comme traite pour la duree du TTL.
 - Trois erreurs consecutives declenchent un redemarrage du navigateur.
 
 ## Limites
@@ -151,7 +154,11 @@ sans notifier ni signer.
 uv run checkmate-watcher --config ~/.config/checkmate-watcher/config.toml check-config
 uv run checkmate-watcher --config ~/.config/checkmate-watcher/config.toml test-notification
 uv run checkmate-watcher --config ~/.config/checkmate-watcher/config.toml capture
+uv run checkmate-watcher --config ~/.config/checkmate-watcher/config.toml reset-state
 ```
+
+`reset-state` efface la memoire des emargements deja traites, utile apres un test
+ou un redemarrage de l'emulateur.
 
 ### 4. Tests unitaires
 

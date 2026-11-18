@@ -18,6 +18,8 @@ poll_interval = 60
 dedupe_ttl = 3600
 # Temps laisse pour repondre a la fenetre de confirmation.
 confirm_timeout = 180
+# Delai avant de reproposer la signature si personne n'a repondu.
+prompt_retry = 300
 # true = signature sans demander (delai ci-dessous).
 auto_sign = false
 auto_sign_delay = 20

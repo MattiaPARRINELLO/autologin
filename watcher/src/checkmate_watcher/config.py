@@ -90,6 +90,7 @@ class WatcherConfig:
     poll_interval: int = 60
     dedupe_ttl: int = 3600
     confirm_timeout: int = 180
+    prompt_retry: int = 300
     auto_sign: bool = False
     auto_sign_delay: int = 20
     headless: bool = False
@@ -173,6 +174,7 @@ def load_config(path: str | Path) -> Config:
         poll_interval=int(watcher_table.get("poll_interval", 60)),
         dedupe_ttl=int(watcher_table.get("dedupe_ttl", 3600)),
         confirm_timeout=int(watcher_table.get("confirm_timeout", 180)),
+        prompt_retry=int(watcher_table.get("prompt_retry", 300)),
         auto_sign=bool(watcher_table.get("auto_sign", False)),
         auto_sign_delay=int(watcher_table.get("auto_sign_delay", 20)),
         headless=bool(watcher_table.get("headless", False)),
@@ -221,6 +223,8 @@ def load_config(path: str | Path) -> Config:
         raise ConfigError("[watcher] poll_interval doit etre >= 15 secondes")
     if watcher.confirm_timeout < 10:
         raise ConfigError("[watcher] confirm_timeout doit etre >= 10 secondes")
+    if watcher.prompt_retry < 30:
+        raise ConfigError("[watcher] prompt_retry doit etre >= 30 secondes")
     if not 0.1 <= signature.padding_ratio <= 1.0:
         raise ConfigError("[signature] padding_ratio doit etre entre 0.1 et 1.0")
 
