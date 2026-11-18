@@ -1,0 +1,45 @@
+# Configuration CheckMate watcher
+# Copier vers ~/.config/checkmate-watcher/config.toml puis chmod 600.
+
+[cesar]
+base_url = "https://cesar.emineo-education.fr"
+login_path = "/connexion"
+dashboard_path = "/"
+username = "ton.identifiant"
+# Recommande : garde le mot de passe hors du fichier
+password_env = "CHECKMATE_PASSWORD"
+# password = "motdepasse-en-clair"
+
+[watcher]
+# Le bouton n'apparait qu'apres un rafraichissement : la page est rechargee
+# a chaque cycle. 60 s est un bon compromis, 30 s pour etre plus reactif.
+poll_interval = 60
+# Duree pendant laquelle un emargement deja traite n'est pas renotifie.
+dedupe_ttl = 3600
+# Temps laisse pour repondre a la fenetre de confirmation.
+confirm_timeout = 180
+# true = signature sans demander (delai ci-dessous).
+auto_sign = false
+auto_sign_delay = 20
+# false = navigateur visible, utile pour la premiere connexion.
+headless = false
+# Facultatif : utiliser un Chromium deja installe plutot que celui de Playwright.
+# executable_path = "/usr/bin/chromium"
+profile_dir = "~/.local/share/checkmate-watcher/profile"
+state_file = "~/.local/share/checkmate-watcher/state.json"
+
+[signature]
+file = "~/.config/checkmate-watcher/signature.json"
+padding_ratio = 0.9
+
+[notifications]
+app_name = "CheckMate"
+icon = "dialog-information"
+
+# Les selecteurs par defaut correspondent au site actuel.
+# A ne modifier que si CESAR change de structure.
+# [selectors]
+# attendance_button = ["button.buttonPresent"]
+# signature_canvas = ["canvas[data-written-signature-target='canvas']"]
+# signature_save = ["button[data-live-action-param='signed']"]
+# confirmation = [".swal2-html-container"]

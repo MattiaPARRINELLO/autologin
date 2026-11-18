@@ -1,0 +1,44 @@
+from __future__ import annotations
+
+from checkmate_watcher.cesar import is_success_confirmation, signal_key
+from checkmate_watcher.state import StateStore
+
+
+def test_signal_key_est_stable_et_sensible_au_cours():
+    payload = {"action": "1234", "row": "Maths 10h", "label": "Signer"}
+    assert signal_key(payload) == signal_key(dict(payload))
+    autre = {"action": "5678", "row": "Maths 10h", "label": "Signer"}
+    assert signal_key(payload) != signal_key(autre)
+
+
+def test_signal_key_ignore_les_espaces_superflus():
+    a = {"action": "", "row": "Maths   10h", "label": " Signer "}
+    b = {"action": "", "row": "Maths 10h", "label": "Signer"}
+    assert signal_key(a) == signal_key(b)
+
+
+def test_is_success_confirmation():
+    assert is_success_confirmation("Votre presence a bien ete prise en compte")
+    assert is_success_confirmation("Présence enregistrée")
+    assert not is_success_confirmation("Une erreur est survenue")
+
+
+def test_state_deduplique_puis_expire(tmp_path):
+    path = tmp_path / "state.json"
+    store = StateStore(path, ttl=60)
+    assert not store.seen("abc", now=1000)
+    store.mark("abc", now=1000)
+    assert store.seen("abc", now=1030)
+    assert not store.seen("abc", now=1061)
+
+    reloaded = StateStore(path, ttl=60)
+    assert reloaded.seen("abc", now=1030)
+
+
+def test_state_ignore_un_fichier_corrompu(tmp_path):
+    path = tmp_path / "state.json"
+    path.write_text("pas du json", encoding="utf-8")
+    store = StateStore(path, ttl=60)
+    assert not store.seen("abc")
+    store.mark("abc")
+    assert path.is_file()
