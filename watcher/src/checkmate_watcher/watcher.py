@@ -22,6 +22,8 @@ logger = logging.getLogger(__name__)
 
 MAX_CONSECUTIVE_ERRORS = 3
 
+MAX_WAIT_CHUNK = 300.0
+
 SIGN = "sign"
 ABSENT = "absent"
 NO_ANSWER = "no_answer"
@@ -42,6 +44,23 @@ async def _send(
         icon=icon,
         urgency=urgency,
     )
+
+
+async def _wait_for_new_window(schedule, current_key: str | None) -> None:
+    """Attend un changement de creneau, par tranches de 5 minutes.
+
+    Les tranches evitent de rater la reprise apres une mise en veille : un
+    asyncio.sleep long ne tient pas compte du temps de suspension.
+    """
+    while True:
+        now = datetime.now()
+        if current_key is None:
+            if schedule.active_window(now) is not None:
+                return
+        elif schedule.window_key(now) != current_key:
+            return
+        wait = min(schedule.seconds_until_next(now), MAX_WAIT_CHUNK)
+        await asyncio.sleep(wait)
 
 
 async def sign_with_visibility(
@@ -178,7 +197,7 @@ async def run_loop(
                 schedule.describe(),
                 resume.strftime("%d/%m %H:%M"),
             )
-            await asyncio.sleep(wait)
+            await _wait_for_new_window(schedule, None)
             now = datetime.now()
 
         current_key = schedule.window_key(now)
@@ -195,7 +214,7 @@ async def run_loop(
                 "deja signe sur ce creneau, pause jusqu'a %s",
                 resume.strftime("%d/%m %H:%M"),
             )
-            await asyncio.sleep(wait)
+            await _wait_for_new_window(schedule, current_key)
 
     await session.open(headless=poll_headless)
 
@@ -220,7 +239,7 @@ async def run_loop(
                         resume.strftime("%d/%m %H:%M"),
                     )
                     await session.close()
-                    await asyncio.sleep(wait)
+                    await _wait_for_new_window(schedule, None)
                     await session.open(headless=poll_headless)
                     continue
 
@@ -239,7 +258,7 @@ async def run_loop(
                         resume.strftime("%d/%m %H:%M"),
                     )
                     await session.close()
-                    await asyncio.sleep(wait)
+                    await _wait_for_new_window(schedule, window_key)
                     await session.open(headless=poll_headless)
                     continue
 
