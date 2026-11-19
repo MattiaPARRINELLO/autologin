@@ -10,7 +10,7 @@ import unicodedata
 from dataclasses import dataclass
 from datetime import date
 
-from .browser import resolve_executable
+from .browser import resolve_launch_options
 from .config import Config
 from .signature import FittedPoint, Point, fit_points
 
@@ -84,8 +84,9 @@ class CesarSession:
         self.headless = self.config.watcher.headless if headless is None else headless
         self.config.watcher.profile_dir.mkdir(parents=True, exist_ok=True)
         self._playwright = await async_playwright().start()
-        executable = resolve_executable(self._playwright.chromium, self.config)
-        options = {"executable_path": executable} if executable else {}
+        options = resolve_launch_options(
+            self._playwright.chromium, self.config
+        ).as_kwargs()
         self._context = await self._playwright.chromium.launch_persistent_context(
             user_data_dir=str(self.config.watcher.profile_dir),
             headless=self.headless,

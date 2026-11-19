@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "Surveille CESAR Emineo et propose de signer l'emargement des qu'il s'ouvre"
 requires-python = ">=3.11"
 dependencies = [
+  "platformdirs>=4.14.7",
   "playwright==1.65.1",
 ]
 
@@ -13,6 +14,7 @@ checkmate-watcher = "checkmate_watcher.cli:main"
 [dependency-groups]
 dev = [
   "pytest>=8",
+  "ruff>=0.17.5",
 ]
 
 [build-system]

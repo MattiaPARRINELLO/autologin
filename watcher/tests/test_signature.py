@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 
 import pytest
 
@@ -79,7 +80,8 @@ def test_save_et_load_signature(tmp_path):
     save_signature(path, points)
     reloaded = load_signature(path)
     assert [(p.x, p.y, p.kind) for p in reloaded] == [(1, 2, "start"), (3, 4, "end")]
-    assert path.stat().st_mode & 0o777 == 0o600
+    if os.name != "nt":
+        assert path.stat().st_mode & 0o777 == 0o600
     assert isinstance(json.loads(path.read_text()), list)
 
 

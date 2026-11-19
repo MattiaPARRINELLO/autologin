@@ -6,7 +6,6 @@ import asyncio
 import logging
 from datetime import datetime, timedelta
 
-from . import notify
 from .cesar import (
     AttendanceSignal,
     CesarError,
@@ -15,6 +14,7 @@ from .cesar import (
     is_success_confirmation,
 )
 from .config import Config
+from .notifications import Notifier
 from .signature import load_signature
 from .state import StateStore
 
@@ -30,20 +30,21 @@ NO_ANSWER = "no_answer"
 DRY_RUN = "dry_run"
 
 
+def _notifier(config: Config) -> Notifier:
+    return Notifier(
+        app_name=config.notifications.app_name,
+        icon=config.notifications.icon,
+    )
+
+
 async def _send(
     config: Config, title: str, message: str, *, icon: str, urgency: str = "critical"
 ) -> bool:
     if not config.notifications.enabled:
         logger.debug("notification desactivee : %s", title)
         return False
-    return await asyncio.to_thread(
-        notify.send,
-        title,
-        message,
-        app_name=config.notifications.app_name,
-        icon=icon,
-        urgency=urgency,
-    )
+    notifier = _notifier(config)
+    return await asyncio.to_thread(notifier.send, title, message, urgency=urgency)
 
 
 async def _wait_for_new_window(schedule, current_key: str | None) -> None:
@@ -130,8 +131,9 @@ async def handle_signal(
         logger.info("confirmations desactivees, aucune signature envoyee")
         return NO_ANSWER
 
+    notifier = _notifier(config)
     answer = await asyncio.to_thread(
-        notify.ask,
+        notifier.ask,
         message,
         timeout=config.watcher.confirm_timeout,
         title=config.notifications.app_name,

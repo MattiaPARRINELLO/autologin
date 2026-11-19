@@ -11,6 +11,18 @@ Le bouton d'emargement n'apparait pas tout seul : le site doit etre recharge. Le
 script recharge donc la page a chaque cycle (`poll_interval`, 60 s par defaut).
 La detection arrive au pire un intervalle apres l'ouverture par le formateur.
 
+## Plateformes
+
+| Plateforme | Notifications | Confirmation | Navigateur | Demarrage auto |
+|------------|---------------|--------------|------------|----------------|
+| Linux | notify-send, fallback D-Bus | zenity, fallback tkinter | Chromium systeme ou bundle | systemd utilisateur |
+| Windows | toast PowerShell (fonctionnement a valider sur machine reelle) | tkinter | Edge ou Chrome installe | script PowerShell prevu |
+| macOS | osascript | tkinter | Chrome / Edge installe | launchd prevu |
+
+Les chemins sont portables via `platformdirs` : `~/.config/checkmate-watcher` sur
+Linux, `%APPDATA%\checkmate-watcher` sur Windows. Les logs tournent dans
+`checkmate-watcher.log` avec rotation, en plus de stdout.
+
 ## Installation
 
 ```bash

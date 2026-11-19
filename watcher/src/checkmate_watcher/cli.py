@@ -9,15 +9,18 @@ import shutil
 import sys
 from pathlib import Path
 
-from . import __version__, notify
-from .browser import missing_browser_message, resolve_executable
+from . import __version__
+from .browser import missing_browser_message, resolve_launch_options
 from .config import Config, ConfigError, load_config
+from .logging_setup import setup_logging
+from .notifications import Notifier
+from .paths import default_config_path
 from .signature import SignatureError, load_signature, parse_points, save_signature
 from .watcher import run_loop
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_CONFIG = "~/.config/checkmate-watcher/config.toml"
+DEFAULT_CONFIG = str(default_config_path())
 
 CAPTURE_HTML = """
 <!doctype html>
@@ -110,15 +113,6 @@ CAPTURE_HTML = """
 """
 
 
-def setup_logging(verbose: bool) -> None:
-    logging.basicConfig(
-        level=logging.DEBUG if verbose else logging.INFO,
-        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
-        datefmt="%H:%M:%S",
-        stream=sys.stdout,
-    )
-
-
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="checkmate-watcher",
@@ -194,8 +188,7 @@ async def command_capture(config: Config) -> int:
 
     print("Ouverture de la fenetre de capture...")
     async with async_playwright() as playwright:
-        executable = resolve_executable(playwright.chromium, config)
-        options = {"executable_path": executable} if executable else {}
+        options = resolve_launch_options(playwright.chromium, config).as_kwargs()
         try:
             browser = await playwright.chromium.launch(headless=False, **options)
         except Exception as exc:
@@ -229,15 +222,17 @@ async def command_capture(config: Config) -> int:
 
 
 def command_test_notification(config: Config) -> int:
-    sent = notify.send(
-        "CheckMate",
-        "Ceci est une notification de test.",
+    notifier = Notifier(
         app_name=config.notifications.app_name,
         icon=config.notifications.icon,
+    )
+    sent = notifier.send(
+        "CheckMate",
+        "Ceci est une notification de test.",
         urgency="normal",
     )
     print("notification envoyee" if sent else "notification impossible")
-    answer = notify.ask(
+    answer = notifier.ask(
         "Ceci est une confirmation de test. Clique sur un bouton.",
         timeout=60,
         title=config.notifications.app_name,

@@ -7,6 +7,11 @@ import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from .paths import (
+    default_profile_dir,
+    default_signature_path,
+    default_state_file,
+)
 from .schedule import (
     DEFAULT_DAYS,
     DEFAULT_WINDOWS,
@@ -105,13 +110,13 @@ class WatcherConfig:
     headless: bool = False
     visible_on_sign: bool = True
     executable_path: str | None = None
-    profile_dir: Path = Path("~/.local/share/checkmate-watcher/profile")
-    state_file: Path = Path("~/.local/share/checkmate-watcher/state.json")
+    profile_dir: Path = field(default_factory=default_profile_dir)
+    state_file: Path = field(default_factory=default_state_file)
 
 
 @dataclass(frozen=True)
 class SignatureConfig:
-    file: Path = Path("~/.config/checkmate-watcher/signature.json")
+    file: Path = field(default_factory=default_signature_path)
     padding_ratio: float = 0.9
 
 
