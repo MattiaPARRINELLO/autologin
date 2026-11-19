@@ -18,6 +18,11 @@ logger = logging.getLogger(__name__)
 
 SUCCESS_KEYWORDS = ("presence", "prise en compte", "present", "signe", "enregistr")
 
+READY_SELECTORS = (
+    ".toastui-calendar-day-view",
+    "div.toastui-calendar-layout",
+)
+
 
 class CesarError(Exception):
     """Erreur generale de pilotage du site."""
@@ -127,6 +132,28 @@ class CesarSession:
         await asyncio.sleep(2)
         await self.open()
 
+    async def _wait_for_ready(self, timeout_ms: int = 6000) -> None:
+        """Attend le premier element qui indique que la page est utilisable."""
+        if self.page is None:
+            return
+        selectors = (
+            READY_SELECTORS
+            + self.selectors.attendance_button
+            + self.selectors.login_username
+        )
+        await self._find_with_wait(selectors, timeout_ms)
+
+    async def _find_with_wait(self, selectors: tuple[str, ...], timeout_ms: int):
+        if self.page is None:
+            return None
+        deadline = asyncio.get_running_loop().time() + timeout_ms / 1000
+        while asyncio.get_running_loop().time() < deadline:
+            locator = await self._first_visible(selectors)
+            if locator is not None:
+                return locator
+            await self.page.wait_for_timeout(200)
+        return None
+
     async def _first_visible(self, selectors: tuple[str, ...]):
         if self.page is None:
             return None
@@ -149,8 +176,9 @@ class CesarSession:
             wait_until="domcontentloaded",
             timeout=45000,
         )
-        # Le calendrier et le bouton sont rendus en JS apres le chargement.
-        await self.page.wait_for_timeout(2500)
+        # Attente adaptative : on repart des que le calendrier ou le formulaire
+        # de connexion est la, au lieu d'un delai fixe.
+        await self._wait_for_ready()
 
     async def _ensure_logged_in(self) -> None:
         if self.page is None:
@@ -191,7 +219,7 @@ class CesarSession:
                 lambda url: self.config.cesar.login_path not in url,
                 timeout=45000,
             )
-            await self.page.wait_for_timeout(2500)
+            await self._wait_for_ready()
         except LoginError:
             raise
         except Exception as exc:
@@ -204,7 +232,7 @@ class CesarSession:
         await self._goto_dashboard()
         await self._ensure_logged_in()
 
-        button = await self._first_visible(self.selectors.attendance_button)
+        button = await self._find_with_wait(self.selectors.attendance_button, 1500)
         if button is None:
             logger.debug("aucun bouton d'emargement visible apres rafraichissement")
             return None

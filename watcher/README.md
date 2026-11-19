@@ -105,8 +105,8 @@ days = ["mon", "tue", "wed", "thu", "fri"]
 windows = ["09:00-12:00", "13:30-16:30"]
 ```
 
-- hors plage : aucune verification, le navigateur est ferme, reprise pile au
-  debut du creneau suivant
+- hors plage : aucune verification, le navigateur est ferme, reprise a 5 s pres
+  au debut du creneau suivant
 - une fois la presence signee dans un creneau, plus aucune verification jusqu'au
   creneau suivant (memoire persistante, meme apres un redemarrage)
 - un emargement manque ou refuse n'empeche pas de reessayer dans le meme creneau
@@ -121,8 +121,9 @@ Pour desactivee completement le planning : `enabled = false`.
 - `visible_on_sign = true` (defaut) : au moment de signer seulement, le navigateur
   se relance en mode visible avec le meme profil, fait la signature, affiche la
   confirmation deux secondes, puis se referme et repasse en invisible.
-- Chaque cycle : `goto` du tableau de bord, attente du rendu JS, recherche de
-  `button.buttonPresent`.
+- Chaque cycle (10 a 15 s) : `goto` du tableau de bord, attente adaptative du
+  rendu JS, recherche de `button.buttonPresent`. Detection typique en 10 a 15 s
+  apres l'ouverture par le formateur.
 - Si le bouton est la et que l'emargement n'a pas deja ete traite : notification
   `notify-send` + fenetre `zenity` avec "Je suis present" / "Absent".
 - Sur "Present" : clic, tracé de la signature au clavier/souris Playwright,

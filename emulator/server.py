@@ -283,7 +283,7 @@ def render_dashboard(state: AttendanceState, run_id: str) -> bytes:
   <nav><a href="/admin">Administration</a><a href="/connexion?logout=1">Deconnexion</a></nav>
 </header>
 <main>
-  <div class="card">
+  <div class="card toastui-calendar-day-view">
     <p class="muted">Tableau de bord de demonstration. Le bouton n'apparait qu'apres
     un rafraichissement de la page, comme sur le site reel.</p>
     <div class="calendar">

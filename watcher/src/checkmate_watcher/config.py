@@ -239,8 +239,8 @@ def load_config(path: str | Path) -> Config:
     except ScheduleError as exc:
         raise ConfigError(f"[schedule] {exc}") from exc
 
-    if watcher.poll_interval < 15:
-        raise ConfigError("[watcher] poll_interval doit etre >= 15 secondes")
+    if watcher.poll_interval < 10:
+        raise ConfigError("[watcher] poll_interval doit etre >= 10 secondes")
     if watcher.confirm_timeout < 10:
         raise ConfigError("[watcher] confirm_timeout doit etre >= 10 secondes")
     if watcher.prompt_retry < 30:

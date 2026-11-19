@@ -59,8 +59,12 @@ async def _wait_for_new_window(schedule, current_key: str | None) -> None:
                 return
         elif schedule.window_key(now) != current_key:
             return
-        wait = min(schedule.seconds_until_next(now), MAX_WAIT_CHUNK)
-        await asyncio.sleep(wait)
+
+        next_start = schedule.next_start(now)
+        remaining = (next_start - now).total_seconds() if next_start else 3600
+        # Precis a 15 s pres du debut, sinon tranches de 5 min pour gerer la veille.
+        chunk = 300.0 if remaining > 600 else 5.0
+        await asyncio.sleep(min(max(remaining, 0.5), chunk))
 
 
 async def sign_with_visibility(

@@ -19,8 +19,8 @@ windows = ["09:00-12:00", "13:30-16:30"]
 
 [watcher]
 # Le bouton n'apparait qu'apres un rafraichissement : la page est rechargee
-# a chaque cycle. 60 s est un bon compromis, 30 s pour etre plus reactif.
-poll_interval = 60
+# a chaque cycle. 10 a 15 s = detection rapide, 60 s = plus econome.
+poll_interval = 15
 # Duree pendant laquelle un emargement deja traite n'est pas renotifie.
 dedupe_ttl = 3600
 # Temps laisse pour repondre a la fenetre de confirmation.
