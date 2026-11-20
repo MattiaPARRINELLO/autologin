@@ -69,10 +69,16 @@ CheckMate ne prend pas de décision à ta place.
 - il ne connaît pas tes notes, tes absences ou tes justificatifs
 - il ne contourne pas un captcha ou une double authentification
 - il ne fonctionne pas si l'ordinateur est éteint
+- il ne sert pas à falsifier une présence : tu dois être réellement présent au
+  cours et signer uniquement pour toi
 - il n'est pas affilié à CESAR, Emineo Education ou ton établissement
 
-Tu restes responsable de l'usage de ta signature et du respect des règles de ton
-école.
+CESAR et Emineo sont des noms et des marques appartenant à Emineo Education et à
+leurs titulaires respectifs, cités uniquement pour décrire l'interopérabilité du
+logiciel. L'auteur n'est pas responsable de ce qui est fait avec CheckMate ni des
+conséquences qui en découlent. Tu restes seul responsable de l'usage de ta
+signature et du respect des règles de ton école. Voir les
+[mentions légales](watcher/docs/mentions-legales.md).
 
 ## Installation sur Windows
 
