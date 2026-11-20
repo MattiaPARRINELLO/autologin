@@ -212,6 +212,10 @@ reprise en quelques minutes et reprend la surveillance.
 Sur Windows, la notification est un toast système. Sur Linux, c'est une
 notification du bureau, avec une fenêtre de confirmation.
 
+**Important** : coupe le mode silencieux et le mode "Ne pas déranger" avant de
+tester. Windows peut envoyer le toast sans l'afficher. L'assistant te demande de
+confirmer que tu l'as bien vu avant de terminer la configuration.
+
 La confirmation est volontaire. CheckMate ne signe pas dans ton dos. Si tu
 veux tester, l'assistant propose un bouton "Tester la notification".
 

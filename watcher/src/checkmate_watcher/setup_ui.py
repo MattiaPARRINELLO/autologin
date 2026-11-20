@@ -327,6 +327,26 @@ SETUP_HTML = """<!doctype html>
   .file-button:hover { background: var(--raised); }
   .file-button input { position: absolute; width: 0; height: 0; opacity: 0; }
 
+  .notice {
+    margin: 0 0 20px;
+    padding: 12px 16px;
+    background: var(--accent-soft);
+    border-left: 3px solid var(--accent);
+    border-radius: 0 8px 8px 0;
+  }
+  .notice strong {
+    display: block;
+    margin-bottom: 4px;
+    font-size: 13px;
+    color: var(--ink);
+  }
+  .notice p {
+    margin: 0;
+    font-size: 12.5px;
+    line-height: 1.45;
+    color: var(--ink-2);
+  }
+
   .checkline {
     display: flex;
     align-items: center;
@@ -509,10 +529,18 @@ SETUP_HTML = """<!doctype html>
     <section data-step="4">
       <h2>Finition</h2>
       <p class="lede">Vérifie que la notification s'affiche, puis installe le démarrage automatique pour ne plus y penser.</p>
+      <div class="notice">
+        <strong>Coupe le mode silencieux</strong>
+        <p>Désactive le mode silencieux ou "Ne pas déranger" avant de tester. Sinon la notification peut ne pas s'afficher, même si CheckMate l'a bien envoyée.</p>
+      </div>
       <div class="actions">
         <button type="button" class="secondary" onclick="testNotification()" id="notifyBtn">Tester la notification</button>
       </div>
       <div class="status" id="notifyStatus" aria-live="polite"></div>
+      <label class="checkline">
+        <input type="checkbox" id="notificationsSeen">
+        <span>J'ai vérifié que la notification s'affiche, mode silencieux désactivé</span>
+      </label>
       <label class="checkline">
         <input type="checkbox" id="autostart" checked>
         <span>Démarrer automatiquement à l'ouverture de session</span>
@@ -520,7 +548,7 @@ SETUP_HTML = """<!doctype html>
       <div class="status" id="finishStatus" aria-live="polite"></div>
       <div class="actions">
         <div class="actions-spacer"></div>
-        <button type="button" class="primary" onclick="finish()" id="finishBtn">Terminer</button>
+        <button type="button" class="primary" onclick="finish()" id="finishBtn" disabled>Terminer</button>
       </div>
     </section>
 
@@ -750,8 +778,12 @@ async function testNotification() {
   button.disabled = true;
   setStatus("notifyStatus", "Envoi en cours...");
   try {
-    const data = await api("/api/test-notification", {});
-    setStatus("notifyStatus", data.message || "Notification envoyée.", "ok");
+    await api("/api/test-notification", {});
+    setStatus(
+      "notifyStatus",
+      "Notification envoyée. Si tu ne la vois pas, coupe le mode silencieux puis relance le test.",
+      "ok"
+    );
   } catch (error) {
     setStatus("notifyStatus", error.message, "err");
   } finally {
@@ -793,6 +825,12 @@ function updateTimetable() {
     slot.querySelector(".slot-state").textContent = index === active ? "en cours" : "";
   });
 }
+
+const notificationsSeen = document.getElementById("notificationsSeen");
+const finishButton = document.getElementById("finishBtn");
+notificationsSeen.addEventListener("change", () => {
+  finishButton.disabled = !notificationsSeen.checked;
+});
 
 updateTimetable();
 setInterval(updateTimetable, 60000);

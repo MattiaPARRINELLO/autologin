@@ -27,8 +27,10 @@ reussie`, `signature` ou `ERREUR`.
 ## Aucune notification
 
 1. Lance `checkmate-watcher test-notification`.
-2. Vérifie le mode "Ne pas déranger" ou "Concentration".
+2. Coupe le mode silencieux, "Ne pas déranger" ou "Concentration".
 3. Sur Windows, autorise CheckMate dans les notifications système.
+4. Dans l'assistant, la case "J'ai vérifié que la notification s'affiche"
+   doit être cochée pour terminer la configuration.
 4. Sur Linux, `notify-send` peut être cassé : CheckMate bascule alors sur D-Bus.
    Le self-test le signale.
 

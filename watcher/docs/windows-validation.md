@@ -28,7 +28,8 @@ uv run checkmate-watcher setup
 - [ ] le mot de passe est visible dans le Gestionnaire d'identifiants Windows
 - [ ] la signature se dessine correctement a la souris
 - [ ] le planning propose bien 09:00-12:00 et 13:30-16:30
-- [ ] le bouton "Tester la notification" affiche un toast Windows
+- [ ] le mode silencieux est coupe et le bouton "Tester la notification"
+      affiche un toast Windows
 - [ ] "Terminer" installe le demarrage automatique sans droits administrateur
 - [ ] la valeur `CheckMate` existe dans le registre utilisateur :
 
