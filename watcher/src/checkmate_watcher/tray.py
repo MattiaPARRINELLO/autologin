@@ -15,7 +15,7 @@ except Exception:  # noqa: BLE001 - optionnel selon la plateforme
     ImageDraw = None
 
 from . import sni
-from .status_server import ACTIONS_BY_NAME, StatusSession
+from .status_server import ACTIONS, StatusSession
 from .window import open_url
 
 logger = logging.getLogger(__name__)
@@ -93,8 +93,9 @@ class TrayController:
         return [
             ("Ouvrir le statut", self._open_status),
             *[
-                (ACTIONS_BY_NAME[name].label, self._action(name))
-                for name in ("configure", "test-notification", "check-update")
+                (action.label, self._action(action.name))
+                for action in ACTIONS
+                if action.in_tray
             ],
             None,
             ("Quitter", self._quit),

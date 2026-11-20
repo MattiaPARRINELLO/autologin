@@ -42,12 +42,23 @@ class Action:
     name: str
     label: str
     method: str
+    in_tray: bool = False
 
 
 ACTIONS = (
-    Action("configure", "Reconfigurer", "configure"),
-    Action("test-notification", "Tester la notification", "test_notification"),
-    Action("check-update", "Verifier les mises a jour", "check_update"),
+    Action("configure", "Reconfigurer", "configure", in_tray=True),
+    Action(
+        "test-notification",
+        "Tester la notification",
+        "test_notification",
+        in_tray=True,
+    ),
+    Action(
+        "check-update",
+        "Verifier les mises a jour",
+        "check_update",
+        in_tray=True,
+    ),
     Action("install-update", "Installer la mise a jour", "install_update"),
     Action("open-logs", "Ouvrir les logs", "open_logs"),
     Action("quit", "Quitter", "quit"),
