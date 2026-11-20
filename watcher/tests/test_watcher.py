@@ -118,3 +118,57 @@ def test_signature_sans_nouvelle_tentative(monkeypatch):
         asyncio.run(_sign_with_retry(retry_config(0), object(), []))
 
     assert calls == ["essai"]
+
+
+def test_compteurs_du_jour_remis_a_zero(tmp_path):
+    from checkmate_watcher.watcher import _bump_daily
+
+    state = StateStore(tmp_path / "s.json")
+    _bump_daily(state, "detections", datetime(2026, 11, 16, 10, 0))
+    _bump_daily(state, "detections", datetime(2026, 11, 16, 11, 0))
+    _bump_daily(state, "signed", datetime(2026, 11, 16, 11, 5))
+    assert state.counter("daily.detections") == 2
+    assert state.counter("daily.signed") == 1
+
+    _bump_daily(state, "detections", datetime(2026, 11, 17, 9, 0))
+    assert state.counter("daily.detections") == 1
+    assert state.counter("daily.signed") == 0
+
+
+def test_veille_du_soir_sans_emargement(tmp_path):
+    from checkmate_watcher.watcher import evening_message
+
+    state = StateStore(tmp_path / "s.json")
+    assert evening_message(state, datetime(2026, 11, 16, 19, 0)) is None
+
+
+def test_veille_du_soir_tout_est_signe(tmp_path):
+    from checkmate_watcher.watcher import _bump_daily, evening_message
+
+    state = StateStore(tmp_path / "s.json")
+    now = datetime(2026, 11, 16, 10, 0)
+    _bump_daily(state, "detections", now)
+    _bump_daily(state, "signed", now)
+    assert evening_message(state, datetime(2026, 11, 16, 19, 0)) is None
+
+
+def test_veille_du_soir_signale_les_emargements_manques(tmp_path):
+    from checkmate_watcher.watcher import _bump_daily, evening_message
+
+    state = StateStore(tmp_path / "s.json")
+    now = datetime(2026, 11, 16, 10, 0)
+    _bump_daily(state, "detections", now)
+    _bump_daily(state, "detections", now)
+    _bump_daily(state, "signed", now)
+    message = evening_message(state, datetime(2026, 11, 16, 19, 0))
+    assert message is not None
+    assert "1 emargement" in message
+    assert "absence" not in message.lower()
+
+
+def test_veille_du_soir_ignore_un_autre_jour(tmp_path):
+    from checkmate_watcher.watcher import _bump_daily, evening_message
+
+    state = StateStore(tmp_path / "s.json")
+    _bump_daily(state, "detections", datetime(2026, 11, 16, 10, 0))
+    assert evening_message(state, datetime(2026, 11, 17, 19, 0)) is None

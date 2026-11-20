@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import stat
 import time
 import tomllib
@@ -34,6 +35,8 @@ from .signature import MAX_PADDING_RATIO, MIN_PADDING_RATIO
 from .updates import BETA_CHANNEL, CHANNELS, STABLE_CHANNEL
 
 logger = logging.getLogger(__name__)
+
+_CLOCK_RE = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
 
 
 class ConfigError(Exception):
@@ -147,6 +150,12 @@ class AnalyticsConfig:
     endpoint: str = DEFAULT_ANALYTICS_ENDPOINT
 
 
+@dataclass(frozen=True)
+class EveningConfig:
+    enabled: bool = True
+    time: str = "19:00"
+
+
 def parse_updates_channel(table: dict) -> str:
     """Lit `[updates] channel`, avec `include_prerelease` en alias historique."""
     raw_channel = table.get("channel")
@@ -178,6 +187,7 @@ class Config:
     schedule: Schedule = field(default_factory=Schedule)
     updates: UpdatesConfig = field(default_factory=UpdatesConfig)
     analytics: AnalyticsConfig = field(default_factory=AnalyticsConfig)
+    evening: EveningConfig = field(default_factory=EveningConfig)
 
 
 def _require(table: dict, key: str, table_name: str) -> str:
@@ -299,6 +309,10 @@ def config_to_dict(
         "analytics": {
             "enabled": config.analytics.enabled,
             "endpoint": config.analytics.endpoint,
+        },
+        "evening": {
+            "enabled": config.evening.enabled,
+            "time": config.evening.time,
         },
         "selectors": {
             "attendance_button": list(config.selectors.attendance_button),
@@ -469,6 +483,17 @@ def load_config(path: str | Path, *, require_password: bool = True) -> Config:
     if analytics.enabled and not analytics.endpoint.startswith(("http://", "https://")):
         raise ConfigError("[analytics] endpoint doit commencer par http:// ou https://")
 
+    evening_table = data.get("evening", {})
+    if not isinstance(evening_table, dict):
+        raise ConfigError("[evening] doit etre une table TOML")
+    evening_defaults = EveningConfig()
+    evening = EveningConfig(
+        enabled=bool(evening_table.get("enabled", evening_defaults.enabled)),
+        time=str(evening_table.get("time", evening_defaults.time)).strip(),
+    )
+    if not _CLOCK_RE.fullmatch(evening.time):
+        raise ConfigError("[evening] time doit etre au format HH:MM")
+
     try:
         schedule = Schedule(
             enabled=bool(schedule_table.get("enabled", False)),
@@ -503,4 +528,5 @@ def load_config(path: str | Path, *, require_password: bool = True) -> Config:
         schedule=schedule,
         updates=updates,
         analytics=analytics,
+        evening=evening,
     )

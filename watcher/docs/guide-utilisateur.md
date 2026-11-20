@@ -231,6 +231,20 @@ remote_selectors = false
 
 ou avec `CHECKMATE_REMOTE_SELECTORS=0`.
 
+### Veille du soir
+
+Chaque jour à une heure configurable (19:00 par défaut), CheckMate fait le
+bilan local de la journée : si un émargement a été détecté mais que toutes les
+signatures n'ont pas été enregistrées, une notification le signale. Aucune
+donnée n'est lue sur CESAR pour ce bilan, et un émargement jamais ouvert n'est
+pas présenté comme une absence.
+
+```toml
+[evening]
+enabled = true
+time = "19:00"
+```
+
 ### Désactiver les statistiques anonymes
 
 CheckMate compte les installations et les signatures avec un identifiant

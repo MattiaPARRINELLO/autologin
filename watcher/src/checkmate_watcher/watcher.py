@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+from contextlib import suppress
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -109,6 +110,66 @@ async def _wait_for_new_window(
         next_start = schedule.next_start(now)
         remaining = (next_start - now).total_seconds() if next_start else 3600
         await asyncio.sleep(min(max(remaining, 0.5), 5.0))
+
+
+def _bump_daily(state: StateStore, name: str, now: datetime) -> None:
+    """Compteur du jour, remis a zero au changement de date."""
+    day = now.date().isoformat()
+    if state.get_meta("daily.day") != day:
+        state.set_meta("daily.day", day)
+        state.set_meta("daily.detections", "0")
+        state.set_meta("daily.signed", "0")
+    state.increment(f"daily.{name}")
+
+
+def evening_message(state: StateStore, now: datetime) -> str | None:
+    """Signale les emargements detectes mais non signes aujourd'hui."""
+    if state.get_meta("daily.day") != now.date().isoformat():
+        return None
+    missing = state.counter("daily.detections") - state.counter("daily.signed")
+    if missing <= 0:
+        return None
+    return (
+        f"{missing} emargement(s) detecte(s) aujourd'hui sans signature "
+        "enregistree. Ouvre CESAR pour verifier."
+    )
+
+
+async def _run_evening_check(config: Config, state: StateStore, stop_event) -> None:
+    if stop_event is not None and stop_event.is_set():
+        return
+    now = datetime.now()
+    state.set_meta("evening.last", now.date().isoformat())
+    message = evening_message(state, now)
+    if message is None:
+        logger.debug("veille du soir : rien a signaler")
+        return
+    logger.warning("veille du soir : %s", message)
+    await _send(
+        config,
+        "Veille du soir",
+        message,
+        icon="dialog-warning",
+        urgency="normal",
+    )
+
+
+async def _evening_loop(config: Config, state: StateStore, stop_event) -> None:
+    clock = datetime.strptime(config.evening.time, "%H:%M").time()
+    while True:
+        now = datetime.now()
+        target = datetime.combine(now.date(), clock)
+        if now >= target:
+            if state.get_meta("evening.last") != now.date().isoformat():
+                await _run_evening_check(config, state, stop_event)
+                continue
+            target += timedelta(days=1)
+        while datetime.now() < target:
+            if stop_event is not None and stop_event.is_set():
+                return
+            remaining = (target - datetime.now()).total_seconds()
+            await asyncio.sleep(min(max(remaining, 0.5), 30.0))
+        await _run_evening_check(config, state, stop_event)
 
 
 async def _check_update(config: Config, state: StateStore) -> None:
@@ -311,6 +372,12 @@ async def run_loop(
         tray = TrayController(status_session)
         tray.start()
     stop_event = status_session.stop_event if status_session else None
+    evening_task: asyncio.Task | None = None
+    if not once and config.evening.enabled:
+        evening_task = asyncio.create_task(
+            _evening_loop(config, state, stop_event),
+            name="checkmate-evening",
+        )
 
     try:
         await _check_update(config, state)
@@ -402,6 +469,7 @@ async def run_loop(
                         logger.debug("nouvelle demande en attente pour %s", signal.key)
                     else:
                         state.increment("stats.detections")
+                        _bump_daily(state, "detections", now)
                         state.set_meta("last_detection_at", _now_iso())
                         decision = await handle_signal(
                             config,
@@ -440,6 +508,7 @@ async def run_loop(
                             else:
                                 state.mark(signal.key)
                                 state.increment("stats.signed")
+                                _bump_daily(state, "signed", now)
                                 analytics.record(config, "signature")
                                 state.set_meta("last_signed_at", _now_iso())
                                 if window_key:
@@ -491,6 +560,10 @@ async def run_loop(
     except StopRequested:
         return 0
     finally:
+        if evening_task is not None:
+            evening_task.cancel()
+            with suppress(asyncio.CancelledError):
+                await evening_task
         if tray is not None:
             tray.stop()
         if status_server is not None:

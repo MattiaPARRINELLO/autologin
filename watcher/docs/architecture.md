@@ -35,6 +35,7 @@ active.
 | `notifications.py` | notifications bureau et fenetre de confirmation, par plateforme |
 | `credentials.py` | mot de passe dans le trousseau systeme quand il est disponible |
 | `state.py` | etat persistant : emargements traites, creneaux signes, compteurs |
+| `watcher.py` (veille) | bilan du soir : emargements detectes mais non signes |
 | `local_http.py` | socle HTTP commun : ecoute locale, jeton, en-tetes de securite, lecture JSON |
 | `status_server.py` | serveur HTTP local du tableau de bord (`/api/status`, `/api/action`) et fichier `runtime.json` |
 | `status_ui.py` | page HTML du tableau de bord |

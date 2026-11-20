@@ -180,3 +180,15 @@ def test_le_canal_prime_sur_l_alias(tmp_path):
 def test_refuse_un_canal_inconnu(tmp_path):
     with pytest.raises(ConfigError, match="channel doit valoir"):
         load_config(write_config(tmp_path, '[updates]\nchannel = "nightly"'))
+
+
+def test_veille_du_soir_par_defaut(tmp_path):
+    config = load_config(write_config(tmp_path))
+    assert config.evening.enabled is True
+    assert config.evening.time == "19:00"
+
+
+def test_veille_du_soir_heure_invalide(tmp_path):
+    path = write_config(tmp_path, '[evening]\ntime = "25:00"')
+    with pytest.raises(ConfigError, match="HH:MM"):
+        load_config(path)
