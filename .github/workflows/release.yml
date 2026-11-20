@@ -12,6 +12,7 @@ jobs:
   channel:
     runs-on: ubuntu-latest
     outputs:
+      version: ${{ steps.detect.outputs.version }}
       prerelease: ${{ steps.detect.outputs.prerelease }}
     steps:
       - uses: actions/checkout@v4
@@ -66,7 +67,7 @@ jobs:
       - name: Construire l'installeur
         shell: pwsh
         run: |
-          $version = ($env:GITHUB_REF_NAME -replace '^watcher-v','' -replace '^v','') -replace '-.*$',''
+          $version = "${{ needs.channel.outputs.version }}"
           & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "/DMyAppVersion=$version" "packaging\checkmate.iss"
 
       - name: Publier l'installeur non signe
@@ -116,9 +117,7 @@ jobs:
         run: uv sync
 
       - name: Archive Linux
-        run: |
-          version="${GITHUB_REF_NAME#watcher-v}"
-          bash packaging/build-linux.sh "${version%%-*}"
+        run: bash packaging/build-linux.sh "${{ needs.channel.outputs.version }}"
 
       - uses: actions/upload-artifact@v4
         with:
@@ -131,6 +130,16 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Determiner le statut de la release
+        id: meta
+        run: |
+          version="${GITHUB_REF_NAME#watcher-v}"
+          case "$version" in
+            *-*) suffix=" beta" ;;
+            *) suffix="" ;;
+          esac
+          echo "name=CheckMate desktop ${version%%-*}$suffix" >> "$GITHUB_OUTPUT"
+
       - uses: actions/download-artifact@v4
         with:
           path: artifacts
@@ -153,6 +162,8 @@ jobs:
 
       - uses: softprops/action-gh-release@v2
         with:
+          name: ${{ steps.meta.outputs.name }}
           generate_release_notes: true
           prerelease: ${{ needs.channel.outputs.prerelease == 'true' }}
+          make_latest: ${{ needs.channel.outputs.prerelease == 'false' }}
           files: release-assets/*

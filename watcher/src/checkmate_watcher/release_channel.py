@@ -29,6 +29,7 @@ class ReleaseChannel:
     name: str
     expected_branch: str
     prerelease: bool
+    version: str
 
 
 def channel_for_tag(tag: str) -> ReleaseChannel:
@@ -43,6 +44,7 @@ def channel_for_tag(tag: str) -> ReleaseChannel:
         name=name,
         expected_branch=EXPECTED_BRANCHES[name],
         prerelease=name == BETA_CHANNEL,
+        version=f"{version.major}.{version.minor}.{version.patch}",
     )
 
 
@@ -62,6 +64,7 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     print(f"channel={channel.name}")
     print(f"branch={channel.expected_branch}")
+    print(f"version={channel.version}")
     print(f"prerelease={'true' if channel.prerelease else 'false'}")
     return 0
 
