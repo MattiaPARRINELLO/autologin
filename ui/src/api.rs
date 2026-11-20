@@ -7,6 +7,7 @@ use std::time::Duration;
 
 pub const APP_NAME: &str = "checkmate-watcher";
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, Deserialize, Default)]
 pub struct Schedule {
     pub enabled: bool,
@@ -22,6 +23,9 @@ pub struct Counters {
     pub errors: u64,
 }
 
+// Ces structures refletent le JSON de l'API locale : tous les champs ne sont
+// pas encore affiches dans l'interface, mais doivent rester deserialises.
+#[allow(dead_code)]
 #[derive(Debug, Clone, Deserialize, Default)]
 pub struct Status {
     pub version: String,
@@ -44,6 +48,7 @@ pub struct Status {
     pub log_file: String,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, Deserialize)]
 pub struct Runtime {
     pub pid: u32,
@@ -52,6 +57,7 @@ pub struct Runtime {
     pub url: String,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, Deserialize, Default)]
 pub struct ActionResponse {
     pub ok: bool,
@@ -141,15 +147,15 @@ fn backend_candidates() -> Vec<PathBuf> {
             );
         }
         if let Ok(current) = std::env::current_exe() {
-            if let Some(folder) = current.parent() {
-                candidates.push(folder.join("CheckMate.exe"));
-            }
+            candidates.extend(current.parent().map(|folder| folder.join("CheckMate.exe")));
         }
     } else {
         if let Ok(current) = std::env::current_exe() {
-            if let Some(folder) = current.parent() {
-                candidates.push(folder.join("checkmate-watcher"));
-            }
+            candidates.extend(
+                current
+                    .parent()
+                    .map(|folder| folder.join("checkmate-watcher")),
+            );
         }
         candidates.push(PathBuf::from("checkmate-watcher"));
     }

@@ -1,10 +1,11 @@
 name: Windows validation
 
+# Validation complete sur Windows : binaire, emulateur, installeur.
+# Lancee a chaque poussee sur beta, et a la demande pour verifier main.
 on:
   workflow_dispatch:
   push:
     branches:
-      - feat/auto-detect-roll-call
       - beta
 
 permissions:

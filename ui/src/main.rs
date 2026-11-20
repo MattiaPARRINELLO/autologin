@@ -16,11 +16,6 @@ const ACCENT: Color32 = Color32::from_rgb(47, 111, 79);
 const WARN: Color32 = Color32::from_rgb(154, 107, 47);
 const ERR: Color32 = Color32::from_rgb(179, 38, 30);
 
-enum UiEvent {
-    Status(Result<Status, String>),
-    Action(Result<ActionResponse, String>),
-}
-
 struct App {
     status: Option<Status>,
     error: Option<String>,
@@ -393,10 +388,10 @@ impl eframe::App for App {
             match event {
                 Ok(response) => {
                     let mut message = response.message.unwrap_or_default();
-                    if response.available == Some(true) {
-                        if let Some(url) = response.url {
-                            message = format!("{message} {url}");
-                        }
+                    if response.available == Some(true)
+                        && let Some(url) = response.url
+                    {
+                        message = format!("{message} {url}");
                     }
                     self.message = Some(message);
                 }

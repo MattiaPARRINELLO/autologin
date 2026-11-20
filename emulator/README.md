@@ -50,4 +50,5 @@ en mode automatique et verifie que la signature est bien enregistree :
 CHECKMATE_E2E=1 uv run --project watcher pytest watcher/tests/test_emulator_e2e.py -v
 ```
 
-Il est ignore par defaut car il demande Chromium et ouvre un navigateur.
+Il est ignore par defaut car il demande Chromium et ouvre un navigateur. La CI
+le lance automatiquement dans le job `E2E emulateur`.

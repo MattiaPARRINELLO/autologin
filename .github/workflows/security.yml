@@ -1,7 +1,8 @@
 name: Security
 
-# Vérifications rapides sur chaque PR, en complément des scans Strix
-# bihebdomadaires : détection de secrets dans le diff et revue des dépendances.
+# Vérifications de sécurité sur chaque PR : détection de secrets dans le diff
+# et revue des dépendances ajoutées. Aucun scan planifié n'est configuré ici ;
+# une analyse plus poussée se lance manuellement avec Strix.
 on:
   pull_request:
 

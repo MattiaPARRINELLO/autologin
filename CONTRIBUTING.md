@@ -38,6 +38,10 @@ reste dans le depot pour reference, mais ne recoit plus de fonctionnalites.
 `ui/` explore une interface native alternative ; elle n'est pas livree avec les
 releases et peut casser sans preavis.
 
+Malgre ces statuts, la CI verifie la syntaxe et le lint de l'extension, et
+compile, teste et formate `ui/` : une surface figee ou experimentale ne doit pas
+pourrir en silence.
+
 Les propositions doivent rester dans ce perimetre. Les problemes du site CESAR
 lui-meme ne sont pas traites ici.
 
@@ -50,6 +54,8 @@ Prerequis :
 
 - Python 3.11 ou plus recent ;
 - [uv](https://docs.astral.sh/uv/getting-started/installation/) ;
+- Node.js 20 ou plus recent, pour l'extension navigateur ;
+- une toolchain Rust recente (edition 2024), pour `ui/` ;
 - Chromium, Google Chrome ou Microsoft Edge pour les tests navigateur ;
 - sur Windows, Inno Setup uniquement pour construire l'installeur.
 
@@ -58,6 +64,7 @@ Installation et verification :
 ```bash
 cd watcher
 uv sync
+uv lock --check
 uv run checkmate-watcher --version
 uvx ruff check src tests
 uvx ruff format --check src tests
@@ -66,12 +73,29 @@ uv run pytest -q
 
 Les tests de bout en bout (`tests/test_emulator_e2e.py`) sont ignores par
 defaut. Ils demandent Chromium et lancent eux-memes l'emulateur CESAR sur un
-port libre : rien a demarrer a la main.
+port libre : rien a demarrer a la main. La CI les lance avec `CHECKMATE_E2E=1` :
 
 ```bash
 cd watcher
 uv run playwright install chromium   # ou installe Chromium, Chrome ou Edge
 CHECKMATE_E2E=1 uv run pytest -q tests/test_emulator_e2e.py
+```
+
+Extension navigateur, a la racine du depot :
+
+```bash
+npm ci
+npm run test:syntax
+npm run lint
+```
+
+Interface Rust experimentale :
+
+```bash
+cd ui
+cargo fmt --check
+cargo clippy --all-targets -- -D warnings
+cargo test
 ```
 
 Sans `CHECKMATE_E2E=1`, pytest ignore ces deux tests et affiche la raison
@@ -139,7 +163,11 @@ qui n'a pas eu lieu.
 
 Chaque pull request vers `main` doit passer :
 
-- `test (ubuntu-latest)` et `test (windows-latest)` : lint, format et tests ;
+- `test (ubuntu-latest)` et `test (windows-latest)` : lint, format et tests Python ;
+- `Lockfile (uv)` : coherence entre `pyproject.toml` et `uv.lock` ;
+- `Extension` : syntaxe et lint des scripts de l'extension ;
+- `UI Rust` : format, clippy et tests de `ui/` ;
+- `E2E emulateur` : pointage complet contre l'emulateur, avec Chromium ;
 - `Secrets (gitleaks)` : detection de secrets dans le diff ;
 - `Dependances (dependency-review)` : revue des dependances ajoutees ;
 - `PR title` : format conventionnel du titre.
@@ -212,6 +240,10 @@ gh api -X PUT repos/MattiaPARRINELLO/autologin/branches/main/protection \
     "contexts": [
       "test (ubuntu-latest)",
       "test (windows-latest)",
+      "Lockfile (uv)",
+      "Extension",
+      "UI Rust",
+      "E2E emulateur",
       "Secrets (gitleaks)",
       "Dépendances (dependency-review)",
       "PR title"
@@ -241,12 +273,16 @@ bloquer le travail courant.
 
 ```bash
 cd watcher
+uv lock --check
 uvx ruff check src tests
 uvx ruff format --check src tests
 uv run pytest -q
 CHECKMATE_E2E=1 uv run pytest -q tests/test_emulator_e2e.py
+cd ..
+npm ci && npm run test:syntax && npm run lint
+cd ui && cargo fmt --check && cargo clippy --all-targets -- -D warnings && cargo test
 ```
 
-Les tests e2e sont facultatifs pour une contribution ordinaire : la CI ne les
-lance pas. Ils servent a verifier le parcours complet detection puis signature
+Les tests e2e tournent en CI, mais restent facultatifs pour une contribution
+ordinaire. Ils servent a verifier le parcours complet detection puis signature
 sur l'emulateur.
