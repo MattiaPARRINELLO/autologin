@@ -13,6 +13,7 @@ from pathlib import Path
 
 import pytest
 
+from checkmate_watcher.browser import bundled_chromium_path
 from checkmate_watcher.cesar import CesarSession
 from checkmate_watcher.config import (
     CesarConfig,
@@ -30,7 +31,13 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 EMULATOR = REPO_ROOT / "emulator" / "server.py"
 E2E_ENABLED = os.environ.get("CHECKMATE_E2E") == "1"
 
-pytestmark = pytest.mark.skipif(not E2E_ENABLED, reason="definir CHECKMATE_E2E=1")
+pytestmark = pytest.mark.skipif(
+    not E2E_ENABLED,
+    reason=(
+        "tests e2e desactives : definir CHECKMATE_E2E=1 "
+        "(Chromium requis, l'emulateur est lance par le test)"
+    ),
+)
 
 
 def free_port() -> int:
@@ -44,7 +51,7 @@ def chromium_path() -> str | None:
         path = shutil.which(name)
         if path:
             return path
-    return None
+    return bundled_chromium_path()
 
 
 def wait_for_state(base_url: str, attempts: int = 60) -> dict:
