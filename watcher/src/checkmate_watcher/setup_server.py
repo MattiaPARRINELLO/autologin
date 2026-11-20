@@ -127,7 +127,12 @@ class SetupSession:
         if "\n" in password or "\r" in password:
             raise SetupError("mot de passe invalide")
 
-        stored = set_password(self.config.cesar.keyring_service, username, password)
+        prefer_keyring = sys.platform.startswith(("win", "darwin"))
+        stored = (
+            set_password(self.config.cesar.keyring_service, username, password)
+            if prefer_keyring
+            else False
+        )
         with self.lock:
             self.password = password
             self.credentials_saved = True
@@ -219,7 +224,20 @@ class SetupSession:
                 "Configuration enregistree, mais le demarrage automatique a echoue. "
                 "Relance l'installation en tant qu'utilisateur."
             )
-        return {"ok": True, "message": message}
+
+        if not autostart_requested:
+            autostart_state = "disabled"
+        elif autostart_ok:
+            autostart_state = "installed"
+        else:
+            autostart_state = "failed"
+        return {
+            "ok": True,
+            "message": message,
+            "username": self.config.cesar.username,
+            "windows": [str(window) for window in self.config.schedule.windows],
+            "autostart": autostart_state,
+        }
 
     # --- persistance ---
 
