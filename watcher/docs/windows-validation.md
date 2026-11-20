@@ -29,11 +29,11 @@ uv run checkmate-watcher setup
 - [ ] la signature se dessine correctement a la souris
 - [ ] le planning propose bien 09:00-12:00 et 13:30-16:30
 - [ ] le bouton "Tester la notification" affiche un toast Windows
-- [ ] "Terminer" installe la tache planifiee sans droits administrateur
-- [ ] la tache `CheckMate` existe :
+- [ ] "Terminer" installe le demarrage automatique sans droits administrateur
+- [ ] la valeur `CheckMate` existe dans le registre utilisateur :
 
 ```powershell
-schtasks /Query /TN CheckMate
+reg query "HKCU\Software\Microsoft\Windows\CurrentVersion\Run" /v CheckMate
 ```
 
 - [ ] apres deconnexion puis reconnexion, le processus demarre sans fenetre
@@ -48,8 +48,8 @@ schtasks /Query /TN CheckMate
 powershell -ExecutionPolicy Bypass -File scripts\windows-check.ps1
 ```
 
-Le script verifie la version, lance `self-test --notify`, installe la tache
-planifiee et la relit. Options :
+Le script verifie la version, lance `self-test --notify`, installe le demarrage
+automatique et le relit dans le registre utilisateur. Options :
 
 ```powershell
 -SkipNotification   # pas de toast

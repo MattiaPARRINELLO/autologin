@@ -16,7 +16,7 @@ La detection arrive au pire un intervalle apres l'ouverture par le formateur.
 | Plateforme | Notifications | Confirmation | Navigateur | Demarrage auto |
 |------------|---------------|--------------|------------|----------------|
 | Linux | notify-send, fallback D-Bus | zenity, fallback tkinter | Chromium systeme ou bundle | systemd utilisateur |
-| Windows | toast PowerShell, valide sur runner GitHub | tkinter | Edge ou Chrome installe | tache planifiee validee |
+| Windows | toast PowerShell, valide sur runner GitHub | tkinter | Edge ou Chrome installe | registre utilisateur valide |
 | macOS | osascript | tkinter | Chrome / Edge installe | launchd prevu |
 
 Les chemins sont portables via `platformdirs` : `~/.config/checkmate-watcher` sur

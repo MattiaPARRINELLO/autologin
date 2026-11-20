@@ -325,8 +325,8 @@ attendant, SmartScreen affiche un avertissement au premier lancement.
 
 ### Windows
 
-Paramètres, Applications, CheckMate, Désinstaller. La tâche planifiée est
-supprimée.
+Paramètres, Applications, CheckMate, Désinstaller. Le démarrage automatique
+est supprimé.
 
 La configuration et la signature restent dans `%APPDATA%\checkmate-watcher`.
 Supprime ce dossier si tu veux tout effacer.

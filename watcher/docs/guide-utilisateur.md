@@ -139,8 +139,8 @@ Sur Windows : `%LOCALAPPDATA%\checkmate-watcher\Logs\checkmate-watcher.log`.
 
 ## Désinstallation
 
-**Windows** : Paramètres, Applications, CheckMate, Désinstaller. La tâche
-planifiée est supprimée. La configuration et la signature restent dans
+**Windows** : Paramètres, Applications, CheckMate, Désinstaller. Le démarrage
+automatique est supprimé. La configuration et la signature restent dans
 `%APPDATA%\checkmate-watcher` si tu veux les supprimer à la main.
 
 **Linux** :

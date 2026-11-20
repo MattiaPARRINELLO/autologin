@@ -109,14 +109,16 @@ jobs:
         run: |
           uv run python -c "from checkmate_watcher.credentials import set_password,get_password,delete_password; s='checkmate-ci'; u='ci'; assert set_password(s,u,'secret'); assert get_password(s,u)=='secret'; delete_password(s,u); print('keyring OK')"
 
-      - name: Tache planifiee
+      - name: Demarrage automatique
         shell: pwsh
         run: |
           uv run checkmate-watcher --config "$env:RUNNER_TEMP\config.toml" install-autostart
           if ($LASTEXITCODE -ne 0) { throw "installation autostart echouee" }
-          schtasks /Query /TN CheckMate
-          if ($LASTEXITCODE -ne 0) { throw "tache absente" }
+          reg query "HKCU\Software\Microsoft\Windows\CurrentVersion\Run" /v CheckMate
+          if ($LASTEXITCODE -ne 0) { throw "valeur Run absente" }
           uv run checkmate-watcher --config "$env:RUNNER_TEMP\config.toml" uninstall-autostart
+          reg query "HKCU\Software\Microsoft\Windows\CurrentVersion\Run" /v CheckMate
+          if ($LASTEXITCODE -eq 0) { throw "valeur Run encore presente" }
 
       - name: Inno Setup
         run: choco install innosetup -y --no-progress

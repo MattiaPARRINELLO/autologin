@@ -41,4 +41,5 @@ Filename: "{app}\CheckMate.exe"; Parameters: "setup"; Description: "Configurer C
 
 [UninstallRun]
 Filename: "{sys}\taskkill.exe"; Parameters: "/F /IM CheckMate.exe"; Flags: runhidden; RunOnceId: "KillApp"
-Filename: "{sys}\schtasks.exe"; Parameters: "/Delete /F /TN CheckMate"; Flags: runhidden; RunOnceId: "DeleteTask"
+Filename: "{sys}\schtasks.exe"; Parameters: "/Delete /F /TN CheckMate"; Flags: runhidden; RunOnceId: "DeleteOldTask"
+Filename: "{sys}\reg.exe"; Parameters: "delete ""HKCU\Software\Microsoft\Windows\CurrentVersion\Run"" /v CheckMate /f"; Flags: runhidden; RunOnceId: "DeleteRunKey"

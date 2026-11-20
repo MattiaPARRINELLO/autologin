@@ -12,6 +12,8 @@ logger = logging.getLogger(__name__)
 
 TASK_NAME = "CheckMate"
 UNIT_NAME = "checkmate-watcher.service"
+RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
+RUN_VALUE = "CheckMate"
 
 
 def _run(command: list[str], timeout: int = 30) -> subprocess.CompletedProcess:
@@ -74,39 +76,43 @@ def _enable_linux(executable: Path, config_path: Path) -> bool:
     return True
 
 
-def _enable_windows(executable: Path, config_path: Path) -> bool:
+def _winreg():
+    import winreg
+
+    return winreg
+
+
+def _windows_command(executable: Path, config_path: Path) -> str:
+    return f'"{executable}" --config "{config_path}" run'
+
+
+def _remove_legacy_windows_task() -> None:
+    """Supprime l'ancienne tache planifiee des versions 0.1.0 et 0.1.1."""
     schtasks = shutil.which("schtasks")
     if not schtasks:
-        logger.error("schtasks introuvable, demarrage automatique impossible")
-        return False
+        return
+    _run([schtasks, "/Delete", "/F", "/TN", TASK_NAME])
 
-    command = " ".join(
-        [
-            f'"{executable}"',
-            "--config",
-            f'"{config_path}"',
-            "run",
-        ]
-    )
-    result = _run(
-        [
-            schtasks,
-            "/Create",
-            "/F",
-            "/SC",
-            "ONLOGON",
-            "/TN",
-            TASK_NAME,
-            "/TR",
-            command,
-            "/RL",
-            "LIMITED",
-            "/DELAY",
-            "0000:10",
-        ]
-    )
-    if result.returncode != 0:
-        logger.error("creation de la tache echouee : %s", result.stderr.strip())
+
+def _enable_windows(executable: Path, config_path: Path) -> bool:
+    _remove_legacy_windows_task()
+    try:
+        winreg = _winreg()
+        with winreg.OpenKey(
+            winreg.HKEY_CURRENT_USER,
+            RUN_KEY,
+            0,
+            winreg.KEY_SET_VALUE,
+        ) as key:
+            winreg.SetValueEx(
+                key,
+                RUN_VALUE,
+                0,
+                winreg.REG_SZ,
+                _windows_command(executable, config_path),
+            )
+    except OSError as exc:
+        logger.error("ecriture du demarrage automatique impossible : %s", exc)
         return False
     return True
 
@@ -129,11 +135,22 @@ def _disable_linux() -> bool:
 
 
 def _disable_windows() -> bool:
-    schtasks = shutil.which("schtasks")
-    if not schtasks:
+    _remove_legacy_windows_task()
+    try:
+        winreg = _winreg()
+        with winreg.OpenKey(
+            winreg.HKEY_CURRENT_USER,
+            RUN_KEY,
+            0,
+            winreg.KEY_SET_VALUE,
+        ) as key:
+            winreg.DeleteValue(key, RUN_VALUE)
+    except FileNotFoundError:
+        return True
+    except OSError as exc:
+        logger.error("suppression du demarrage automatique impossible : %s", exc)
         return False
-    result = _run([schtasks, "/Delete", "/F", "/TN", TASK_NAME])
-    return result.returncode == 0
+    return True
 
 
 def disable_autostart() -> bool:
@@ -153,11 +170,18 @@ def _status_linux() -> bool:
 
 
 def _status_windows() -> bool:
-    schtasks = shutil.which("schtasks")
-    if not schtasks:
+    try:
+        winreg = _winreg()
+        with winreg.OpenKey(
+            winreg.HKEY_CURRENT_USER,
+            RUN_KEY,
+            0,
+            winreg.KEY_READ,
+        ) as key:
+            winreg.QueryValueEx(key, RUN_VALUE)
+    except OSError:
         return False
-    result = _run([schtasks, "/Query", "/TN", TASK_NAME])
-    return result.returncode == 0
+    return True
 
 
 def autostart_enabled() -> bool:
@@ -169,14 +193,13 @@ def autostart_enabled() -> bool:
 
 
 def restart_autostart() -> bool:
-    """Relance le service ou la tache apres un changement de configuration."""
+    """Relance le service apres un changement de configuration.
+
+    Sur Windows, l'entree du registre prend effet a la prochaine ouverture de
+    session ; il n'y a pas de service a redemarrer.
+    """
     if sys.platform.startswith("win"):
-        schtasks = shutil.which("schtasks")
-        if not schtasks:
-            return False
-        _run([schtasks, "/End", "/TN", TASK_NAME])
-        result = _run([schtasks, "/Run", "/TN", TASK_NAME])
-        return result.returncode == 0
+        return True
     if sys.platform == "linux":
         systemctl = shutil.which("systemctl")
         if not systemctl:

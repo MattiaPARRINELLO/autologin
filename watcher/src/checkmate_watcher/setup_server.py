@@ -235,11 +235,18 @@ class SetupSession:
                 "Configuration enregistree. Le demarrage automatique est desactive."
             )
         elif autostart_ok:
-            message = "Configuration enregistree et demarrage automatique installe."
+            if sys.platform.startswith("win"):
+                message = (
+                    "Configuration enregistree. Le demarrage automatique prendra "
+                    "effet a la prochaine ouverture de session. Tu peux aussi "
+                    "lancer CheckMate depuis le menu Demarrer."
+                )
+            else:
+                message = "Configuration enregistree et service redemarre."
         else:
             message = (
                 "Configuration enregistree, mais le demarrage automatique a echoue. "
-                "Relance l'installation en tant qu'utilisateur."
+                "Tu peux lancer CheckMate depuis le menu Demarrer."
             )
 
         if not autostart_requested:

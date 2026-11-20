@@ -1,6 +1,6 @@
 [project]
 name = "checkmate-watcher"
-version = "0.1.1"
+version = "0.1.2"
 description = "Surveille CESAR Emineo et propose de signer l'emargement des qu'il s'ouvre"
 requires-python = ">=3.11"
 dependencies = [
