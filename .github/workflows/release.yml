@@ -22,6 +22,18 @@ jobs:
         with:
           enable-cache: true
 
+      - name: Determiner le statut de la release
+        id: meta
+        shell: bash
+        run: |
+          version="${GITHUB_REF_NAME#watcher-v}"
+          case "$version" in
+            *-*) prerelease=true ;;
+            *) prerelease=false ;;
+          esac
+          echo "version=${version%%-*}" >> "$GITHUB_OUTPUT"
+          echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
+
       - name: Dependances
         run: uv sync
 
@@ -34,7 +46,7 @@ jobs:
       - name: Construire l'installeur
         shell: pwsh
         run: |
-          $version = $env:GITHUB_REF_NAME -replace '^watcher-v','' -replace '^v',''
+          $version = "${{ steps.meta.outputs.version }}"
           & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "/DMyAppVersion=$version" "packaging\checkmate.iss"
 
       - name: Publier l'installeur non signe
@@ -82,8 +94,19 @@ jobs:
       - name: Dependances
         run: uv sync
 
+      - name: Determiner le statut de la release
+        id: meta
+        run: |
+          version="${GITHUB_REF_NAME#watcher-v}"
+          case "$version" in
+            *-*) prerelease=true ;;
+            *) prerelease=false ;;
+          esac
+          echo "version=${version%%-*}" >> "$GITHUB_OUTPUT"
+          echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
+
       - name: Archive Linux
-        run: bash packaging/build-linux.sh "${GITHUB_REF_NAME#watcher-v}"
+        run: bash packaging/build-linux.sh "${{ steps.meta.outputs.version }}"
 
       - uses: actions/upload-artifact@v4
         with:
@@ -96,6 +119,18 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Determiner le statut de la release
+        id: meta
+        run: |
+          version="${GITHUB_REF_NAME#watcher-v}"
+          case "$version" in
+            *-*) prerelease=true; suffix=" beta" ;;
+            *) prerelease=false; suffix="" ;;
+          esac
+          echo "version=${version%%-*}" >> "$GITHUB_OUTPUT"
+          echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
+          echo "name=CheckMate desktop ${version%%-*}$suffix" >> "$GITHUB_OUTPUT"
+
       - uses: actions/download-artifact@v4
         with:
           path: artifacts
@@ -118,6 +153,8 @@ jobs:
 
       - uses: softprops/action-gh-release@v2
         with:
+          name: ${{ steps.meta.outputs.name }}
           generate_release_notes: true
-          prerelease: true
+          prerelease: ${{ steps.meta.outputs.prerelease }}
+          make_latest: ${{ steps.meta.outputs.prerelease == 'false' }}
           files: release-assets/*
