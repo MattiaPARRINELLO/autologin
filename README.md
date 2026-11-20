@@ -22,7 +22,9 @@
 ---
 
 ## 🎯 Présentation
-CheckMate est une extension Chrome conçue pour les apprenants et formateurs utilisant la plateforme CESAR Emineo. Elle automatise entièrement le processus de pointage : ouverture de la session, connexion, recherche du bouton de signature, reproduction fidèle de votre signature manuscrite et validation. Une fois configurée, un seul clic suffit pour pointer sa présence.
+CheckMate est une extension Chrome conçue pour les apprenants et formateurs utilisant la plateforme CESAR Emineo.
+
+> **Application de bureau** : le watcher Python dans [`watcher/`](watcher/) surveille CESAR et signe l'émargement localement, sans onglet ouvert. Voir la [page de téléchargement](DOWNLOAD.md). Elle automatise entièrement le processus de pointage : ouverture de la session, connexion, recherche du bouton de signature, reproduction fidèle de votre signature manuscrite et validation. Une fois configurée, un seul clic suffit pour pointer sa présence.
 
 ---
 
