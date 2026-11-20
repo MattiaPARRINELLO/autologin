@@ -4,6 +4,7 @@ import pytest
 
 from checkmate_watcher.updates import (
     Release,
+    Version,
     check_for_update,
     parse_release,
     parse_version,
@@ -24,10 +25,27 @@ def release(tag: str, *, prerelease: bool = False) -> Release:
 
 
 def test_parse_version():
-    assert parse_version("watcher-v1.2.3") == (1, 2, 3)
-    assert parse_version("watcher-0.1.0") == (0, 1, 0)
-    assert parse_version("v1.6.0") == (1, 6, 0)
+    assert parse_version("watcher-v1.2.3") == Version(1, 2, 3)
+    assert parse_version("watcher-0.1.0") == Version(0, 1, 0)
+    assert parse_version("v1.6.0") == Version(1, 6, 0)
     assert parse_version("pas une version") is None
+
+
+def test_parse_version_ordonne_les_betas_avant_la_stable():
+    beta1 = parse_version("watcher-v0.6.0-beta.1")
+    beta2 = parse_version("watcher-v0.6.0-beta.2")
+    stable = parse_version("watcher-v0.6.0")
+    assert beta1 is not None and beta2 is not None and stable is not None
+    assert beta1 < beta2 < stable
+    assert parse_version("watcher-v0.6.0-beta1") == beta1
+    assert str(stable) == "0.6.0"
+    assert str(beta1) == "0.6.0-beta.1"
+
+
+def test_parse_version_garde_les_tags_sans_suffixe():
+    assert parse_version("watcher-v0.1.3") == Version(0, 1, 3)
+    assert parse_version("watcher-v0.5.9") == Version(0, 5, 9)
+    assert parse_version("watcher-v0.5.9") < parse_version("watcher-v0.6.0")
 
 
 def test_parse_release_compte_les_telechargements():
@@ -54,7 +72,7 @@ def test_parse_release_ignore_les_tags_de_l_extension():
         }
     )
     assert parsed is not None
-    assert parsed.version == (0, 2, 0)
+    assert parsed.version == Version(0, 2, 0)
     assert parsed.prerelease is True
 
 
@@ -64,15 +82,28 @@ def test_select_latest_avec_prereleases():
         release("watcher-v0.2.0", prerelease=True),
         release("watcher-v0.1.5"),
     ]
-    assert select_latest(releases).tag == "watcher-v0.2.0"
+    assert select_latest(releases, channel="beta").tag == "watcher-v0.2.0"
+    assert select_latest(releases, channel="stable").tag == "watcher-v0.1.5"
     assert select_latest(releases, include_prerelease=False).tag == "watcher-v0.1.5"
+
+
+def test_select_latest_respecte_le_canal():
+    releases = [
+        release("watcher-v0.6.0", prerelease=False),
+        release("watcher-v0.7.0-beta.1", prerelease=True),
+        release("watcher-v0.7.0-beta.2", prerelease=True),
+    ]
+    stable = select_latest(releases, channel="stable")
+    beta = select_latest(releases, channel="beta")
+    assert stable is not None and stable.tag == "watcher-v0.6.0"
+    assert beta is not None and beta.tag == "watcher-v0.7.0-beta.2"
 
 
 def test_check_for_update():
     releases = [release("watcher-0.1.0"), release("watcher-v0.2.0")]
     update = check_for_update("0.1.0", releases=releases)
     assert update is not None
-    assert update.version == (0, 2, 0)
+    assert update.version == Version(0, 2, 0)
 
 
 def test_check_for_update_deja_a_jour():
@@ -83,9 +114,28 @@ def test_check_for_update_deja_a_jour():
 
 def test_check_for_update_refuse_les_prereleases():
     releases = [release("watcher-0.1.0"), release("watcher-v0.2.0", prerelease=True)]
+    assert check_for_update("0.1.0", channel="stable", releases=releases) is None
     assert (
         check_for_update("0.1.0", include_prerelease=False, releases=releases) is None
     )
+
+
+def test_check_for_update_accepte_les_prereleases_en_beta():
+    releases = [
+        release("watcher-v0.1.0"),
+        release("watcher-v0.2.0-beta.1", prerelease=True),
+    ]
+    update = check_for_update("0.1.0", channel="beta", releases=releases)
+    assert update is not None
+    assert update.version_text == "0.2.0-beta.1"
+
+
+def test_une_beta_du_meme_numero_est_proposee_avant_la_stable():
+    releases = [release("watcher-v0.6.0-beta.1", prerelease=True)]
+    beta = check_for_update("0.5.0", channel="beta", releases=releases)
+    assert beta is not None and beta.tag == "watcher-v0.6.0-beta.1"
+    assert check_for_update("0.5.0", channel="stable", releases=releases) is None
+    assert check_for_update("0.6.0", channel="beta", releases=releases) is None
 
 
 def test_parse_release_collecte_les_assets():
@@ -120,7 +170,7 @@ def test_platform_asset():
     )
     parsed = Release(
         tag="watcher-v0.4.2",
-        version=(0, 4, 2),
+        version=Version(0, 4, 2),
         url="",
         name="",
         prerelease=True,
@@ -172,7 +222,7 @@ def test_download_update(tmp_path):
     sums.write_text(f"{digest}  CheckMate-linux-0.4.2.tar.gz\n", encoding="utf-8")
     release = Release(
         tag="watcher-v0.4.2",
-        version=(0, 4, 2),
+        version=Version(0, 4, 2),
         url="",
         name="",
         prerelease=True,
@@ -200,7 +250,7 @@ def test_download_update_somme_invalide(tmp_path):
     )
     release = Release(
         tag="watcher-v0.4.2",
-        version=(0, 4, 2),
+        version=Version(0, 4, 2),
         url="",
         name="",
         prerelease=True,

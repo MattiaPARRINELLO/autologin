@@ -66,6 +66,7 @@ def build_snapshot(
 
     return {
         "version": __version__,
+        "channel": config.updates.channel,
         "build": BUILD,
         "started_at": _iso(started_at),
         "now": _iso(moment),
