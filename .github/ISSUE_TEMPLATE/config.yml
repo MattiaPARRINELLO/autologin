@@ -1,5 +1,8 @@
 blank_issues_enabled: false
 contact_links:
+  - name: Poser une question d'usage
+    url: https://github.com/MattiaPARRINELLO/autologin/issues/new?template=question.yml
+    about: Installation, configuration, dépannage. Les Discussions ne sont pas activées.
   - name: Politique de sécurité
     url: https://github.com/MattiaPARRINELLO/autologin/security/policy
     about: Signaler une faille en privé, sans ouvrir d'issue publique.
