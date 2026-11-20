@@ -21,6 +21,7 @@ SETUP_HTML = """<!doctype html>
     --ok: #2f6f4f;
     --err: #b3261e;
     --ease: cubic-bezier(0.22, 1, 0.36, 1);
+    --pen-cursor: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20'%3E%3Cpath d='M10 3v4M10 13v4M3 10h4M13 10h4' stroke='%23ffffff' stroke-width='4' stroke-linecap='round'/%3E%3Cpath d='M10 3v4M10 13v4M3 10h4M13 10h4' stroke='%231f1b16' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E") 10 10, crosshair;
   }
   * { box-sizing: border-box; }
   body {
@@ -298,7 +299,7 @@ SETUP_HTML = """<!doctype html>
     background: #ffffff;
     border: 1px solid var(--line);
     border-radius: 12px;
-    cursor: crosshair;
+    cursor: var(--pen-cursor);
     touch-action: none;
   }
   .import-line {
@@ -723,6 +724,10 @@ canvas.addEventListener("pointercancel", endStroke);
 function clearPad() {
   points = [];
   context.clearRect(0, 0, canvas.width, canvas.height);
+  context.strokeStyle = "#1f1b16";
+  context.lineWidth = 2.4;
+  context.lineCap = "round";
+  context.lineJoin = "round";
   setStatus("signatureStatus", "");
 }
 

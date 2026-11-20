@@ -263,6 +263,8 @@ document.addEventListener('DOMContentLoaded', () => {
    */
   btnClear.addEventListener('click', () => {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 2;
     signatureData = [];
     hasSignature = false;
     placeholder.classList.remove('hidden');

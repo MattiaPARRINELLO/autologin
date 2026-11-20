@@ -457,7 +457,7 @@ body {
   display: block;
   width: 100%;
   height: 100%;
-  cursor: crosshair;
+  cursor: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20'%3E%3Cpath d='M10 3v4M10 13v4M3 10h4M13 10h4' stroke='%23ffffff' stroke-width='4' stroke-linecap='round'/%3E%3Cpath d='M10 3v4M10 13v4M3 10h4M13 10h4' stroke='%231f1b16' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E") 10 10, crosshair;
 }
 
 .canvas-placeholder {
