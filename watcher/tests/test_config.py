@@ -35,6 +35,19 @@ def test_charge_les_valeurs_par_defaut(tmp_path):
     assert config.selectors.attendance_button[0] == "button.buttonPresent"
 
 
+def test_les_chemins_par_defaut_viennent_de_paths(tmp_path):
+    from checkmate_watcher.paths import (
+        default_profile_dir,
+        default_signature_path,
+        default_state_file,
+    )
+
+    config = load_config(write_config(tmp_path))
+    assert config.watcher.profile_dir == default_profile_dir()
+    assert config.watcher.state_file == default_state_file()
+    assert config.signature.file == default_signature_path()
+
+
 def test_surcharge_les_valeurs(tmp_path):
     config = load_config(
         write_config(
@@ -55,6 +68,25 @@ def test_surcharge_les_valeurs(tmp_path):
     assert config.watcher.auto_sign is True
     assert config.watcher.headless is True
     assert config.signature.padding_ratio == 0.5
+
+
+def test_save_puis_reload_conserve_toute_la_configuration(tmp_path):
+    from dataclasses import replace
+
+    from checkmate_watcher.config import default_config, save_config
+
+    config = default_config()
+    config = replace(
+        config,
+        cesar=replace(config.cesar, username="eleve", password="secret"),
+        watcher=replace(config.watcher, executable_path="/opt/chrome", auto_sign=True),
+        notifications=replace(config.notifications, enabled=False),
+        updates=replace(config.updates, channel="beta"),
+    )
+    path = tmp_path / "config.toml"
+    save_config(path, config, password="secret")
+
+    assert load_config(path) == config
 
 
 def test_refuse_un_intervalle_trop_court(tmp_path):
@@ -119,13 +151,11 @@ def test_refuse_un_ficher_absent(tmp_path):
 def test_canal_stable_par_defaut(tmp_path):
     config = load_config(write_config(tmp_path))
     assert config.updates.channel == "stable"
-    assert config.updates.include_prerelease is False
 
 
 def test_lit_le_canal_beta(tmp_path):
     config = load_config(write_config(tmp_path, '[updates]\nchannel = "beta"'))
     assert config.updates.channel == "beta"
-    assert config.updates.include_prerelease is True
 
 
 def test_alias_include_prerelease(tmp_path):

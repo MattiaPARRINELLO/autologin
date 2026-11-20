@@ -3,18 +3,23 @@
 // Orchestre les étapes du pointage automatisé
 // =============================================
 
+import {
+  GITHUB_REPO,
+  PRESENCE_BUTTON_SELECTOR,
+  PROGRESS_STORAGE_KEY,
+  appendExecutionLog as persistExecutionLog,
+  progressState
+} from './shared.js';
+
 // --- Constantes ---
-const URL_CONNEXION = 'https://cesar.emineo-education.fr/connexion';
-const URL_TABLEAU_BORD = 'https://cesar.emineo-education.fr/';
-const TIMEOUT_CHARGEMENT = 30000; // 30 secondes (site lent)
-const TIMEOUT_REDIRECTION = 30000; // 30 secondes (site lent)
-const EXECUTION_LOG_KEY = 'executionLogs';
-const MAX_EXECUTION_LOGS = 40;
+const SITE_ORIGIN = 'https://cesar.emineo-education.fr';
+const LOGIN_PATH = '/connexion';
+const URL_CONNEXION = `${SITE_ORIGIN}${LOGIN_PATH}`;
+const TIMEOUT_CHARGEMENT = 30000;
+const TIMEOUT_REDIRECTION = 30000;
 const NOTIFICATION_STATUS_ID = 'checkmate-pointage-status';
 const NOTIFICATION_PROGRESS_ID = 'checkmate-pointage-progress';
 const NOTIFICATION_DEDUPE_MS = 1800;
-const PROGRESS_STORAGE_KEY = 'pointageProgress';
-const GITHUB_REPO = 'MattiaPARRINELLO/CheckMate';
 const GITHUB_API_HEADERS = {
   Accept: 'application/vnd.github+json',
   'X-GitHub-Api-Version': '2022-11-28'
@@ -35,29 +40,6 @@ const SITE_SELECTORS = {
 };
 
 /**
- * Persist un log pour affichage dans le popup
- * @param {string} tag
- * @param {string} message
- * @param {'info'|'success'|'error'} level
- */
-function appendExecutionLog(tag, message, level = 'info') {
-  const entry = {
-    id: `${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
-    ts: new Date().toISOString(),
-    source: 'background',
-    tag,
-    message,
-    level
-  };
-
-  chrome.storage.local.get([EXECUTION_LOG_KEY], (result) => {
-    const logs = Array.isArray(result[EXECUTION_LOG_KEY]) ? result[EXECUTION_LOG_KEY] : [];
-    logs.unshift(entry);
-    chrome.storage.local.set({ [EXECUTION_LOG_KEY]: logs.slice(0, MAX_EXECUTION_LOGS) });
-  });
-}
-
-/**
  * Log horodaté pour faciliter le debug
  * @param {string} tag - Catégorie du log (ex: 'Étape 1')
  * @param {string} message - Message à afficher
@@ -65,7 +47,7 @@ function appendExecutionLog(tag, message, level = 'info') {
 function log(tag, message, level = 'info') {
   const now = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit', fractionalSecondDigits: 3 });
   console.log(`[${now}][${tag}] ${message}`);
-  appendExecutionLog(tag, message, level);
+  persistExecutionLog(tag, message, level);
 }
 
 /**
@@ -125,7 +107,6 @@ async function getDerniereVersionGithub() {
     try {
       errorBody = await response.text();
     } catch (_) {
-      // ignorer lecture body
     }
     log('Mise à jour', `releases/latest indisponible (${response.status}) pour ${GITHUB_REPO}${errorBody ? ` | body=${errorBody}` : ''}`, 'error');
 
@@ -262,18 +243,16 @@ function afficherNotification(titre, message, options = {}) {
     iconUrl: 'icons/icon128.png',
     title: titre,
     message: message
-  }, (notificationId) => {
+  }, (_notificationId) => {
     if (chrome.runtime.lastError) {
       console.warn('Notification échouée:', chrome.runtime.lastError.message);
     }
   });
 }
 
-let notificationProgressionCreee = false;
-
 /**
  * Met à jour la notification de progression du pointage.
- * Une seule notification est créée puis mise à jour à chaque étape (pas de spam).
+ * Une seule notification est mise à jour à chaque étape (pas de spam).
  * L'état est aussi publié dans le storage pour que le popup l'affiche en direct.
  * @param {string} message - Étape en cours
  * @param {number} pourcentage - Avancement (0-100)
@@ -282,7 +261,7 @@ function notifierProgression(message, pourcentage) {
   const progress = Math.max(0, Math.min(100, Math.round(pourcentage)));
 
   chrome.storage.local.set({
-    [PROGRESS_STORAGE_KEY]: { message, pourcentage: progress, enCours: true, ts: Date.now() }
+    [PROGRESS_STORAGE_KEY]: progressState(message, progress, true)
   });
 
   const options = {
@@ -294,24 +273,13 @@ function notifierProgression(message, pourcentage) {
     silent: true
   };
 
-  if (notificationProgressionCreee) {
-    chrome.notifications.update(NOTIFICATION_PROGRESS_ID, options, (maj) => {
-      if (chrome.runtime.lastError) return;
-      // La notification a été fermée par l'utilisateur → la recréer
-      if (!maj) {
-        notificationProgressionCreee = false;
-        notifierProgression(message, progress);
+  chrome.notifications.update(NOTIFICATION_PROGRESS_ID, options, (maj) => {
+    if (chrome.runtime.lastError || maj) return;
+    chrome.notifications.create(NOTIFICATION_PROGRESS_ID, options, () => {
+      if (chrome.runtime.lastError) {
+        console.warn('Notification de progression échouée:', chrome.runtime.lastError.message);
       }
     });
-    return;
-  }
-
-  chrome.notifications.create(NOTIFICATION_PROGRESS_ID, options, () => {
-    if (chrome.runtime.lastError) {
-      console.warn('Notification de progression échouée:', chrome.runtime.lastError.message);
-      return;
-    }
-    notificationProgressionCreee = true;
   });
 }
 
@@ -319,10 +287,9 @@ function notifierProgression(message, pourcentage) {
  * Retire la notification de progression et clôt l'état partagé avec le popup.
  */
 function terminerProgression() {
-  notificationProgressionCreee = false;
   chrome.notifications.clear(NOTIFICATION_PROGRESS_ID, () => {});
   chrome.storage.local.set({
-    [PROGRESS_STORAGE_KEY]: { message: '', pourcentage: 0, enCours: false, ts: Date.now() }
+    [PROGRESS_STORAGE_KEY]: progressState('', 0, false)
   });
 }
 
@@ -355,11 +322,10 @@ function attendreChargementOnglet(tabId, timeout = TIMEOUT_CHARGEMENT) {
 /**
  * Attend que l'URL d'un onglet change (redirection post-connexion)
  * @param {number} tabId - ID de l'onglet
- * @param {string} urlActuelle - URL avant la redirection
  * @param {number} timeout - Timeout en millisecondes
  * @returns {Promise<string>} La nouvelle URL
  */
-function attendreRedirection(tabId, urlActuelle, timeout = TIMEOUT_REDIRECTION) {
+function attendreRedirection(tabId, timeout = TIMEOUT_REDIRECTION) {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
       chrome.tabs.onUpdated.removeListener(listener);
@@ -368,8 +334,7 @@ function attendreRedirection(tabId, urlActuelle, timeout = TIMEOUT_REDIRECTION) 
 
     function listener(updatedTabId, changeInfo, tab) {
       if (updatedTabId === tabId && changeInfo.status === 'complete') {
-        // Vérifier que l'URL a changé (n'est plus la page de connexion)
-        if (tab.url && !tab.url.includes('/connexion')) {
+        if (tab.url && !tab.url.includes(LOGIN_PATH)) {
           clearTimeout(timer);
           chrome.tabs.onUpdated.removeListener(listener);
           // Délai pour que le DOM de la nouvelle page soit prêt
@@ -417,10 +382,9 @@ async function attendreSelecteurDansOnglet(tabId, selector, timeout = 45000, int
 /**
  * Lance le message de signature vers le content script.
  * @param {number} tabId - ID de l'onglet
- * @param {{outdated:boolean,currentVersion:string,latestVersion:string|null,latestUrl:string|null}} updateInfo
  * @returns {Promise<{success: boolean, error?: string}>}
  */
-async function lancerSignatureViaContentScript(tabId, updateInfo) {
+async function lancerSignatureViaContentScript(tabId) {
   const payload = {
     action: 'lancerSignature'
   };
@@ -438,37 +402,6 @@ async function lancerSignatureViaContentScript(tabId, updateInfo) {
       }
     });
   });
-}
-
-/**
- * Demande au content script d'afficher l'alerte de mise à jour dans la page.
- * @param {number} tabId
- * @param {{outdated:boolean,currentVersion:string,latestVersion:string|null,latestUrl:string|null}} updateInfo
- */
-async function afficherAlerteMiseAJourDansPage(tabId, updateInfo) {
-  if (!tabId || !updateInfo || !updateInfo.outdated) {
-    return;
-  }
-
-  try {
-    await new Promise((resolve) => {
-      chrome.tabs.sendMessage(tabId, {
-        action: 'afficherAlerteMiseAJour',
-        currentVersion: updateInfo.currentVersion,
-        latestVersion: updateInfo.latestVersion,
-        latestUrl: updateInfo.latestUrl
-      }, () => {
-        if (chrome.runtime.lastError) {
-          log('Mise à jour', `Impossible d'afficher la modale en page: ${chrome.runtime.lastError.message}`, 'error');
-        } else {
-          log('Mise à jour', 'Modale de mise à jour affichée dans la page');
-        }
-        resolve();
-      });
-    });
-  } catch (e) {
-    log('Mise à jour', `Erreur lors de l'affichage de la modale en page: ${e.message}`, 'error');
-  }
 }
 
 /**
@@ -576,7 +509,7 @@ async function verifierSiDejaConnecte(tabId) {
   try {
     const tab = await chrome.tabs.get(tabId);
     log('Session', `URL actuelle: ${tab.url}`);
-    if (!tab.url.includes('/connexion')) {
+    if (!tab.url.includes(LOGIN_PATH)) {
       log('Session', `Redirection immédiate détectée vers: ${tab.url}`);
       return true;
     }
@@ -597,7 +530,7 @@ async function verifierSiDejaConnecte(tabId) {
     // Vérifier si l'URL a changé (redirection serveur différée)
     try {
       const tabActuelle = await chrome.tabs.get(tabId);
-      if (!tabActuelle.url.includes('/connexion')) {
+      if (!tabActuelle.url.includes(LOGIN_PATH)) {
         log('Session', `Tentative ${i + 1}/${MAX_TENTATIVES} — redirection détectée vers: ${tabActuelle.url}`);
         return true;
       }
@@ -660,7 +593,6 @@ function scriptRemplirFormulaire(username, password) {
       window.HTMLInputElement.prototype, 'value'
     ).set;
 
-    // --- Champ identifiant ---
     const champUsername = document.querySelector('input#username');
     if (!champUsername) {
       throw new Error('Champ identifiant introuvable (input#username)');
@@ -672,7 +604,6 @@ function scriptRemplirFormulaire(username, password) {
     champUsername.dispatchEvent(new Event('change', { bubbles: true }));
     champUsername.dispatchEvent(new Event('blur', { bubbles: true }));
 
-    // --- Champ mot de passe ---
     const champPassword = document.querySelector('input#password');
     if (!champPassword) {
       throw new Error('Champ mot de passe introuvable (input#password)');
@@ -684,7 +615,6 @@ function scriptRemplirFormulaire(username, password) {
     champPassword.dispatchEvent(new Event('change', { bubbles: true }));
     champPassword.dispatchEvent(new Event('blur', { bubbles: true }));
 
-    // --- Bouton de connexion ---
     const boutonConnexion = document.querySelector('button[type="submit"].btn-primary');
     if (!boutonConnexion) {
       throw new Error('Bouton de connexion introuvable (button[type="submit"].btn-primary)');
@@ -724,7 +654,7 @@ async function etape2_remplirFormulaire(tabId, username, password) {
 async function etape3_attendreRedirection(tabId) {
   try {
     log('Étape 3', `Attente de la redirection (timeout ${TIMEOUT_REDIRECTION}ms)...`);
-    const nouvelleUrl = await attendreRedirection(tabId, URL_CONNEXION);
+    const nouvelleUrl = await attendreRedirection(tabId);
     log('Étape 3', `Redirection réussie vers: ${nouvelleUrl}`);
     return nouvelleUrl;
   } catch (erreur) {
@@ -777,6 +707,7 @@ async function lancerPointage() {
       const continuer = await confirmerSignatureSiVersionObsolete(tabId, updateInfo);
       if (!continuer) {
         log('Pointage', "Processus annulé par l'utilisateur (version non à jour)", 'error');
+        terminerProgression();
         try { chrome.tabs.remove(tabId); } catch (_) { }
         return {
           success: false,
@@ -796,7 +727,6 @@ async function lancerPointage() {
     log('Pointage', `Résultat vérification session : ${dejaConnecte ? 'CONNECTÉ' : 'NON CONNECTÉ'}`);
 
     if (dejaConnecte) {
-      // L'utilisateur est déjà connecté → passer directement à la signature
       log('Pointage', 'Session active détectée — étapes 2 et 3 ignorées, passage à la signature');
       notifierProgression('Session déjà active — connexion ignorée', 50);
     } else {
@@ -819,7 +749,7 @@ async function lancerPointage() {
     // ÉTAPE 4 — Préparer la page de signature (site potentiellement lent)
     log('Pointage', 'Étape 4 — Préparation de la page de signature (attente du bouton)...');
     notifierProgression('Recherche du bouton de signature…', 70);
-    const boutonPret = await attendreSelecteurDansOnglet(tabId, 'button.buttonPresent', 45000, 1000);
+    const boutonPret = await attendreSelecteurDansOnglet(tabId, PRESENCE_BUTTON_SELECTOR, 45000, 1000);
     if (!boutonPret) {
       throw new Error('Le bouton de signature est resté introuvable après attente prolongée (45s)');
     }
@@ -830,17 +760,17 @@ async function lancerPointage() {
     log('Pointage', `Étape 5 — Envoi du message 'lancerSignature' au content script (tabId=${tabId})...`);
     notifierProgression('Signature en cours…', 85);
 
-    let resultatSignature = await lancerSignatureViaContentScript(tabId, updateInfo);
+    let resultatSignature = await lancerSignatureViaContentScript(tabId);
 
     // Retry ciblé: cas fréquent juste après login où le DOM met encore quelques secondes à stabiliser.
-    if (!resultatSignature.success && resultatSignature.error && resultatSignature.error.includes('Aucun bouton de signature trouvé')) {
+    if (!resultatSignature.success && resultatSignature.code === 'button-missing') {
       log('Pointage', 'Étape 5 — Premier essai sans bouton trouvé, attente supplémentaire de 10s puis retry...');
       notifierProgression('Bouton absent — nouvel essai…', 75);
       await new Promise((resolve) => setTimeout(resolve, 10000));
-      const boutonRetryPret = await attendreSelecteurDansOnglet(tabId, 'button.buttonPresent', 20000, 1000);
+      const boutonRetryPret = await attendreSelecteurDansOnglet(tabId, PRESENCE_BUTTON_SELECTOR, 20000, 1000);
       if (boutonRetryPret) {
         notifierProgression('Signature en cours… (2e essai)', 85);
-        resultatSignature = await lancerSignatureViaContentScript(tabId, updateInfo);
+        resultatSignature = await lancerSignatureViaContentScript(tabId);
       }
     }
 
@@ -849,7 +779,6 @@ async function lancerPointage() {
       throw new Error(resultatSignature.error || 'Échec de la signature');
     }
 
-    // Signature réussie — Notification finale
     log('Pointage', 'Étape 5 terminée — Signature validée avec succès !', 'success');
     terminerProgression();
     afficherNotification('✅ Pointage Auto', 'Présence pointée et signée avec succès !');
@@ -886,7 +815,6 @@ async function lancerPointage() {
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === 'lancerPointage') {
-    // Exécuter le pointage de manière asynchrone et répondre au popup
     lancerPointage().then((resultat) => {
       sendResponse(resultat);
     }).catch((erreur) => {

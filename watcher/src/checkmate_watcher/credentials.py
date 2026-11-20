@@ -3,10 +3,16 @@
 from __future__ import annotations
 
 import logging
+import sys
 
 logger = logging.getLogger(__name__)
 
 DEFAULT_SERVICE = "checkmate-watcher"
+
+
+def prefer_keyring() -> bool:
+    """Le trousseau est fiable sur Windows et macOS ; Linux passe par le fichier env."""
+    return sys.platform.startswith(("win", "darwin"))
 
 
 def _keyring_module():
@@ -44,15 +50,3 @@ def set_password(service: str, username: str, password: str) -> bool:
     except Exception as exc:  # noqa: BLE001
         logger.warning("ecriture dans le trousseau impossible : %s", exc)
         return False
-
-
-def delete_password(service: str, username: str) -> bool:
-    keyring = _keyring_module()
-    if keyring is None:
-        return False
-    try:
-        keyring.delete_password(service, username)
-    except Exception as exc:  # noqa: BLE001
-        logger.debug("suppression du trousseau ignoree : %s", exc)
-        return False
-    return True

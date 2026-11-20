@@ -3,13 +3,17 @@
 // Gestion de la configuration et du canvas signature
 // =============================================
 
-const EXECUTION_LOG_KEY = 'executionLogs';
-const MAX_EXECUTION_LOGS = 40;
-const PROGRESS_STORAGE_KEY = 'pointageProgress';
+import {
+  EXECUTION_LOG_KEY,
+  GITHUB_REPO,
+  PROGRESS_STORAGE_KEY,
+  appendExecutionLog as persistExecutionLog,
+  progressState
+} from './shared.js';
+
 const PROGRESS_STALE_MS = 5 * 60 * 1000;
 
 document.addEventListener('DOMContentLoaded', () => {
-  // --- Références DOM ---
   const body = document.body;
   const usernameInput = document.getElementById('username');
   const passwordInput = document.getElementById('password');
@@ -37,7 +41,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const updateModalConfirm = document.getElementById('update-modal-confirm');
   const updateModalMessage = document.getElementById('update-modal-message');
 
-  // --- État du dessin ---
   let isDrawing = false;
   let signatureData = []; // Tableau de coordonnées [{x, y, type}]
   let hasSignature = false;
@@ -106,20 +109,7 @@ document.addEventListener('DOMContentLoaded', () => {
    * @param {'info'|'success'|'error'} level
    */
   function appendExecutionLog(tag, message, level = 'info') {
-    const entry = {
-      id: `${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
-      ts: new Date().toISOString(),
-      source: 'popup',
-      tag,
-      message,
-      level
-    };
-
-    chrome.storage.local.get([EXECUTION_LOG_KEY], (result) => {
-      const logs = Array.isArray(result[EXECUTION_LOG_KEY]) ? result[EXECUTION_LOG_KEY] : [];
-      logs.unshift(entry);
-      chrome.storage.local.set({ [EXECUTION_LOG_KEY]: logs.slice(0, MAX_EXECUTION_LOGS) });
-    });
+    persistExecutionLog(tag, message, level);
   }
 
   /**
@@ -464,7 +454,7 @@ document.addEventListener('DOMContentLoaded', () => {
         '...\n\n' +
         `## Infos techniques\n- Version CheckMate: ${version}\n- Navigateur: ${browser}`
       );
-      const url = `https://github.com/MattiaPARRINELLO/CheckMate/issues/new?title=${title}&body=${body}`;
+      const url = `https://github.com/${GITHUB_REPO}/issues/new?title=${title}&body=${body}`;
       chrome.tabs.create({ url });
     });
   }
@@ -506,7 +496,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const username = usernameInput.value.trim();
     const password = passwordInput.value;
 
-    // Validation des champs
     if (!username) {
       updateStatusBar('Veuillez saisir un identifiant');
       appendExecutionLog('Configuration', 'Identifiant manquant', 'error');
@@ -523,7 +512,6 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    // Sauvegarde dans chrome.storage.local
     const lastAction = `Configuration sauvegardée — ${formatDateHeure()}`;
 
     chrome.storage.local.set({
@@ -562,16 +550,13 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
 
-      // Désactiver le bouton pendant l'exécution
-      setStartButtonLoading();
+        setStartButtonLoading();
       updateStatusBar('Lancement du pointage...');
-      updateProgressBar({ message: 'Lancement du pointage…', pourcentage: 5, enCours: true, ts: Date.now() }, true);
+      updateProgressBar(progressState('Lancement du pointage…', 5, true), true);
       appendExecutionLog('Pointage', 'Demarrage du pointage', 'info');
 
-      // Envoyer le message au background.js pour démarrer le processus
-      chrome.runtime.sendMessage({ action: 'lancerPointage' }, (response) => {
-        // Réactiver le bouton
-        setStartButtonIdle();
+        chrome.runtime.sendMessage({ action: 'lancerPointage' }, (response) => {
+            setStartButtonIdle();
         updateProgressBar({ enCours: false });
 
         if (chrome.runtime.lastError) {

@@ -86,7 +86,8 @@ class CesarSession:
         self.config.watcher.profile_dir.mkdir(parents=True, exist_ok=True)
         self._playwright = await async_playwright().start()
         options = resolve_launch_options(
-            self._playwright.chromium, self.config
+            self._playwright.chromium,
+            self.config.watcher.executable_path,
         ).as_kwargs()
         self._context = await self._playwright.chromium.launch_persistent_context(
             user_data_dir=str(self.config.watcher.profile_dir),
@@ -130,9 +131,10 @@ class CesarSession:
             self._playwright = None
 
     async def restart(self) -> None:
+        headless = self.headless
         await self.close()
         await asyncio.sleep(2)
-        await self.open()
+        await self.open(headless=headless)
 
     async def _wait_for_ready(self, timeout_ms: int = 6000) -> None:
         """Attend le premier element qui indique que la page est utilisable."""
@@ -186,15 +188,15 @@ class CesarSession:
         if self.page is None:
             raise CesarError("navigateur non demarre")
         if self.config.cesar.login_path in self.page.url:
-            await self._login()
+            await self.login()
             return
 
         username = await self._first_visible(self.selectors.login_username)
         password = await self._first_visible(self.selectors.login_password)
         if username is not None and password is not None:
-            await self._login()
+            await self.login()
 
-    async def _login(self) -> None:
+    async def login(self) -> None:
         if self.page is None:
             raise LoginError("navigateur non demarre")
         logger.info("connexion a CESAR")

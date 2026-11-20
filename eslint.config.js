@@ -10,7 +10,7 @@ export default [
     files: ["*.js"],
     languageOptions: {
       ecmaVersion: 2022,
-      sourceType: "script",
+      sourceType: "module",
       globals: {
         ...globals.browser,
         ...globals.webextensions,
@@ -28,6 +28,12 @@ export default [
         },
       ],
       "no-empty": ["error", { allowEmptyCatch: true }],
+    },
+  },
+  {
+    files: ["content.js"],
+    languageOptions: {
+      sourceType: "script",
     },
   },
 ];

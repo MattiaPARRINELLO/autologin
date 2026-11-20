@@ -1,7 +1,14 @@
 from __future__ import annotations
 
 from checkmate_watcher import notifications
+from checkmate_watcher.config import default_config
 from checkmate_watcher.notifications import Notifier, _applescript_string, _gvariant
+
+
+def test_notifier_reprend_la_configuration():
+    notifier = Notifier.from_config(default_config())
+    assert notifier.app_name == "CheckMate"
+    assert notifier.icon == "dialog-information"
 
 
 def test_gvariant_echappe_les_guillemets():
@@ -79,15 +86,23 @@ def test_confirmation_windows_utilise_tkinter(monkeypatch):
 
 
 def test_confirmation_linux_bascule_sur_tkinter(monkeypatch):
-    monkeypatch.setattr(
-        notifications,
-        "ask_zenity",
-        lambda *args, **kwargs: None,
-    )
+    def unavailable(*args, **kwargs):
+        raise notifications.DialogUnavailable("zenity introuvable")
+
+    monkeypatch.setattr(notifications, "ask_zenity", unavailable)
+    monkeypatch.setattr(notifications, "ask_tkinter", lambda *args, **kwargs: False)
+    notifier = Notifier(platform="linux")
+    assert notifier.ask("present ?") is False
+
+
+def test_confirmation_expiree_ne_relance_pas_tkinter(monkeypatch):
+    monkeypatch.setattr(notifications, "ask_zenity", lambda *args, **kwargs: None)
     monkeypatch.setattr(
         notifications,
         "ask_tkinter",
-        lambda *args, **kwargs: False,
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("ne doit pas etre appele")
+        ),
     )
     notifier = Notifier(platform="linux")
-    assert notifier.ask("present ?") is False
+    assert notifier.ask("present ?", timeout=1) is None

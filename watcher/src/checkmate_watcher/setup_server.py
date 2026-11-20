@@ -2,23 +2,25 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import secrets
 import sys
+import tempfile
 import threading
 from dataclasses import replace
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from http.server import ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import parse_qs, urlparse
+from typing import Any
+from urllib.parse import urlparse
 
-from . import BUILD, __version__
 from .autostart import (
     current_executable,
     enable_autostart,
     restart_autostart,
 )
-from .browser import resolve_launch_options
+from .cesar import CesarSession
 from .config import (
     Config,
     ConfigError,
@@ -26,10 +28,20 @@ from .config import (
     load_config,
     save_config,
 )
-from .credentials import keyring_available, set_password
+from .credentials import keyring_available, prefer_keyring, set_password
+from .local_http import LocalError, LocalHandler
+from .local_http import create_server as _create_server
 from .notifications import Notifier
 from .paths import default_env_path
-from .schedule import Schedule, ScheduleError, parse_days, parse_windows
+from .schedule import (
+    DAY_NAMES,
+    DEFAULT_DAYS,
+    DEFAULT_WINDOWS,
+    Schedule,
+    ScheduleError,
+    parse_days,
+    parse_windows,
+)
 from .setup_ui import SETUP_HTML
 from .signature import SignatureError, load_signature, parse_points, save_signature
 from .window import open_url
@@ -38,12 +50,28 @@ logger = logging.getLogger(__name__)
 
 MAX_BODY = 1_000_000
 MAX_TIMEOUT = 1800
+DAY_LABELS = {
+    "mon": "Lun",
+    "tue": "Mar",
+    "wed": "Mer",
+    "thu": "Jeu",
+    "fri": "Ven",
+    "sat": "Sam",
+    "sun": "Dim",
+}
 
 
-class SetupError(Exception):
-    def __init__(self, message: str, status: int = 400) -> None:
-        super().__init__(message)
-        self.status = status
+def _days_html(days: tuple[int, ...]) -> str:
+    ordered = sorted(DAY_NAMES.items(), key=lambda item: item[1])
+    return "\n".join(
+        f'<label><input type="checkbox" value="{name}"'
+        f"{' checked' if index in days else ''}>{DAY_LABELS[name]}</label>"
+        for name, index in ordered
+    )
+
+
+class SetupError(LocalError):
+    """Etape d'onboarding refusee."""
 
 
 class SetupSession:
@@ -72,15 +100,7 @@ class SetupSession:
             "has_signature": has_signature,
             "days": [
                 name
-                for name, index in (
-                    ("mon", 0),
-                    ("tue", 1),
-                    ("wed", 2),
-                    ("thu", 3),
-                    ("fri", 4),
-                    ("sat", 5),
-                    ("sun", 6),
-                )
+                for name, index in sorted(DAY_NAMES.items(), key=lambda item: item[1])
                 if index in self.config.schedule.days
             ],
             "windows": [str(window) for window in self.config.schedule.windows],
@@ -128,10 +148,9 @@ class SetupSession:
         if "\n" in password or "\r" in password:
             raise SetupError("mot de passe invalide")
 
-        prefer_keyring = sys.platform.startswith(("win", "darwin"))
         stored = (
             set_password(self.config.cesar.keyring_service, username, password)
-            if prefer_keyring
+            if prefer_keyring()
             else False
         )
         with self.lock:
@@ -149,7 +168,7 @@ class SetupSession:
 
         if stored:
             message = "Identifiants enregistres dans le trousseau du systeme."
-        elif sys.platform.startswith(("win", "darwin")):
+        elif prefer_keyring():
             message = "Identifiants enregistres dans un fichier prive."
         else:
             message = "Identifiants enregistres pour le service."
@@ -201,10 +220,7 @@ class SetupSession:
         return {"ok": True, "message": "Planning enregistre."}
 
     def test_notification(self) -> dict:
-        notifier = Notifier(
-            app_name=self.config.notifications.app_name,
-            icon=self.config.notifications.icon,
-        )
+        notifier = Notifier.from_config(self.config)
         sent = notifier.send(
             "CheckMate",
             "Si tu vois cette notification, tout fonctionne.",
@@ -266,7 +282,7 @@ class SetupSession:
     # --- persistance ---
 
     def _persist(self) -> None:
-        if sys.platform.startswith(("win", "darwin")):
+        if prefer_keyring():
             stored = False
             if self.password:
                 stored = set_password(
@@ -297,8 +313,7 @@ class SetupSession:
 def _test_connection(
     config: Config, base_url: str, username: str, password: str
 ) -> str:
-    from playwright.sync_api import sync_playwright
-
+    """Reproduit la connexion reelle, avec les selecteurs et le flux du watcher."""
     candidate = replace(
         config,
         cesar=replace(
@@ -308,93 +323,47 @@ def _test_connection(
             password=password,
         ),
     )
-    selectors = candidate.selectors
 
-    with sync_playwright() as playwright:
-        options = resolve_launch_options(playwright.chromium, candidate).as_kwargs()
-        browser = playwright.chromium.launch(headless=True, **options)
-        try:
-            page = browser.new_page()
-            page.set_default_timeout(20000)
-            page.goto(
-                candidate.cesar.login_url,
-                wait_until="domcontentloaded",
-                timeout=45000,
+    async def attempt() -> None:
+        with tempfile.TemporaryDirectory(prefix="checkmate-login-") as profile:
+            accessible = replace(
+                candidate,
+                watcher=replace(candidate.watcher, profile_dir=Path(profile)),
             )
-            page.locator(selectors.login_username[0]).first.fill(username)
-            page.locator(selectors.login_password[0]).first.fill(password)
-            page.locator(selectors.login_submit[0]).first.click()
-            page.wait_for_url(
-                lambda url: candidate.cesar.login_path not in url,
-                timeout=45000,
-            )
-            page.wait_for_timeout(1200)
-        except Exception as exc:
-            message = str(exc).splitlines()[0]
-            raise SetupError(f"connexion echouee : {message}") from exc
-        finally:
-            browser.close()
+            session = CesarSession(accessible)
+            try:
+                await session.open(headless=True)
+                await session.login()
+            finally:
+                await session.close()
+
+    try:
+        asyncio.run(asyncio.wait_for(attempt(), timeout=90))
+    except Exception as exc:
+        message = str(exc).splitlines()[0] or exc.__class__.__name__
+        raise SetupError(f"connexion echouee : {message}") from exc
     return "Connexion reussie."
 
 
-class _Handler(BaseHTTPRequestHandler):
+class _Handler(LocalHandler):
     session: SetupSession
-
-    def log_message(self, format: str, *args: object) -> None:
-        return
-
-    # --- helpers ---
-
-    def _send(self, status: int, payload: bytes, content_type: str) -> None:
-        self.send_response(status)
-        self.send_header("Content-Type", content_type)
-        self.send_header("Content-Length", str(len(payload)))
-        self.send_header("Cache-Control", "no-store")
-        self.send_header("X-Content-Type-Options", "nosniff")
-        self.send_header("Referrer-Policy", "no-referrer")
-        self.end_headers()
-        self.wfile.write(payload)
-
-    def _json(self, status: int, data: dict) -> None:
-        self._send(
-            status,
-            json.dumps(data, ensure_ascii=False).encode("utf-8"),
-            "application/json; charset=utf-8",
-        )
-
-    def _authorized(self) -> bool:
-        return self.headers.get("X-CheckMate-Token") == self.session.token
-
-    def _read_json(self) -> dict:
-        length = int(self.headers.get("Content-Length") or 0)
-        if length <= 0 or length > MAX_BODY:
-            return {}
-        raw = self.rfile.read(length)
-        try:
-            data = json.loads(raw.decode("utf-8"))
-        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-            raise SetupError("corps JSON invalide") from exc
-        if not isinstance(data, dict):
-            raise SetupError("corps JSON invalide")
-        return data
+    max_body = MAX_BODY
 
     def do_GET(self) -> None:
-        parsed = urlparse(self.path)
-        if parsed.path == "/":
-            token = (parse_qs(parsed.query).get("token") or [""])[0]
-            if token != self.session.token:
-                self._send(403, b"Jeton invalide", "text/plain; charset=utf-8")
-                return
-            html = SETUP_HTML.replace("__TOKEN__", self.session.token).replace(
-                "__VERSION__", f"{__version__} - build {BUILD}"
+        path = urlparse(self.path).path
+        if path == "/":
+            self._serve_page(
+                SETUP_HTML,
+                {
+                    "DAYS": _days_html(parse_days(DEFAULT_DAYS)),
+                    "WINDOWS": ", ".join(DEFAULT_WINDOWS),
+                },
             )
-            self._send(200, html.encode("utf-8"), "text/html; charset=utf-8")
             return
-        if parsed.path == "/favicon.ico":
-            self.send_response(204)
-            self.end_headers()
+        if path == "/favicon.ico":
+            self._favicon()
             return
-        if parsed.path == "/api/state":
+        if path == "/api/state":
             if not self._authorized():
                 self._json(403, {"error": "acces refuse"})
                 return
@@ -409,24 +378,12 @@ class _Handler(BaseHTTPRequestHandler):
         path = urlparse(self.path).path
         try:
             payload = self._read_json()
-            if path == "/api/test-login":
-                result = self.session.test_login(payload)
-            elif path == "/api/credentials":
-                result = self.session.save_credentials(payload)
-            elif path == "/api/signature":
-                result = self.session.save_signature(payload)
-            elif path == "/api/import-signature":
-                result = self.session.import_signature(payload)
-            elif path == "/api/schedule":
-                result = self.session.save_schedule(payload)
-            elif path == "/api/test-notification":
-                result = self.session.test_notification()
-            elif path == "/api/finish":
-                result = self.session.finish(payload)
-            else:
+            handler = self._routes().get(path)
+            if handler is None:
                 self._json(404, {"error": "route inconnue"})
                 return
-        except SetupError as exc:
+            result = handler(payload)
+        except LocalError as exc:
             self._json(exc.status, {"error": str(exc)})
             return
         except Exception as exc:
@@ -437,12 +394,20 @@ class _Handler(BaseHTTPRequestHandler):
         if path == "/api/finish":
             self.session.finished.set()
 
+    def _routes(self) -> dict[str, Any]:
+        return {
+            "/api/test-login": self.session.test_login,
+            "/api/credentials": self.session.save_credentials,
+            "/api/signature": self.session.save_signature,
+            "/api/import-signature": self.session.import_signature,
+            "/api/schedule": self.session.save_schedule,
+            "/api/test-notification": lambda _: self.session.test_notification(),
+            "/api/finish": self.session.finish,
+        }
+
 
 def create_server(session: SetupSession) -> ThreadingHTTPServer:
-    handler = type("SetupHandler", (_Handler,), {"session": session})
-    server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
-    server.daemon_threads = True
-    return server
+    return _create_server(session, _Handler)
 
 
 def run_setup(

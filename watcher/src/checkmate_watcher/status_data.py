@@ -35,18 +35,17 @@ def build_snapshot(
 ) -> dict:
     moment = now or datetime.now()
     schedule = config.schedule
-    window = schedule.active_window(moment)
-    window_key = schedule.window_key(moment)
-    signed = bool(window_key and state.window_done(window_key))
+    situation = schedule.situation(moment, state.window_done)
+    window = situation.window
 
-    if not schedule.enabled:
-        mode, label = "active", "Surveillance active"
-    elif window is None:
-        mode, label = "outside", "Hors créneau"
-    elif signed:
-        mode, label = "signed", "Créneau signé"
-    else:
-        mode, label = "active", "Surveillance active"
+    labels = {
+        "disabled": "Surveillance active",
+        "active": "Surveillance active",
+        "outside": "Hors créneau",
+        "signed": "Créneau signé",
+    }
+    mode = "active" if situation.reason == "disabled" else situation.reason
+    label = labels[situation.reason]
 
     if _recent(state.get_meta("last_error_at"), moment):
         mode, label = "error", "Erreur récente"

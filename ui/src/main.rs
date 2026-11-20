@@ -80,15 +80,21 @@ impl App {
     }
 
     fn start_backend(&mut self, context: egui::Context) {
-        match api::start_backend() {
-            Ok(()) => {
-                self.message = Some("Demarrage du service...".to_string());
-                self.error = None;
-                self.last_refresh = Instant::now() - Duration::from_secs(10);
-                context.request_repaint_after(Duration::from_secs(1));
-            }
-            Err(error) => self.message = Some(error),
+        if self.busy {
+            return;
         }
+        self.busy = true;
+        self.error = None;
+        self.message = Some("Verification du service...".to_string());
+        let sender = self.action_tx.clone();
+        std::thread::spawn(move || {
+            let result = api::start_backend().map(|()| ActionResponse {
+                message: Some("Service demarre. Actualisation...".to_string()),
+                ..ActionResponse::default()
+            });
+            let _ = sender.send(result);
+        });
+        context.request_repaint();
     }
 
     fn mode_color(mode: &str) -> Color32 {

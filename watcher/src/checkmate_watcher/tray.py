@@ -5,7 +5,6 @@ from __future__ import annotations
 import logging
 import os
 import threading
-import webbrowser
 
 try:
     import pystray
@@ -16,7 +15,8 @@ except Exception:  # noqa: BLE001 - optionnel selon la plateforme
     ImageDraw = None
 
 from . import sni
-from .status_server import StatusSession
+from .status_server import ACTIONS, StatusSession
+from .window import open_url
 
 logger = logging.getLogger(__name__)
 
@@ -92,12 +92,11 @@ class TrayController:
     def _menu_items(self) -> list:
         return [
             ("Ouvrir le statut", self._open_status),
-            ("Reconfigurer", lambda: self._safe(self.session.configure)),
-            (
-                "Tester la notification",
-                lambda: self._safe(self.session.test_notification),
-            ),
-            ("Verifier les mises a jour", self._check_update),
+            *[
+                (action.label, self._action(action.name))
+                for action in ACTIONS
+                if action.in_tray
+            ],
             None,
             ("Quitter", self._quit),
         ]
@@ -129,7 +128,10 @@ class TrayController:
 
     def _open_status(self) -> None:
         if self.session.url:
-            webbrowser.open(self.session.url)
+            open_url(self.session.url)
+
+    def _action(self, name: str):
+        return lambda: self._safe(lambda: self.session.action(name))
 
     def _safe(self, action) -> None:
         try:
@@ -147,13 +149,6 @@ class TrayController:
             return
         if self.icon is not None:
             self.icon.notify(message, "CheckMate")
-
-    def _check_update(self) -> None:
-        try:
-            result = self.session.check_update()
-            self._notify(result.get("message", "Verification terminee."))
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("verification de mise a jour echouee : %s", exc)
 
     def _quit(self, icon=None, item=None) -> None:
         self._stop.set()

@@ -132,27 +132,12 @@ def parse_release(data: dict) -> Release | None:
     )
 
 
-def include_prerelease_for(
-    channel: str = STABLE_CHANNEL,
-    include_prerelease: bool | None = None,
-) -> bool:
-    """Resout le canal en acceptation des prereleases.
-
-    `include_prerelease` reste accepte pour la compatibilite et prend le pas
-    lorsqu'il est fourni.
-    """
-    if include_prerelease is not None:
-        return include_prerelease
-    return str(channel).strip().lower() == BETA_CHANNEL
-
-
 def select_latest(
     releases: list[Release],
     *,
     channel: str = STABLE_CHANNEL,
-    include_prerelease: bool | None = None,
 ) -> Release | None:
-    accept_prerelease = include_prerelease_for(channel, include_prerelease)
+    accept_prerelease = str(channel).strip().lower() == BETA_CHANNEL
     candidates = [
         release for release in releases if accept_prerelease or not release.prerelease
     ]
@@ -184,7 +169,6 @@ def check_for_update(
     current: str = __version__,
     *,
     channel: str = STABLE_CHANNEL,
-    include_prerelease: bool | None = None,
     releases: list[Release] | None = None,
 ) -> Release | None:
     current_version = parse_version(current)
@@ -192,11 +176,7 @@ def check_for_update(
         return None
     if releases is None:
         releases = fetch_releases()
-    latest = select_latest(
-        releases,
-        channel=channel,
-        include_prerelease=include_prerelease,
-    )
+    latest = select_latest(releases, channel=channel)
     if latest is None:
         return None
     if latest.version > current_version:

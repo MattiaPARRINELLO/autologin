@@ -13,6 +13,11 @@ logger = logging.getLogger(__name__)
 
 ZENITY_TIMEOUT_CODE = 5
 
+
+class DialogUnavailable(Exception):
+    """L'outil de dialogue n'est pas disponible ; un autre peut le remplacer."""
+
+
 POWERSHELL_APP_ID = (
     "{1AC14E77-02E7-4E5D-B744-2EB1AE5198B7}\\WindowsPowerShell\\v1.0\\powershell.exe"
 )
@@ -220,7 +225,7 @@ def ask_zenity(
 ) -> bool | None:
     binary = shutil.which("zenity")
     if not binary:
-        return None
+        raise DialogUnavailable("zenity introuvable")
 
     command = [
         binary,
@@ -242,8 +247,7 @@ def ask_zenity(
             env=_clean_env(),
         )
     except (OSError, subprocess.SubprocessError) as exc:
-        logger.warning("zenity a echoue : %s", exc)
-        return None
+        raise DialogUnavailable(f"zenity a echoue : {exc}") from exc
 
     if result.returncode == 0:
         return True
@@ -253,8 +257,9 @@ def ask_zenity(
 
     stderr = (result.stderr or "").strip()
     if stderr:
-        logger.warning("zenity n'a pas pu afficher la confirmation : %s", stderr)
-        return None
+        raise DialogUnavailable(
+            f"zenity n'a pas pu afficher la confirmation : {stderr}"
+        )
     return False
 
 
@@ -315,6 +320,13 @@ def ask_tkinter(
 class Notifier:
     """Notifications et confirmations selon la plateforme."""
 
+    @classmethod
+    def from_config(cls, config) -> Notifier:
+        return cls(
+            app_name=config.notifications.app_name,
+            icon=config.notifications.icon,
+        )
+
     def __init__(
         self,
         app_name: str = "CheckMate",
@@ -355,15 +367,16 @@ class Notifier:
     ) -> bool | None:
         window_title = title or self.app_name
         if self.platform.startswith("linux"):
-            answer = ask_zenity(
-                text,
-                timeout=timeout,
-                title=window_title,
-                ok_label=ok_label,
-                cancel_label=cancel_label,
-            )
-            if answer is not None:
-                return answer
+            try:
+                return ask_zenity(
+                    text,
+                    timeout=timeout,
+                    title=window_title,
+                    ok_label=ok_label,
+                    cancel_label=cancel_label,
+                )
+            except DialogUnavailable as exc:
+                logger.info("zenity indisponible, repli sur tkinter : %s", exc)
         return ask_tkinter(
             text,
             timeout=timeout,

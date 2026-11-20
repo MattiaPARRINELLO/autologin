@@ -11,8 +11,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
-from .config import Config
-
 logger = logging.getLogger(__name__)
 
 LINUX_CANDIDATES = (
@@ -130,13 +128,12 @@ def platform_channel(
 
 def resolve_launch_options(
     browser_type: BrowserType,
-    config: Config,
+    executable_path: str | None = None,
     platform: str | None = None,
 ) -> LaunchOptions:
-    """Priorite : config, Chromium du bundle, navigateur systeme."""
-    configured = config.watcher.executable_path
-    if configured:
-        return LaunchOptions(executable_path=configured)
+    """Priorite : chemin configure, Chromium du bundle, navigateur systeme."""
+    if executable_path:
+        return LaunchOptions(executable_path=executable_path)
 
     try:
         expected = browser_type.executable_path

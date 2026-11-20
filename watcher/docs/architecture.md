@@ -33,6 +33,7 @@ CESAR et, si les mises a jour sont activees, vers l'API GitHub des releases.
 | `notifications.py` | notifications bureau et fenetre de confirmation, par plateforme |
 | `credentials.py` | mot de passe dans le trousseau systeme quand il est disponible |
 | `state.py` | etat persistant : emargements traites, creneaux signes, compteurs |
+| `local_http.py` | socle HTTP commun : ecoute locale, jeton, en-tetes de securite, lecture JSON |
 | `status_server.py` | serveur HTTP local du tableau de bord (`/api/status`, `/api/action`) et fichier `runtime.json` |
 | `status_ui.py` | page HTML du tableau de bord |
 | `status_data.py` | construction de l'instantane affiche par le tableau de bord |

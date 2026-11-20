@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -47,10 +48,7 @@ DRY_RUN = "dry_run"
 
 
 def _notifier(config: Config) -> Notifier:
-    return Notifier(
-        app_name=config.notifications.app_name,
-        icon=config.notifications.icon,
-    )
+    return Notifier.from_config(config)
 
 
 async def _send(
@@ -61,6 +59,24 @@ async def _send(
         return False
     notifier = _notifier(config)
     return await asyncio.to_thread(notifier.send, title, message, urgency=urgency)
+
+
+@dataclass(frozen=True)
+class Pause:
+    """Raison de suspendre la surveillance jusqu'a la prochaine ouverture."""
+
+    reason: str
+    resume: datetime
+    window_key: str | None
+
+
+def _pause_reason(schedule, state, now: datetime) -> Pause | None:
+    situation = schedule.situation(now, state.window_done)
+    if situation.reason not in {"outside", "signed"}:
+        return None
+    resume = now + timedelta(seconds=schedule.seconds_until_next(now))
+    label = "hors plage" if situation.reason == "outside" else "creneau deja signe"
+    return Pause(label, resume, situation.key)
 
 
 async def _wait_for_new_window(
@@ -255,40 +271,22 @@ async def run_loop(
         )
         schedule = config.schedule
 
-        if schedule.enabled:
-            now = datetime.now()
-            if schedule.active_window(now) is None:
-                wait = schedule.seconds_until_next(now)
-                resume = now + timedelta(seconds=wait)
-                if once:
-                    logger.info(
-                        "hors plage de surveillance, prochaine ouverture %s",
-                        resume.strftime("%d/%m %H:%M"),
-                    )
-                    return 0
+        pause = _pause_reason(schedule, state, datetime.now())
+        if pause is not None:
+            if once:
                 logger.info(
-                    "hors plage (%s), reprise vers %s",
-                    schedule.describe(),
-                    resume.strftime("%d/%m %H:%M"),
+                    "%s, prochaine ouverture %s",
+                    pause.reason,
+                    pause.resume.strftime("%d/%m %H:%M"),
                 )
-                await _wait_for_new_window(schedule, None, stop_event)
-                now = datetime.now()
-
-            current_key = schedule.window_key(now)
-            if current_key and state.window_done(current_key):
-                wait = schedule.seconds_until_next(now)
-                resume = now + timedelta(seconds=wait)
-                if once:
-                    logger.info(
-                        "creneau deja signe, prochaine ouverture %s",
-                        resume.strftime("%d/%m %H:%M"),
-                    )
-                    return 0
-                logger.info(
-                    "deja signe sur ce creneau, pause jusqu'a %s",
-                    resume.strftime("%d/%m %H:%M"),
-                )
-                await _wait_for_new_window(schedule, current_key, stop_event)
+                return 0
+            logger.info(
+                "%s (%s), reprise vers %s",
+                pause.reason,
+                schedule.describe(),
+                pause.resume.strftime("%d/%m %H:%M"),
+            )
+            await _wait_for_new_window(schedule, pause.window_key, stop_event)
 
         if stop_event is not None and stop_event.is_set():
             return 0
@@ -304,55 +302,36 @@ async def run_loop(
                 if stop_event is not None and stop_event.is_set():
                     return 0
 
-                if schedule.enabled:
-                    now = datetime.now()
-                    if schedule.active_window(now) is None:
-                        wait = schedule.seconds_until_next(now)
-                        resume = now + timedelta(seconds=wait)
-                        if once:
-                            logger.info(
-                                "hors plage, prochaine ouverture %s",
-                                resume.strftime("%d/%m %H:%M"),
-                            )
-                            return 0
+                now = datetime.now()
+                pause = _pause_reason(schedule, state, now)
+                if pause is not None:
+                    if once:
                         logger.info(
-                            "fin de plage, pause jusqu'a %s",
-                            resume.strftime("%d/%m %H:%M"),
+                            "%s, prochaine ouverture %s",
+                            pause.reason,
+                            pause.resume.strftime("%d/%m %H:%M"),
                         )
-                        await session.close()
-                        await _wait_for_new_window(schedule, None, stop_event)
-                        await session.open(headless=poll_headless)
-                        continue
+                        return 0
+                    logger.info(
+                        "%s, pause jusqu'a %s",
+                        pause.reason,
+                        pause.resume.strftime("%d/%m %H:%M"),
+                    )
+                    await session.close()
+                    await _wait_for_new_window(schedule, pause.window_key, stop_event)
+                    await session.open(headless=poll_headless)
+                    continue
 
-                    window_key = schedule.window_key(now)
-                    if window_key and state.window_done(window_key):
-                        wait = schedule.seconds_until_next(now)
-                        resume = now + timedelta(seconds=wait)
-                        if once:
-                            logger.info(
-                                "creneau deja signe, prochaine ouverture %s",
-                                resume.strftime("%d/%m %H:%M"),
-                            )
-                            return 0
+                window_key = schedule.window_key(now)
+                if window_key != last_window_key:
+                    window = schedule.active_window(now)
+                    if window is not None:
                         logger.info(
-                            "deja signe sur ce creneau, pause jusqu'a %s",
-                            resume.strftime("%d/%m %H:%M"),
+                            "surveillance active sur le creneau %s (toutes les %ss)",
+                            window,
+                            config.watcher.poll_interval,
                         )
-                        await session.close()
-                        await _wait_for_new_window(schedule, window_key, stop_event)
-                        await session.open(headless=poll_headless)
-                        continue
-
-                    current = schedule.window_key(datetime.now())
-                    if current != last_window_key:
-                        window = schedule.active_window(datetime.now())
-                        if window is not None:
-                            logger.info(
-                                "surveillance active sur le creneau %s (toutes les %ss)",
-                                window,
-                                config.watcher.poll_interval,
-                            )
-                        last_window_key = current
+                    last_window_key = window_key
 
                 try:
                     signal = await session.check()

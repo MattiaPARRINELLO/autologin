@@ -16,18 +16,12 @@ class FakeKeyring:
     def set_password(self, service: str, username: str, password: str) -> None:
         self.store[(service, username)] = password
 
-    def delete_password(self, service: str, username: str) -> None:
-        self.store.pop((service, username), None)
-
 
 class BrokenKeyring:
     def get_password(self, service, username):
         raise RuntimeError("verrouille")
 
     def set_password(self, service, username, password):
-        raise RuntimeError("verrouille")
-
-    def delete_password(self, service, username):
         raise RuntimeError("verrouille")
 
 
@@ -38,15 +32,12 @@ def test_cycle_de_vie_du_mot_de_passe(monkeypatch):
     assert credentials.get_password("checkmate", "eleve") is None
     assert credentials.set_password("checkmate", "eleve", "secret") is True
     assert credentials.get_password("checkmate", "eleve") == "secret"
-    assert credentials.delete_password("checkmate", "eleve") is True
-    assert credentials.get_password("checkmate", "eleve") is None
 
 
 def test_trousseau_en_erreur_ne_plante_pas(monkeypatch):
     monkeypatch.setattr(credentials, "_keyring_module", lambda: BrokenKeyring())
     assert credentials.get_password("checkmate", "eleve") is None
     assert credentials.set_password("checkmate", "eleve", "secret") is False
-    assert credentials.delete_password("checkmate", "eleve") is False
 
 
 def test_config_lit_le_mot_de_passe_du_trousseau(monkeypatch, tmp_path):

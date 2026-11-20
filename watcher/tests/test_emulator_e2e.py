@@ -9,6 +9,7 @@ import subprocess
 import sys
 import time
 import urllib.request
+from contextlib import contextmanager
 from pathlib import Path
 
 import pytest
@@ -70,7 +71,11 @@ def post(base_url: str, path: str) -> dict:
         return json.loads(response.read())
 
 
-def test_le_watcher_detecte_et_signe_sur_l_emulateur(tmp_path):
+POINTS = [Point(10, 10, "start"), Point(60, 40, "move"), Point(120, 20, "end")]
+
+
+@contextmanager
+def emulator(**environment: str):
     executable = chromium_path()
     if executable is None:
         pytest.skip("aucun Chromium disponible")
@@ -80,43 +85,52 @@ def test_le_watcher_detecte_et_signe_sur_l_emulateur(tmp_path):
         [sys.executable, str(EMULATOR), "--port", str(port)],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
+        env={**os.environ, **environment},
     )
     base_url = f"http://127.0.0.1:{port}"
-
     try:
         wait_for_state(base_url)
         post(base_url, "/api/attendance/open")
+        yield executable, base_url
+    finally:
+        process.terminate()
+        try:
+            process.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            process.kill()
 
-        signature_file = tmp_path / "signature.json"
-        save_signature(
-            signature_file,
-            [Point(10, 10, "start"), Point(60, 40, "move"), Point(120, 20, "end")],
-        )
 
-        config = Config(
-            cesar=CesarConfig(
-                base_url=base_url,
-                username="demo",
-                password="demo",
-                login_path="/connexion",
-                dashboard_path="/",
-            ),
-            watcher=WatcherConfig(
-                poll_interval=15,
-                auto_sign=True,
-                auto_sign_delay=0,
-                headless=True,
-                visible_on_sign=False,
-                executable_path=executable,
-                profile_dir=tmp_path / "profile",
-                state_file=tmp_path / "state.json",
-            ),
-            signature=SignatureConfig(file=signature_file, padding_ratio=0.9),
-            notifications=NotificationConfig(enabled=False),
-            updates=UpdatesConfig(enabled=False),
-            selectors=Selectors.from_dict({}),
-        )
+def make_config(tmp_path, executable: str, base_url: str) -> Config:
+    signature_file = tmp_path / "signature.json"
+    save_signature(signature_file, POINTS)
+    return Config(
+        cesar=CesarConfig(
+            base_url=base_url,
+            username="demo",
+            password="demo",
+            login_path="/connexion",
+            dashboard_path="/",
+        ),
+        watcher=WatcherConfig(
+            poll_interval=15,
+            auto_sign=True,
+            auto_sign_delay=0,
+            headless=True,
+            visible_on_sign=False,
+            executable_path=executable,
+            profile_dir=tmp_path / "profile",
+            state_file=tmp_path / "state.json",
+        ),
+        signature=SignatureConfig(file=signature_file, padding_ratio=0.9),
+        notifications=NotificationConfig(enabled=False),
+        updates=UpdatesConfig(enabled=False),
+        selectors=Selectors.from_dict({}),
+    )
 
+
+def test_le_watcher_detecte_et_signe_sur_l_emulateur(tmp_path):
+    with emulator() as (executable, base_url):
+        config = make_config(tmp_path, executable, base_url)
         code = asyncio.run(
             asyncio.wait_for(
                 run_loop(config, once=True, auto_override=True), timeout=120
@@ -127,62 +141,11 @@ def test_le_watcher_detecte_et_signe_sur_l_emulateur(tmp_path):
         state = wait_for_state(base_url)
         assert state["signed"] is True
         assert state["signature_points"] >= 2
-    finally:
-        process.terminate()
-        try:
-            process.wait(timeout=10)
-        except subprocess.TimeoutExpired:
-            process.kill()
 
 
 def test_sign_attend_la_disparition_du_bouton(tmp_path):
-    executable = chromium_path()
-    if executable is None:
-        pytest.skip("aucun Chromium disponible")
-
-    port = free_port()
-    environment = {**os.environ, "ATTENDANCE_CLOSE_DELAY_MS": "2000"}
-    process = subprocess.Popen(
-        [sys.executable, str(EMULATOR), "--port", str(port)],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-        env=environment,
-    )
-    base_url = f"http://127.0.0.1:{port}"
-
-    try:
-        wait_for_state(base_url)
-        post(base_url, "/api/attendance/open")
-
-        signature_file = tmp_path / "signature.json"
-        save_signature(
-            signature_file,
-            [Point(10, 10, "start"), Point(60, 40, "move"), Point(120, 20, "end")],
-        )
-
-        config = Config(
-            cesar=CesarConfig(
-                base_url=base_url,
-                username="demo",
-                password="demo",
-                login_path="/connexion",
-                dashboard_path="/",
-            ),
-            watcher=WatcherConfig(
-                poll_interval=15,
-                auto_sign=True,
-                auto_sign_delay=0,
-                headless=True,
-                visible_on_sign=False,
-                executable_path=executable,
-                profile_dir=tmp_path / "profile",
-                state_file=tmp_path / "state.json",
-            ),
-            signature=SignatureConfig(file=signature_file, padding_ratio=0.9),
-            notifications=NotificationConfig(enabled=False),
-            updates=UpdatesConfig(enabled=False),
-            selectors=Selectors.from_dict({}),
-        )
+    with emulator(ATTENDANCE_CLOSE_DELAY_MS="2000") as (executable, base_url):
+        config = make_config(tmp_path, executable, base_url)
 
         async def scenario() -> tuple[str, float, int]:
             session = CesarSession(config)
@@ -191,13 +154,7 @@ def test_sign_attend_la_disparition_du_bouton(tmp_path):
                 await session._goto_dashboard()
                 await session._ensure_logged_in()
                 started = time.monotonic()
-                confirmation = await session.sign(
-                    [
-                        Point(10, 10, "start"),
-                        Point(60, 40, "move"),
-                        Point(120, 20, "end"),
-                    ]
-                )
+                confirmation = await session.sign(POINTS)
                 elapsed = time.monotonic() - started
                 # Au retour de sign(), le bouton doit deja avoir disparu du DOM.
                 remaining = await session.page.locator(".buttonPresent").count()
@@ -213,9 +170,3 @@ def test_sign_attend_la_disparition_du_bouton(tmp_path):
         assert remaining == 0
         assert elapsed >= 2.0
         assert wait_for_state(base_url)["signed"] is True
-    finally:
-        process.terminate()
-        try:
-            process.wait(timeout=10)
-        except subprocess.TimeoutExpired:
-            process.kill()

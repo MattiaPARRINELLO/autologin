@@ -16,6 +16,7 @@ from pathlib import Path
 
 from . import BUILD, __version__
 from .autostart import (
+    UNIT_NAME,
     autostart_enabled,
     current_executable,
     disable_autostart,
@@ -252,7 +253,9 @@ async def command_capture(config: Config) -> int:
 
     print("Ouverture de la fenetre de capture...")
     async with async_playwright() as playwright:
-        options = resolve_launch_options(playwright.chromium, config).as_kwargs()
+        options = resolve_launch_options(
+            playwright.chromium, config.watcher.executable_path
+        ).as_kwargs()
         try:
             browser = await playwright.chromium.launch(headless=False, **options)
         except Exception as exc:
@@ -286,10 +289,7 @@ async def command_capture(config: Config) -> int:
 
 
 def command_test_notification(config: Config) -> int:
-    notifier = Notifier(
-        app_name=config.notifications.app_name,
-        icon=config.notifications.icon,
-    )
+    notifier = Notifier.from_config(config)
     sent = notifier.send(
         "CheckMate",
         "Ceci est une notification de test.",
@@ -338,7 +338,7 @@ def command_self_test(config: Config, *, notify: bool = False) -> int:
     class Probe:
         executable_path = ""
 
-    options = resolve_launch_options(Probe(), config)
+    options = resolve_launch_options(Probe(), config.watcher.executable_path)
     if options.executable_path:
         checks.append(("navigateur", True, options.executable_path))
     elif options.channel:
@@ -378,10 +378,7 @@ def command_self_test(config: Config, *, notify: bool = False) -> int:
         checks.append(("dossier de donnees", True, str(log_dir)))
 
     if notify:
-        notifier = Notifier(
-            app_name=config.notifications.app_name,
-            icon=config.notifications.icon,
-        )
+        notifier = Notifier.from_config(config)
         sent = notifier.send(
             "CheckMate",
             "Test de notification reussi.",
@@ -445,7 +442,7 @@ def command_status(config: Config, config_path: Path) -> int:
         started = False
         if systemctl:
             result = subprocess.run(
-                [systemctl, "--user", "start", "checkmate-watcher.service"],
+                [systemctl, "--user", "start", UNIT_NAME],
                 check=False,
                 capture_output=True,
                 timeout=20,

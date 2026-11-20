@@ -74,6 +74,15 @@ def test_tableau_de_bord(tmp_path):
             base,
             "/api/action",
             token=session.token,
+            payload={"action": "inconnue"},
+        )
+        assert status == 400
+        assert "inconnue" in result["error"]
+
+        status, result = call(
+            base,
+            "/api/action",
+            token=session.token,
             payload={"action": "quit"},
         )
         assert status == 200

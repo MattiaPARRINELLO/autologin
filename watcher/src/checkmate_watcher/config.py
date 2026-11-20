@@ -29,6 +29,7 @@ from .schedule import (
     parse_days,
     parse_windows,
 )
+from .signature import MAX_PADDING_RATIO, MIN_PADDING_RATIO
 from .updates import BETA_CHANNEL, CHANNELS, STABLE_CHANNEL
 
 logger = logging.getLogger(__name__)
@@ -59,10 +60,7 @@ DEFAULT_SELECTORS: dict[str, tuple[str, ...]] = {
         "button[data-live-action-param*='sign']",
         ".swal2-container button.btn-primary",
     ),
-    "confirmation": (
-        ".swal2-html-container",
-        ".swal2-popup .swal2-html-container",
-    ),
+    "confirmation": (".swal2-html-container",),
     "login_username": ("input#username",),
     "login_password": ("input#password",),
     "login_submit": ("button[type='submit'].btn-primary",),
@@ -138,11 +136,6 @@ class UpdatesConfig:
     enabled: bool = True
     channel: str = STABLE_CHANNEL
 
-    @property
-    def include_prerelease(self) -> bool:
-        """Alias de compatibilite : le canal beta accepte les prereleases."""
-        return self.channel == BETA_CHANNEL
-
 
 def parse_updates_channel(table: dict) -> str:
     """Lit `[updates] channel`, avec `include_prerelease` en alias historique."""
@@ -210,23 +203,20 @@ def _resolve_password(
 
 
 def default_config() -> Config:
+    """Configuration proposee par l'assistant : reglages recommandes."""
     return Config(
         cesar=CesarConfig(
             base_url="https://cesar.emineo-education.fr",
             username="",
             password="",
         ),
-        watcher=WatcherConfig(
-            poll_interval=10,
-            headless=True,
-            visible_on_sign=True,
-        ),
+        watcher=WatcherConfig(poll_interval=10, headless=True),
         signature=SignatureConfig(),
         notifications=NotificationConfig(),
         selectors=Selectors.from_dict({}),
         schedule=Schedule(
             enabled=True,
-            days=(0, 1, 2, 3, 4),
+            days=parse_days(DEFAULT_DAYS),
             windows=parse_windows(DEFAULT_WINDOWS),
         ),
         updates=UpdatesConfig(),
@@ -234,9 +224,8 @@ def default_config() -> Config:
 
 
 def _days_to_names(days: tuple[int, ...]) -> list[str]:
-    names = [name for name, index in DAY_NAMES.items() if index in days]
-    order = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
-    return sorted(names, key=order.index)
+    ordered = sorted(DAY_NAMES.items(), key=lambda item: item[1])
+    return [name for name, index in ordered if index in days]
 
 
 def config_to_dict(
@@ -385,56 +374,60 @@ def load_config(path: str | Path, *, require_password: bool = True) -> Config:
     if not cesar.base_url.startswith(("http://", "https://")):
         raise ConfigError("[cesar] base_url doit commencer par http:// ou https://")
 
+    watcher_defaults = WatcherConfig()
     watcher = WatcherConfig(
-        poll_interval=int(watcher_table.get("poll_interval", 60)),
-        dedupe_ttl=int(watcher_table.get("dedupe_ttl", 3600)),
-        confirm_timeout=int(watcher_table.get("confirm_timeout", 180)),
-        prompt_retry=int(watcher_table.get("prompt_retry", 300)),
-        auto_sign=bool(watcher_table.get("auto_sign", False)),
-        auto_sign_delay=int(watcher_table.get("auto_sign_delay", 20)),
-        headless=bool(watcher_table.get("headless", False)),
-        visible_on_sign=bool(watcher_table.get("visible_on_sign", True)),
+        poll_interval=int(
+            watcher_table.get("poll_interval", watcher_defaults.poll_interval)
+        ),
+        dedupe_ttl=int(watcher_table.get("dedupe_ttl", watcher_defaults.dedupe_ttl)),
+        confirm_timeout=int(
+            watcher_table.get("confirm_timeout", watcher_defaults.confirm_timeout)
+        ),
+        prompt_retry=int(
+            watcher_table.get("prompt_retry", watcher_defaults.prompt_retry)
+        ),
+        auto_sign=bool(watcher_table.get("auto_sign", watcher_defaults.auto_sign)),
+        auto_sign_delay=int(
+            watcher_table.get("auto_sign_delay", watcher_defaults.auto_sign_delay)
+        ),
+        headless=bool(watcher_table.get("headless", watcher_defaults.headless)),
+        visible_on_sign=bool(
+            watcher_table.get("visible_on_sign", watcher_defaults.visible_on_sign)
+        ),
         executable_path=(
             str(watcher_table["executable_path"])
             if watcher_table.get("executable_path")
             else None
         ),
         profile_dir=expand_path(
-            str(
-                watcher_table.get(
-                    "profile_dir", "~/.local/share/checkmate-watcher/profile"
-                )
-            )
+            str(watcher_table.get("profile_dir", watcher_defaults.profile_dir))
         ),
         state_file=expand_path(
-            str(
-                watcher_table.get(
-                    "state_file", "~/.local/share/checkmate-watcher/state.json"
-                )
-            )
+            str(watcher_table.get("state_file", watcher_defaults.state_file))
         ),
     )
 
+    signature_defaults = SignatureConfig()
     signature = SignatureConfig(
-        file=expand_path(
-            str(
-                signature_table.get(
-                    "file", "~/.config/checkmate-watcher/signature.json"
-                )
-            )
+        file=expand_path(str(signature_table.get("file", signature_defaults.file))),
+        padding_ratio=float(
+            signature_table.get("padding_ratio", signature_defaults.padding_ratio)
         ),
-        padding_ratio=float(signature_table.get("padding_ratio", 0.9)),
     )
 
+    notification_defaults = NotificationConfig()
     notifications = NotificationConfig(
-        app_name=str(notification_table.get("app_name", "CheckMate")),
-        icon=str(notification_table.get("icon", "dialog-information")),
-        enabled=bool(notification_table.get("enabled", True)),
+        app_name=str(
+            notification_table.get("app_name", notification_defaults.app_name)
+        ),
+        icon=str(notification_table.get("icon", notification_defaults.icon)),
+        enabled=bool(notification_table.get("enabled", notification_defaults.enabled)),
     )
 
     selectors = Selectors.from_dict(selectors_table)
+    updates_defaults = UpdatesConfig()
     updates = UpdatesConfig(
-        enabled=bool(updates_table.get("enabled", True)),
+        enabled=bool(updates_table.get("enabled", updates_defaults.enabled)),
         channel=parse_updates_channel(updates_table),
     )
 
@@ -453,8 +446,11 @@ def load_config(path: str | Path, *, require_password: bool = True) -> Config:
         raise ConfigError("[watcher] confirm_timeout doit etre >= 10 secondes")
     if watcher.prompt_retry < 30:
         raise ConfigError("[watcher] prompt_retry doit etre >= 30 secondes")
-    if not 0.1 <= signature.padding_ratio <= 1.0:
-        raise ConfigError("[signature] padding_ratio doit etre entre 0.1 et 1.0")
+    if not MIN_PADDING_RATIO <= signature.padding_ratio <= MAX_PADDING_RATIO:
+        raise ConfigError(
+            f"[signature] padding_ratio doit etre entre "
+            f"{MIN_PADDING_RATIO} et {MAX_PADDING_RATIO}"
+        )
 
     return Config(
         cesar=cesar,

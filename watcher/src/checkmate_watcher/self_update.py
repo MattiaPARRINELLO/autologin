@@ -15,6 +15,7 @@ import tempfile
 from pathlib import Path
 
 from . import __version__
+from .autostart import UNIT_NAME
 from .paths import default_update_dir
 from .updates import (
     Release,
@@ -35,7 +36,7 @@ WINDOWS_FLAGS = [
 LINUX_SCRIPT = """#!/usr/bin/env bash
 set -u
 sleep 2
-systemctl --user stop checkmate-watcher >/dev/null 2>&1 || true
+systemctl --user stop {unit} >/dev/null 2>&1 || true
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 tar -xzf {archive} -C "$WORK" || exit 1
@@ -77,6 +78,7 @@ def _install_linux(archive: Path, cleanup: Path) -> None:
     script = LINUX_SCRIPT.format(
         archive=_quote(str(archive)),
         cleanup=_quote(str(cleanup)),
+        unit=UNIT_NAME,
     )
     handle, path = tempfile.mkstemp(prefix="checkmate-update-", suffix=".sh")
     try:

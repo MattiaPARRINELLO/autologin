@@ -10,14 +10,17 @@ import subprocess
 import sys
 import threading
 import urllib.request
+from dataclasses import dataclass
 from datetime import datetime
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from http.server import ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import urlparse
 
-from . import BUILD, __version__
+from . import __version__
 from .autostart import current_executable
 from .config import Config
+from .local_http import LocalError, LocalHandler
+from .local_http import create_server as _create_server
 from .notifications import Notifier
 from .paths import data_dir, default_log_file
 from .self_update import update_now
@@ -27,14 +30,40 @@ from .updates import UpdateError, check_for_update
 
 logger = logging.getLogger(__name__)
 
-MAX_BODY = 100_000
 RUNTIME_NAME = "runtime.json"
 
 
-class StatusError(Exception):
-    def __init__(self, message: str, status: int = 400) -> None:
-        super().__init__(message)
-        self.status = status
+class StatusError(LocalError):
+    """Action du tableau de bord refusee."""
+
+
+@dataclass(frozen=True)
+class Action:
+    name: str
+    label: str
+    method: str
+    in_tray: bool = False
+
+
+ACTIONS = (
+    Action("configure", "Reconfigurer", "configure", in_tray=True),
+    Action(
+        "test-notification",
+        "Tester la notification",
+        "test_notification",
+        in_tray=True,
+    ),
+    Action(
+        "check-update",
+        "Verifier les mises a jour",
+        "check_update",
+        in_tray=True,
+    ),
+    Action("install-update", "Installer la mise a jour", "install_update"),
+    Action("open-logs", "Ouvrir les logs", "open_logs"),
+    Action("quit", "Quitter", "quit"),
+)
+ACTIONS_BY_NAME = {action.name: action for action in ACTIONS}
 
 
 def runtime_path() -> Path:
@@ -119,10 +148,7 @@ class StatusSession:
         )
 
     def test_notification(self) -> dict:
-        notifier = Notifier(
-            app_name=self.config.notifications.app_name,
-            icon=self.config.notifications.icon,
-        )
+        notifier = Notifier.from_config(self.config)
         sent = notifier.send(
             "CheckMate",
             "Test de notification. Si tu ne la vois pas, coupe le mode silencieux.",
@@ -211,60 +237,25 @@ class StatusSession:
         self.stop_event.set()
         return {"ok": True, "message": "CheckMate est arrêté."}
 
+    def action(self, name: str) -> dict:
+        action = ACTIONS_BY_NAME.get(name)
+        if action is None:
+            raise StatusError("action inconnue")
+        return getattr(self, action.method)()
 
-class _Handler(BaseHTTPRequestHandler):
+
+class _Handler(LocalHandler):
     session: StatusSession
 
-    def log_message(self, format: str, *args: object) -> None:
-        return
-
-    def _send(self, status: int, payload: bytes, content_type: str) -> None:
-        self.send_response(status)
-        self.send_header("Content-Type", content_type)
-        self.send_header("Content-Length", str(len(payload)))
-        self.send_header("Cache-Control", "no-store")
-        self.send_header("X-Content-Type-Options", "nosniff")
-        self.send_header("Referrer-Policy", "no-referrer")
-        self.end_headers()
-        self.wfile.write(payload)
-
-    def _json(self, status: int, data: dict) -> None:
-        self._send(
-            status,
-            json.dumps(data, ensure_ascii=False).encode("utf-8"),
-            "application/json; charset=utf-8",
-        )
-
-    def _authorized(self) -> bool:
-        return self.headers.get("X-CheckMate-Token") == self.session.token
-
-    def _read_json(self) -> dict:
-        length = int(self.headers.get("Content-Length") or 0)
-        if length <= 0 or length > MAX_BODY:
-            return {}
-        try:
-            data = json.loads(self.rfile.read(length).decode("utf-8"))
-        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-            raise StatusError("corps JSON invalide") from exc
-        return data if isinstance(data, dict) else {}
-
     def do_GET(self) -> None:
-        parsed = urlparse(self.path)
-        if parsed.path == "/":
-            token = (parse_qs(parsed.query).get("token") or [""])[0]
-            if token != self.session.token:
-                self._send(403, b"Jeton invalide", "text/plain; charset=utf-8")
-                return
-            html = STATUS_HTML.replace("__TOKEN__", self.session.token).replace(
-                "__VERSION__", f"{__version__} - build {BUILD}"
-            )
-            self._send(200, html.encode("utf-8"), "text/html; charset=utf-8")
+        path = urlparse(self.path).path
+        if path == "/":
+            self._serve_page(STATUS_HTML)
             return
-        if parsed.path == "/favicon.ico":
-            self.send_response(204)
-            self.end_headers()
+        if path == "/favicon.ico":
+            self._favicon()
             return
-        if parsed.path == "/api/status":
+        if path == "/api/status":
             if not self._authorized():
                 self._json(403, {"error": "acces refuse"})
                 return
@@ -276,30 +267,14 @@ class _Handler(BaseHTTPRequestHandler):
         if not self._authorized():
             self._json(403, {"error": "acces refuse"})
             return
-        path = urlparse(self.path).path
-        if path != "/api/action":
+        if urlparse(self.path).path != "/api/action":
             self._json(404, {"error": "route inconnue"})
             return
 
-        action = ""
         try:
             payload = self._read_json()
-            action = str(payload.get("action") or "")
-            if action == "configure":
-                result = self.session.configure()
-            elif action == "test-notification":
-                result = self.session.test_notification()
-            elif action == "check-update":
-                result = self.session.check_update()
-            elif action == "install-update":
-                result = self.session.install_update()
-            elif action == "open-logs":
-                result = self.session.open_logs()
-            elif action == "quit":
-                result = self.session.quit()
-            else:
-                raise StatusError("action inconnue")
-        except StatusError as exc:
+            result = self.session.action(str(payload.get("action") or ""))
+        except LocalError as exc:
             self._json(exc.status, {"error": str(exc)})
             return
         except Exception as exc:
@@ -308,16 +283,10 @@ class _Handler(BaseHTTPRequestHandler):
             return
 
         self._json(200, result)
-        if action == "quit":
-            # La reponse est envoyee ; la boucle verra l'evenement et fermera tout.
-            self.session.stop_event.set()
 
 
 def create_server(session: StatusSession) -> ThreadingHTTPServer:
-    handler = type("StatusHandler", (_Handler,), {"session": session})
-    server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
-    server.daemon_threads = True
-    return server
+    return _create_server(session, _Handler)
 
 
 def start_status_server(session: StatusSession) -> ThreadingHTTPServer:

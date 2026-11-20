@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, time, timedelta
 from itertools import pairwise
@@ -37,6 +38,15 @@ class Window:
 
 
 @dataclass(frozen=True)
+class Situation:
+    """Etat du planning a un instant donne."""
+
+    reason: str
+    window: Window | None = None
+    key: str | None = None
+
+
+@dataclass(frozen=True)
 class Schedule:
     enabled: bool = False
     days: tuple[int, ...] = (0, 1, 2, 3, 4)
@@ -62,6 +72,20 @@ class Schedule:
             return None
         index = self.windows.index(window)
         return f"{moment.date().isoformat()}#{index}"
+
+    def situation(
+        self, moment: datetime, is_signed: Callable[[str], bool]
+    ) -> Situation:
+        """Decrit le creneau courant : desactive, hors plage, signe ou actif."""
+        if not self.enabled:
+            return Situation("disabled")
+        window = self.active_window(moment)
+        if window is None:
+            return Situation("outside")
+        key = self.window_key(moment)
+        if key and is_signed(key):
+            return Situation("signed", window, key)
+        return Situation("active", window, key)
 
     def next_start(self, moment: datetime) -> datetime | None:
         """Prochain debut de plage apres l'instant donne."""
