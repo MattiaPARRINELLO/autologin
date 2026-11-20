@@ -21,7 +21,8 @@ SetupIconFile=..\assets\checkmate.ico
 UninstallDisplayIcon={app}\CheckMate.exe
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
-CloseApplications=no
+CloseApplications=yes
+RestartApplications=no
 
 [Languages]
 Name: "french"; MessagesFile: "compiler:Languages\French.isl"
@@ -43,3 +44,21 @@ Filename: "{app}\CheckMate.exe"; Parameters: "setup"; Description: "Configurer C
 Filename: "{sys}\taskkill.exe"; Parameters: "/F /IM CheckMate.exe"; Flags: runhidden; RunOnceId: "KillApp"
 Filename: "{sys}\schtasks.exe"; Parameters: "/Delete /F /TN CheckMate"; Flags: runhidden; RunOnceId: "DeleteOldTask"
 Filename: "{sys}\reg.exe"; Parameters: "delete ""HKCU\Software\Microsoft\Windows\CurrentVersion\Run"" /v CheckMate /f"; Flags: runhidden; RunOnceId: "DeleteRunKey"
+
+[Code]
+procedure CurStepChanged(CurStep: TSetupStep);
+var
+  ResultCode: Integer;
+begin
+  if CurStep = ssInstall then
+  begin
+    Exec(
+      ExpandConstant('{sys}\taskkill.exe'),
+      '/F /IM CheckMate.exe',
+      '',
+      SW_HIDE,
+      ewWaitUntilTerminated,
+      ResultCode
+    );
+  end;
+end;
