@@ -34,3 +34,20 @@ jobs:
 
       - name: Tests
         run: uv run pytest -q
+
+  lock:
+    name: Lockfile (uv)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: watcher
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Verifier uv.lock
+        run: uv lock --check
