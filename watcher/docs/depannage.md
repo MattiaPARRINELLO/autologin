@@ -88,6 +88,17 @@ CheckMate.exe status
 Sous Linux, la fenêtre native demande GTK et WebKitGTK. Sans eux, CheckMate
 ouvre la page dans le navigateur.
 
+## L'icône de notification est un carré plein
+
+Sous Linux, CheckMate publie une icône StatusNotifierItem avec un vrai pixmap de
+64 pixels. Si Plasma ou la barre des tâches affiche encore un aplat, la session
+n'expose peut-être pas D-Bus. Vérifie que `DBUS_SESSION_BUS_ADDRESS` est défini,
+ou force l'ancien backend XEmbed :
+
+```bash
+CHECKMATE_TRAY=xorg checkmate-watcher status
+```
+
 ## Le navigateur est introuvable
 
 Installe Microsoft Edge ou Google Chrome, ou :

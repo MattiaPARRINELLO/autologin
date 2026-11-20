@@ -1,0 +1,5 @@
+# dbus-next exige des annotations de signature D-Bus ecrites comme des chaines
+# ("s", "a(iiay)", ...). Ruff les voit comme des noms non definis et veut retirer
+# les guillemets, ce qui casserait l'introspection D-Bus.
+[lint.per-file-ignores]
+"src/checkmate_watcher/sni.py" = ["F821", "UP037", "RET501"]
