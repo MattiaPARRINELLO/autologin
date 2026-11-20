@@ -9,6 +9,15 @@ présence, et la signature est rejouée automatiquement.
 Pendant l'attente, aucun navigateur visible. Une fenêtre s'ouvre uniquement au
 moment de signer, puis se referme.
 
+> **Avertissement.** CheckMate signe uniquement **ta** présence, pour un cours
+> auquel tu assistes réellement. Ne l'utilise pas pour falsifier une présence :
+> signer pour un cours auquel tu n'assistes pas, ou à la place de quelqu'un
+> d'autre, est un usage détourné. L'auteur n'est pas responsable de ce qui est
+> fait avec le logiciel. Le projet n'est ni affilié à CESAR, ni à Emineo
+> Education, ni à ton établissement ; CESAR et Emineo sont des marques
+> d'Emineo Education et de leurs titulaires respectifs. Détails dans les
+> [mentions légales](mentions-legales.md).
+
 ## Prérequis
 
 - Windows 10 ou 11, ou une distribution Linux avec systemd.
@@ -213,5 +222,6 @@ L'ancienne clé `include_prerelease = true` reste acceptée et équivaut à
   automatique échouera et le self-test le signalera.
 - Une mise à jour de CESAR peut casser les sélecteurs. Les logs indiquent alors
   qu'aucun bouton n'est trouvé.
-- CheckMate signe à ta place, avec ta signature. Tu restes responsable de son
-  usage.
+- CheckMate signe à ta place, avec ta signature, uniquement si tu es présent.
+  Ne l'utilise pas pour falsifier une présence : l'auteur n'est pas responsable
+  de ce qui est fait avec le logiciel.
