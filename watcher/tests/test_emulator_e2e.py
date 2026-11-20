@@ -177,7 +177,7 @@ def test_sign_attend_la_disparition_du_bouton(tmp_path):
             selectors=Selectors.from_dict({}),
         )
 
-        async def scenario() -> tuple[str, float]:
+        async def scenario() -> tuple[str, float, int]:
             session = CesarSession(config)
             await session.open(headless=True)
             try:
@@ -191,13 +191,19 @@ def test_sign_attend_la_disparition_du_bouton(tmp_path):
                         Point(120, 20, "end"),
                     ]
                 )
-                return confirmation, time.monotonic() - started
+                elapsed = time.monotonic() - started
+                # Au retour de sign(), le bouton doit deja avoir disparu du DOM.
+                remaining = await session.page.locator(".buttonPresent").count()
+                return confirmation, elapsed, remaining
             finally:
                 await session.close()
 
-        confirmation, elapsed = asyncio.run(asyncio.wait_for(scenario(), timeout=120))
+        confirmation, elapsed, remaining = asyncio.run(
+            asyncio.wait_for(scenario(), timeout=120)
+        )
 
         assert "prise en compte" in confirmation.lower()
+        assert remaining == 0
         assert elapsed >= 2.0
         assert wait_for_state(base_url)["signed"] is True
     finally:
