@@ -44,8 +44,6 @@ def test_fit_points_centre_et_respecte_les_dimensions():
     ]
     fitted = fit_points(points, 320, 150, 0.9)
     assert len(fitted) == 3
-    assert fitted[0].kind == "start"
-    assert fitted[-1].kind == "end"
     assert all(0 <= p.x <= 320 and 0 <= p.y <= 150 for p in fitted)
 
     xs = [p.x for p in fitted]
@@ -60,13 +58,6 @@ def test_fit_points_conserve_le_ratio():
     width = max(p.x for p in fitted) - min(p.x for p in fitted)
     height = max(p.y for p in fitted) - min(p.y for p in fitted)
     assert pytest.approx(width / height, rel=0.01) == 2.0
-
-
-def test_fit_points_force_les_extremites():
-    points = [Point(0, 0, "move"), Point(10, 10, "move")]
-    fitted = fit_points(points, 100, 100)
-    assert fitted[0].kind == "start"
-    assert fitted[-1].kind == "end"
 
 
 def test_fit_points_refuse_un_canvas_vide():

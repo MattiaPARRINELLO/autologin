@@ -25,7 +25,6 @@ class Point:
 class FittedPoint:
     x: float
     y: float
-    kind: str
 
 
 def _coerce_point(raw: object) -> Point:
@@ -73,17 +72,6 @@ def save_signature(path: Path, points: list[Point]) -> None:
     path.chmod(0o600)
 
 
-def _normalize_ends(points: list[Point]) -> list[Point]:
-    if not points:
-        return points
-    result = list(points)
-    if result[0].kind != "start":
-        result[0] = Point(result[0].x, result[0].y, "start")
-    if result[-1].kind != "end":
-        result[-1] = Point(result[-1].x, result[-1].y, "end")
-    return result
-
-
 def fit_points(
     points: list[Point],
     width: float,
@@ -117,14 +105,13 @@ def fit_points(
     offset_y = (height - draw_height) / 2
 
     fitted = []
-    for point in _normalize_ends(points):
+    for point in points:
         x = offset_x + (point.x - min_x) * scale
         y = offset_y + (point.y - min_y) * scale
         fitted.append(
             FittedPoint(
                 x=min(max(x, 0.0), width),
                 y=min(max(y, 0.0), height),
-                kind=point.kind,
             )
         )
     return fitted

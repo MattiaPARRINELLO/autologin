@@ -132,13 +132,11 @@ def test_refuse_un_ficher_absent(tmp_path):
 def test_canal_stable_par_defaut(tmp_path):
     config = load_config(write_config(tmp_path))
     assert config.updates.channel == "stable"
-    assert config.updates.include_prerelease is False
 
 
 def test_lit_le_canal_beta(tmp_path):
     config = load_config(write_config(tmp_path, '[updates]\nchannel = "beta"'))
     assert config.updates.channel == "beta"
-    assert config.updates.include_prerelease is True
 
 
 def test_alias_include_prerelease(tmp_path):

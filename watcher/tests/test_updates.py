@@ -84,7 +84,6 @@ def test_select_latest_avec_prereleases():
     ]
     assert select_latest(releases, channel="beta").tag == "watcher-v0.2.0"
     assert select_latest(releases, channel="stable").tag == "watcher-v0.1.5"
-    assert select_latest(releases, include_prerelease=False).tag == "watcher-v0.1.5"
 
 
 def test_select_latest_respecte_le_canal():
@@ -115,9 +114,6 @@ def test_check_for_update_deja_a_jour():
 def test_check_for_update_refuse_les_prereleases():
     releases = [release("watcher-0.1.0"), release("watcher-v0.2.0", prerelease=True)]
     assert check_for_update("0.1.0", channel="stable", releases=releases) is None
-    assert (
-        check_for_update("0.1.0", include_prerelease=False, releases=releases) is None
-    )
 
 
 def test_check_for_update_accepte_les_prereleases_en_beta():

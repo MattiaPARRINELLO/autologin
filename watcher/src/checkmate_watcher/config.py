@@ -138,11 +138,6 @@ class UpdatesConfig:
     enabled: bool = True
     channel: str = STABLE_CHANNEL
 
-    @property
-    def include_prerelease(self) -> bool:
-        """Alias de compatibilite : le canal beta accepte les prereleases."""
-        return self.channel == BETA_CHANNEL
-
 
 def parse_updates_channel(table: dict) -> str:
     """Lit `[updates] channel`, avec `include_prerelease` en alias historique."""
