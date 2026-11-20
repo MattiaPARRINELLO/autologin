@@ -1,0 +1,142 @@
+name: Windows validation
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: watcher
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Dependances
+        run: uv sync
+
+      - name: Tests unitaires Windows
+        run: uv run pytest -q
+
+      - name: Bundle PyInstaller
+        run: uv run pyinstaller packaging/checkmate.spec --noconfirm --clean
+
+      - name: Verifier le binaire
+        shell: pwsh
+        run: |
+          .\dist\CheckMate\CheckMate.exe --version
+          if ($LASTEXITCODE -ne 0) { throw "binaire invalide" }
+
+      - name: Demarrer l'emulateur
+        shell: pwsh
+        working-directory: .
+        run: |
+          $process = Start-Process python -ArgumentList "emulator/server.py","--port","8899" -WorkingDirectory "$env:GITHUB_WORKSPACE" -PassThru
+          $process.Id | Set-Content "$env:RUNNER_TEMP/emulator.pid"
+          for ($i = 0; $i -lt 30; $i++) {
+            try {
+              Invoke-RestMethod -Uri "http://127.0.0.1:8899/api/state" -TimeoutSec 1 | Out-Null
+              Write-Host "emulateur pret"
+              exit 0
+            } catch {
+              Start-Sleep -Seconds 1
+            }
+          }
+          throw "emulateur non demarre"
+
+      - name: Fixture de test
+        shell: pwsh
+        run: |
+          $temp = ($env:RUNNER_TEMP -replace '\\','/')
+          @(
+            '[cesar]',
+            'base_url = "http://127.0.0.1:8899"',
+            'username = "demo"',
+            'password = "demo"',
+            '',
+            '[schedule]',
+            'enabled = false',
+            '',
+            '[watcher]',
+            'poll_interval = 10',
+            'auto_sign = true',
+            'auto_sign_delay = 0',
+            'headless = true',
+            'visible_on_sign = false',
+            "profile_dir = `"$temp/profile`"",
+            "state_file = `"$temp/state.json`"",
+            '',
+            '[signature]',
+            "file = `"$temp/signature.json`"",
+            '',
+            '[notifications]',
+            'enabled = false'
+          ) | Set-Content -Encoding UTF8 "$env:RUNNER_TEMP\config.toml"
+
+          '[{"x":10,"y":10,"type":"start"},{"x":60,"y":40,"type":"move"},{"x":120,"y":20,"type":"end"}]' |
+            Set-Content -Encoding UTF8 "$env:RUNNER_TEMP\signature.json"
+
+      - name: Pointage complet sur l'emulateur
+        shell: pwsh
+        run: |
+          Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:8899/api/attendance/open" | Out-Null
+          & ".\dist\CheckMate\CheckMate.exe" --config "$env:RUNNER_TEMP\config.toml" run --once
+          if ($LASTEXITCODE -ne 0) { throw "echec du pointage" }
+          $state = Invoke-RestMethod -Uri "http://127.0.0.1:8899/api/state"
+          if (-not $state.signed) { throw "signature non enregistree" }
+          Write-Host "pointage Windows OK"
+
+      - name: Notification Windows
+        shell: pwsh
+        run: |
+          $result = uv run python -c "from checkmate_watcher.notifications import Notifier; print(Notifier(platform='win32').send('CheckMate','Validation Windows'))"
+          Write-Host $result
+          if ($result -notmatch "True") { throw "toast Windows echoue" }
+
+      - name: Credential Manager
+        shell: pwsh
+        run: |
+          uv run python -c "from checkmate_watcher.credentials import set_password,get_password,delete_password; s='checkmate-ci'; u='ci'; assert set_password(s,u,'secret'); assert get_password(s,u)=='secret'; delete_password(s,u); print('keyring OK')"
+
+      - name: Tache planifiee
+        shell: pwsh
+        run: |
+          uv run checkmate-watcher --config "$env:RUNNER_TEMP\config.toml" install-autostart
+          if ($LASTEXITCODE -ne 0) { throw "installation autostart echouee" }
+          schtasks /Query /TN CheckMate
+          if ($LASTEXITCODE -ne 0) { throw "tache absente" }
+          uv run checkmate-watcher --config "$env:RUNNER_TEMP\config.toml" uninstall-autostart
+
+      - name: Inno Setup
+        run: choco install innosetup -y --no-progress
+
+      - name: Construire l'installeur
+        shell: pwsh
+        run: |
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "/DMyAppVersion=0.1.0" "packaging\checkmate.iss"
+          if ($LASTEXITCODE -ne 0) { throw "installeur echoue" }
+
+      - name: Publier l'installeur
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer
+          path: watcher/dist-installer/*.exe
+          if-no-files-found: error
+
+      - name: Arreter l'emulateur
+        if: always()
+        shell: pwsh
+        working-directory: .
+        run: |
+          if (Test-Path "$env:RUNNER_TEMP/emulator.pid") {
+            $emulatorPid = Get-Content "$env:RUNNER_TEMP/emulator.pid"
+            Stop-Process -Id $emulatorPid -Force -ErrorAction SilentlyContinue
+          }
