@@ -58,6 +58,32 @@ class LaunchOptions:
         return {}
 
 
+def playwright_cache_dir(platform: str | None = None) -> Path:
+    override = os.environ.get("PLAYWRIGHT_BROWSERS_PATH")
+    if override and override != "0":
+        return Path(override)
+    current = platform or sys.platform
+    if current.startswith("win"):
+        base = os.environ.get("LOCALAPPDATA") or str(Path.home() / "AppData/Local")
+        return Path(base) / "ms-playwright"
+    if current == "darwin":
+        return Path.home() / "Library/Caches/ms-playwright"
+    return Path.home() / ".cache/ms-playwright"
+
+
+def bundled_browser_present(
+    platform: str | None = None,
+    root: Path | None = None,
+) -> bool:
+    cache = root or playwright_cache_dir(platform)
+    patterns = (
+        "chromium-*/chrome-linux*/chrome",
+        "chromium-*/chrome-win*/chrome.exe",
+        "chromium-*/chrome-mac*/Chromium.app/Contents/MacOS/Chromium",
+    )
+    return any(cache.glob(pattern) for pattern in patterns)
+
+
 def system_chromium() -> str | None:
     for name in LINUX_CANDIDATES:
         path = shutil.which(name)

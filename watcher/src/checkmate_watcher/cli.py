@@ -4,14 +4,30 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import getpass
 import logging
 import shutil
 import sys
 from pathlib import Path
 
 from . import __version__
-from .browser import missing_browser_message, resolve_launch_options
+from .autostart import (
+    autostart_enabled,
+    current_executable,
+    disable_autostart,
+    enable_autostart,
+)
+from .browser import (
+    bundled_browser_present,
+    missing_browser_message,
+    resolve_launch_options,
+)
 from .config import Config, ConfigError, load_config
+from .credentials import (
+    get_password,
+    keyring_available,
+    set_password,
+)
 from .logging_setup import setup_logging
 from .notifications import Notifier
 from .paths import default_config_path
@@ -128,6 +144,10 @@ def build_parser() -> argparse.ArgumentParser:
             "test-notification",
             "check-config",
             "reset-state",
+            "self-test",
+            "set-password",
+            "install-autostart",
+            "uninstall-autostart",
         ],
     )
     parser.add_argument(
@@ -138,6 +158,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--dry-run", action="store_true", help="detecte sans notifier ni signer"
     )
     parser.add_argument("--auto", action="store_true", help="signe sans confirmation")
+    parser.add_argument(
+        "--notify",
+        action="store_true",
+        help="self-test : envoie aussi une notification reelle",
+    )
     parser.add_argument("--verbose", "-v", action="store_true")
     parser.add_argument(
         "--version", action="version", version=f"%(prog)s {__version__}"
@@ -241,16 +266,138 @@ def command_test_notification(config: Config) -> int:
     return 0 if sent else 1
 
 
+def command_set_password(config: Config) -> int:
+    password = getpass.getpass("Mot de passe CESAR : ")
+    if not password:
+        print("mot de passe vide, rien n'a ete enregistre")
+        return 1
+    if not keyring_available():
+        print("trousseau systeme indisponible : utilise password_env ou password")
+        return 1
+    if not set_password(config.cesar.keyring_service, config.cesar.username, password):
+        print("enregistrement dans le trousseau impossible")
+        return 1
+    print(f"mot de passe enregistre dans le trousseau ({config.cesar.keyring_service})")
+    return 0
+
+
+def command_self_test(config: Config, *, notify: bool = False) -> int:
+    checks: list[tuple[str, bool, str]] = []
+
+    if config.cesar.password:
+        checks.append(("mot de passe", True, "disponible"))
+    else:
+        checks.append(("mot de passe", False, "absent"))
+
+    try:
+        points = load_signature(config.signature.file)
+    except SignatureError as exc:
+        checks.append(("signature", False, str(exc)))
+    else:
+        checks.append(("signature", True, f"{len(points)} points"))
+
+    class Probe:
+        executable_path = ""
+
+    options = resolve_launch_options(Probe(), config)
+    if options.executable_path:
+        checks.append(("navigateur", True, options.executable_path))
+    elif options.channel:
+        checks.append(("navigateur", True, f"canal {options.channel}"))
+    elif bundled_browser_present():
+        checks.append(("navigateur", True, "Chromium Playwright"))
+    else:
+        checks.append(("navigateur", False, "aucun navigateur trouve"))
+
+    if keyring_available():
+        stored = get_password(config.cesar.keyring_service, config.cesar.username)
+        checks.append(
+            ("trousseau", True, "mot de passe present" if stored else "disponible")
+        )
+    else:
+        checks.append(("trousseau", False, "indisponible"))
+
+    if autostart_enabled():
+        checks.append(("demarrage auto", True, "actif"))
+    else:
+        checks.append(("demarrage auto", False, "inactif"))
+
+    if config.schedule.enabled:
+        checks.append(("planning", True, config.schedule.describe()))
+    else:
+        checks.append(("planning", False, "desactive"))
+
+    log_dir = config.watcher.state_file.parent
+    try:
+        log_dir.mkdir(parents=True, exist_ok=True)
+        probe = log_dir / ".checkmate-write-test"
+        probe.write_text("ok", encoding="utf-8")
+        probe.unlink()
+    except OSError as exc:
+        checks.append(("dossier de donnees", False, str(exc)))
+    else:
+        checks.append(("dossier de donnees", True, str(log_dir)))
+
+    if notify:
+        notifier = Notifier(
+            app_name=config.notifications.app_name,
+            icon=config.notifications.icon,
+        )
+        sent = notifier.send(
+            "CheckMate",
+            "Test de notification reussi.",
+            urgency="normal",
+        )
+        checks.append(("notification", sent, "envoyee" if sent else "echec"))
+
+    print("Bilan CheckMate")
+    failures = 0
+    for name, ok, detail in checks:
+        if not ok:
+            failures += 1
+        marker = "OK  " if ok else "FAIL"
+        print(f"  [{marker}] {name:<16} {detail}")
+
+    return 0 if failures == 0 else 1
+
+
+def command_install_autostart(config_path: Path) -> int:
+    executable = current_executable()
+    config_path = config_path.expanduser().resolve()
+    if not enable_autostart(executable, config_path):
+        print("installation du demarrage automatique impossible")
+        return 1
+    print(f"demarrage automatique installe : {executable} --config {config_path} run")
+    return 0
+
+
+def command_uninstall_autostart() -> int:
+    if not disable_autostart():
+        print("desinstallation du demarrage automatique impossible")
+        return 1
+    print("demarrage automatique desactive")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     setup_logging(args.verbose)
 
+    needs_password = args.command in {"run", "capture", "test-notification"}
     try:
-        config = load_config(Path(args.config))
+        config = load_config(Path(args.config), require_password=needs_password)
     except ConfigError as exc:
         logger.error("configuration invalide : %s", exc)
         return 2
 
+    if args.command == "set-password":
+        return command_set_password(config)
+    if args.command == "self-test":
+        return command_self_test(config, notify=args.notify)
+    if args.command == "install-autostart":
+        return command_install_autostart(Path(args.config))
+    if args.command == "uninstall-autostart":
+        return command_uninstall_autostart()
     if args.command == "check-config":
         return command_check_config(config)
     if args.command == "test-notification":

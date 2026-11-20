@@ -23,6 +23,32 @@ Les chemins sont portables via `platformdirs` : `~/.config/checkmate-watcher` su
 Linux, `%APPDATA%\checkmate-watcher` sur Windows. Les logs tournent dans
 `checkmate-watcher.log` avec rotation, en plus de stdout.
 
+## Windows
+
+L'installeur `.exe` n'est pas encore publie. En attendant, sur une machine avec
+Python et [uv](https://docs.astral.sh/uv/) :
+
+```powershell
+cd watcher
+uv sync
+uv run checkmate-watcher --config "$env:APPDATA\checkmate-watcher\config.toml" set-password
+uv run checkmate-watcher --config "$env:APPDATA\checkmate-watcher\config.toml" capture
+uv run checkmate-watcher --config "$env:APPDATA\checkmate-watcher\config.toml" install-autostart
+uv run checkmate-watcher --config "$env:APPDATA\checkmate-watcher\config.toml" self-test --notify
+```
+
+Le mot de passe part dans le Credential Manager, le demarrage auto dans une tache
+planifiee au logon, et les notifications utilisent les toasts Windows.
+
+Commandes utiles partout :
+
+```bash
+checkmate-watcher self-test          # diagnostic complet
+checkmate-watcher set-password       # stocke le mot de passe dans le trousseau
+checkmate-watcher install-autostart  # tache planifiee / service systemd
+checkmate-watcher uninstall-autostart
+```
+
 ## Installation
 
 ```bash

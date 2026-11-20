@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import logging
 import os
 import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from .credentials import DEFAULT_SERVICE
+from .credentials import get_password as get_keyring_password
 from .paths import (
     default_profile_dir,
     default_signature_path,
@@ -20,6 +23,8 @@ from .schedule import (
     parse_days,
     parse_windows,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class ConfigError(Exception):
@@ -87,6 +92,7 @@ class CesarConfig:
     base_url: str
     username: str
     password: str
+    keyring_service: str = DEFAULT_SERVICE
     login_path: str = "/connexion"
     dashboard_path: str = "/"
 
@@ -144,20 +150,33 @@ def _require(table: dict, key: str, table_name: str) -> str:
     return value.strip()
 
 
-def _resolve_password(table: dict) -> str:
+def _resolve_password(
+    table: dict, username: str, service: str, required: bool = True
+) -> str:
     direct = table.get("password")
+    if isinstance(direct, str) and direct:
+        return direct
+
     env_name = table.get("password_env")
     if isinstance(env_name, str) and env_name:
         value = os.environ.get(env_name)
-        if value is None:
-            raise ConfigError(f"variable d'environnement {env_name} introuvable")
-        return value
-    if isinstance(direct, str) and direct:
-        return direct
-    raise ConfigError("[cesar] password ou password_env est obligatoire")
+        if value:
+            return value
+        logger.debug("variable %s absente, essai du trousseau", env_name)
+
+    stored = get_keyring_password(service, username)
+    if stored:
+        return stored
+
+    if required:
+        raise ConfigError(
+            "[cesar] mot de passe introuvable : renseigne password ou password_env, "
+            "ou lance 'checkmate-watcher set-password'"
+        )
+    return ""
 
 
-def load_config(path: str | Path) -> Config:
+def load_config(path: str | Path, *, require_password: bool = True) -> Config:
     config_path = Path(path)
     if not config_path.is_file():
         raise ConfigError(f"fichier de configuration introuvable : {config_path}")
@@ -175,10 +194,16 @@ def load_config(path: str | Path) -> Config:
     if not isinstance(cesar_table, dict):
         raise ConfigError("[cesar] doit etre une table TOML")
 
+    username = _require(cesar_table, "username", "cesar")
+    keyring_service = str(cesar_table.get("keyring_service", DEFAULT_SERVICE))
+
     cesar = CesarConfig(
         base_url=_require(cesar_table, "base_url", "cesar").rstrip("/"),
-        username=_require(cesar_table, "username", "cesar"),
-        password=_resolve_password(cesar_table),
+        username=username,
+        password=_resolve_password(
+            cesar_table, username, keyring_service, required=require_password
+        ),
+        keyring_service=keyring_service,
         login_path=str(cesar_table.get("login_path", "/connexion")),
         dashboard_path=str(cesar_table.get("dashboard_path", "/")),
     )

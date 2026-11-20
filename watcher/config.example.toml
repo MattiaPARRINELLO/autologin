@@ -6,9 +6,12 @@ base_url = "https://cesar.emineo-education.fr"
 login_path = "/connexion"
 dashboard_path = "/"
 username = "ton.identifiant"
-# Recommande : garde le mot de passe hors du fichier
+# Recommande : garde le mot de passe hors du fichier.
+# Windows : 'checkmate-watcher set-password' l'enregistre dans le Credential Manager.
+# Linux : le fichier env du service ou password_env.
 password_env = "CHECKMATE_PASSWORD"
 # password = "motdepasse-en-clair"
+# keyring_service = "checkmate-watcher"
 
 [schedule]
 # Surveillance limitee aux creneaux de cours. Une fois signe sur un creneau,
