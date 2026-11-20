@@ -29,6 +29,7 @@ from .schedule import (
     parse_days,
     parse_windows,
 )
+from .signature import MAX_PADDING_RATIO, MIN_PADDING_RATIO
 from .updates import BETA_CHANNEL, CHANNELS, STABLE_CHANNEL
 
 logger = logging.getLogger(__name__)
@@ -59,10 +60,7 @@ DEFAULT_SELECTORS: dict[str, tuple[str, ...]] = {
         "button[data-live-action-param*='sign']",
         ".swal2-container button.btn-primary",
     ),
-    "confirmation": (
-        ".swal2-html-container",
-        ".swal2-popup .swal2-html-container",
-    ),
+    "confirmation": (".swal2-html-container",),
     "login_username": ("input#username",),
     "login_password": ("input#password",),
     "login_submit": ("button[type='submit'].btn-primary",),
@@ -448,8 +446,11 @@ def load_config(path: str | Path, *, require_password: bool = True) -> Config:
         raise ConfigError("[watcher] confirm_timeout doit etre >= 10 secondes")
     if watcher.prompt_retry < 30:
         raise ConfigError("[watcher] prompt_retry doit etre >= 30 secondes")
-    if not 0.1 <= signature.padding_ratio <= 1.0:
-        raise ConfigError("[signature] padding_ratio doit etre entre 0.1 et 1.0")
+    if not MIN_PADDING_RATIO <= signature.padding_ratio <= MAX_PADDING_RATIO:
+        raise ConfigError(
+            f"[signature] padding_ratio doit etre entre "
+            f"{MIN_PADDING_RATIO} et {MAX_PADDING_RATIO}"
+        )
 
     return Config(
         cesar=cesar,

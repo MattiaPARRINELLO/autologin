@@ -70,6 +70,25 @@ def test_surcharge_les_valeurs(tmp_path):
     assert config.signature.padding_ratio == 0.5
 
 
+def test_save_puis_reload_conserve_toute_la_configuration(tmp_path):
+    from dataclasses import replace
+
+    from checkmate_watcher.config import default_config, save_config
+
+    config = default_config()
+    config = replace(
+        config,
+        cesar=replace(config.cesar, username="eleve", password="secret"),
+        watcher=replace(config.watcher, executable_path="/opt/chrome", auto_sign=True),
+        notifications=replace(config.notifications, enabled=False),
+        updates=replace(config.updates, channel="beta"),
+    )
+    path = tmp_path / "config.toml"
+    save_config(path, config, password="secret")
+
+    assert load_config(path) == config
+
+
 def test_refuse_un_intervalle_trop_court(tmp_path):
     with pytest.raises(ConfigError):
         load_config(write_config(tmp_path, "[watcher]\npoll_interval = 5"))

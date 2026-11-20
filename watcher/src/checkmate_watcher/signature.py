@@ -8,6 +8,8 @@ from dataclasses import dataclass
 from pathlib import Path
 
 VALID_KINDS = ("start", "move", "end")
+MIN_PADDING_RATIO = 0.1
+MAX_PADDING_RATIO = 1.0
 
 
 class SignatureError(Exception):
@@ -83,8 +85,10 @@ def fit_points(
         raise SignatureError("aucun point a mettre a l'echelle")
     if width <= 0 or height <= 0:
         raise SignatureError("dimensions de canvas invalides")
-    if not 0.1 <= padding_ratio <= 1.0:
-        raise SignatureError("padding_ratio doit etre entre 0.1 et 1.0")
+    if not MIN_PADDING_RATIO <= padding_ratio <= MAX_PADDING_RATIO:
+        raise SignatureError(
+            f"padding_ratio doit etre entre {MIN_PADDING_RATIO} et {MAX_PADDING_RATIO}"
+        )
 
     xs = [p.x for p in points]
     ys = [p.y for p in points]
