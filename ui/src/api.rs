@@ -149,7 +149,7 @@ fn backend_candidates() -> Vec<PathBuf> {
 }
 
 pub fn start_backend() -> Result<(), String> {
-    if read_runtime().is_some() {
+    if fetch_status().is_ok() {
         return Ok(());
     }
 
