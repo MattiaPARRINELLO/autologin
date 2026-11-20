@@ -43,7 +43,7 @@ else
     cp -a "$ROOT/pyproject.toml" "$ROOT/uv.lock" "$ROOT/src" "$APP_DIR/"
 fi
 
-"$UV_BIN" sync --project "$APP_DIR" >/dev/null
+"$UV_BIN" sync --no-dev --project "$APP_DIR" >/dev/null
 echo "Application installee dans $APP_DIR"
 
 rm -f "$BIN"

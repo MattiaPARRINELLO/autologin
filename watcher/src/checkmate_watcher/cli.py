@@ -31,7 +31,7 @@ from .credentials import (
 )
 from .logging_setup import setup_logging
 from .notifications import Notifier
-from .paths import default_config_path
+from .paths import default_config_path, default_log_file
 from .setup_server import run_setup
 from .signature import SignatureError, load_signature, parse_points, save_signature
 from .watcher import run_loop
@@ -199,6 +199,7 @@ def command_check_config(config: Config) -> int:
     print(f"  Profil         : {config.watcher.profile_dir}")
     print(f"  Etat           : {config.watcher.state_file}")
     print(f"  Signature      : {config.signature.file}")
+    print(f"  Logs           : {default_log_file()}")
 
     if config.signature.file.is_file():
         try:

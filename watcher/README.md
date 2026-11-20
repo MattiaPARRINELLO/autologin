@@ -23,6 +23,14 @@ Les chemins sont portables via `platformdirs` : `~/.config/checkmate-watcher` su
 Linux, `%APPDATA%\checkmate-watcher` sur Windows. Les logs tournent dans
 `checkmate-watcher.log` avec rotation, en plus de stdout.
 
+## Documentation
+
+- [Guide utilisateur](docs/guide-utilisateur.md)
+- [Vie privée](docs/vie-privee.md)
+- [Dépannage](docs/depannage.md)
+- [Validation Windows](docs/windows-validation.md)
+- [Présentation HTML](presentation/index.html)
+
 ## Onboarding
 
 ```bash

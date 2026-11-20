@@ -23,7 +23,7 @@ if ! command -v uv >/dev/null 2>&1; then
     exit 1
 fi
 
-uv sync --project "$ROOT"
+uv sync --no-dev --project "$ROOT"
 
 CONFIG="$HOME/.config/checkmate-watcher/config.toml"
 if [ ! -f "$CONFIG" ]; then
