@@ -35,8 +35,8 @@ jobs:
       - name: Verifier le binaire
         shell: pwsh
         run: |
-          .\dist\CheckMate\CheckMate.exe --version
-          if ($LASTEXITCODE -ne 0) { throw "binaire invalide" }
+          $process = Start-Process -FilePath ".\dist\CheckMate\CheckMate.exe" -ArgumentList "--version" -Wait -PassThru
+          if ($process.ExitCode -ne 0) { throw "binaire invalide ($($process.ExitCode))" }
 
       - name: Demarrer l'emulateur
         shell: pwsh
@@ -91,8 +91,8 @@ jobs:
         shell: pwsh
         run: |
           Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:8899/api/attendance/open" | Out-Null
-          & ".\dist\CheckMate\CheckMate.exe" --config "$env:RUNNER_TEMP\config.toml" run --once
-          if ($LASTEXITCODE -ne 0) { throw "echec du pointage" }
+          $process = Start-Process -FilePath ".\dist\CheckMate\CheckMate.exe" -ArgumentList "--config", "$env:RUNNER_TEMP\config.toml", "run", "--once" -Wait -PassThru
+          if ($process.ExitCode -ne 0) { throw "echec du pointage ($($process.ExitCode))" }
           $state = Invoke-RestMethod -Uri "http://127.0.0.1:8899/api/state"
           if (-not $state.signed) { throw "signature non enregistree" }
           Write-Host "pointage Windows OK"
