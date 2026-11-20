@@ -20,7 +20,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0 # gitleaks a besoin de l'historique pour lire le diff
 
@@ -39,7 +39,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Revue des dépendances ajoutées
         uses: actions/dependency-review-action@v4
