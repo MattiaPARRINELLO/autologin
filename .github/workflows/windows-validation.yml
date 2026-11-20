@@ -117,8 +117,10 @@ jobs:
           reg query "HKCU\Software\Microsoft\Windows\CurrentVersion\Run" /v CheckMate
           if ($LASTEXITCODE -ne 0) { throw "valeur Run absente" }
           uv run checkmate-watcher --config "$env:RUNNER_TEMP\config.toml" uninstall-autostart
-          reg query "HKCU\Software\Microsoft\Windows\CurrentVersion\Run" /v CheckMate
+          reg query "HKCU\Software\Microsoft\Windows\CurrentVersion\Run" /v CheckMate 2>$null
           if ($LASTEXITCODE -eq 0) { throw "valeur Run encore presente" }
+          Write-Host "valeur Run absente, OK"
+          exit 0
 
       - name: Inno Setup
         run: choco install innosetup -y --no-progress
