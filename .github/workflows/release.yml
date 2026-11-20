@@ -1,0 +1,123 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "watcher-v*"
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: watcher
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Dependances
+        run: uv sync
+
+      - name: Bundle PyInstaller
+        run: uv run pyinstaller packaging/checkmate.spec --noconfirm --clean
+
+      - name: Inno Setup
+        run: choco install innosetup -y --no-progress
+
+      - name: Construire l'installeur
+        shell: pwsh
+        run: |
+          $version = $env:GITHUB_REF_NAME -replace '^watcher-v','' -replace '^v',''
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "/DMyAppVersion=$version" "packaging\checkmate.iss"
+
+      - name: Publier l'installeur non signe
+        id: upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer
+          path: watcher/dist-installer/*.exe
+          if-no-files-found: error
+
+      - name: SignPath
+        if: ${{ vars.SIGNPATH_PROJECT_SLUG != '' }}
+        uses: signpath/github-action-submit-signing-request@v1
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ vars.SIGNPATH_POLICY_SLUG }}
+          artifact-configuration-slug: ${{ vars.SIGNPATH_ARTIFACT_CONFIGURATION_SLUG }}
+          github-artifact-id: ${{ steps.upload.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: signed
+
+      - name: Publier l'installeur signe
+        if: ${{ vars.SIGNPATH_PROJECT_SLUG != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer-signed
+          path: watcher/signed/**/*.exe
+          if-no-files-found: error
+
+  linux:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: watcher
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Dependances
+        run: uv sync
+
+      - name: Archive Linux
+        run: bash packaging/build-linux.sh "${GITHUB_REF_NAME#watcher-v}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-archive
+          path: watcher/dist/*.tar.gz
+          if-no-files-found: error
+
+  release:
+    needs: [windows, linux]
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Choisir les fichiers et calculer les sommes
+        run: |
+          mkdir -p release-assets
+          signed=$(find artifacts/windows-installer-signed -name '*.exe' 2>/dev/null | head -1 || true)
+          if [ -n "$signed" ]; then
+            echo "Installeur signe : $signed"
+            cp "$signed" release-assets/
+          else
+            echo "Aucun installeur signe, publication du non signe"
+            cp artifacts/windows-installer/*.exe release-assets/
+          fi
+          cp artifacts/linux-archive/*.tar.gz release-assets/
+          cd release-assets
+          sha256sum * > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          prerelease: true
+          files: release-assets/*

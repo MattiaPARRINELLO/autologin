@@ -1,0 +1,6 @@
+[Unit]
+Description=Redemarrage propre de CheckMate avant chaque cours
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/systemctl --user restart checkmate-watcher.service

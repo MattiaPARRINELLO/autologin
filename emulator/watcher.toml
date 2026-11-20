@@ -1,0 +1,43 @@
+# Configuration watcher pour l'emulateur CESAR local.
+# Copier vers ~/.config/checkmate-watcher/emulator.toml.
+
+[cesar]
+base_url = "http://127.0.0.1:8787"
+login_path = "/connexion"
+dashboard_path = "/"
+username = "demo"
+password = "demo"
+
+# Desactive pour pouvoir tester a n'importe quelle heure.
+# Mets enabled = true avec une plage couvrant maintenant pour tester le planning.
+[schedule]
+enabled = false
+days = ["mon", "tue", "wed", "thu", "fri"]
+windows = ["09:00-12:00", "13:30-16:30"]
+
+[watcher]
+poll_interval = 15
+dedupe_ttl = 3600
+confirm_timeout = 120
+prompt_retry = 60
+auto_sign = false
+auto_sign_delay = 5
+# Surveillance invisible ; une fenetre s'ouvre seulement pour signer.
+headless = true
+visible_on_sign = true
+# A renseigner si le Chromium de Playwright n'est pas installe.
+# executable_path = "/usr/bin/chromium"
+profile_dir = "~/.local/share/checkmate-watcher/emulator-profile"
+state_file = "~/.local/share/checkmate-watcher/emulator-state.json"
+
+[signature]
+file = "~/.config/checkmate-watcher/signature.json"
+padding_ratio = 0.9
+
+[updates]
+enabled = false
+
+[notifications]
+app_name = "CheckMate (emulateur)"
+icon = "dialog-information"
+enabled = true

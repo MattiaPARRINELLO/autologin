@@ -1,0 +1,67 @@
+# Configuration CheckMate watcher
+# Copier vers ~/.config/checkmate-watcher/config.toml puis chmod 600.
+
+[cesar]
+base_url = "https://cesar.emineo-education.fr"
+login_path = "/connexion"
+dashboard_path = "/"
+username = "ton.identifiant"
+# Recommande : garde le mot de passe hors du fichier.
+# Windows : 'checkmate-watcher set-password' l'enregistre dans le Credential Manager.
+# Linux : le fichier env du service ou password_env.
+password_env = "CHECKMATE_PASSWORD"
+# password = "motdepasse-en-clair"
+# keyring_service = "checkmate-watcher"
+
+[schedule]
+# Surveillance limitee aux creneaux de cours. Une fois signe sur un creneau,
+# le script ne verifie plus rien jusqu'au creneau suivant.
+enabled = true
+days = ["mon", "tue", "wed", "thu", "fri"]
+windows = ["09:00-12:00", "13:30-16:30"]
+
+[watcher]
+# Le bouton n'apparait qu'apres un rafraichissement : la page est rechargee
+# a chaque cycle. 10 a 15 s = detection rapide, 60 s = plus econome.
+poll_interval = 15
+# Duree pendant laquelle un emargement deja traite n'est pas renotifie.
+dedupe_ttl = 3600
+# Temps laisse pour repondre a la fenetre de confirmation.
+confirm_timeout = 180
+# Delai avant de reproposer la signature si personne n'a repondu.
+prompt_retry = 300
+# true = signature sans demander (delai ci-dessous).
+auto_sign = false
+auto_sign_delay = 20
+# Surveillance sans aucune fenetre.
+headless = true
+# true = le navigateur visible s'ouvre uniquement au moment de signer,
+# puis se referme une fois la confirmation affichee.
+visible_on_sign = true
+# Facultatif : utiliser un Chromium deja installe plutot que celui de Playwright.
+# executable_path = "/usr/bin/chromium"
+profile_dir = "~/.local/share/checkmate-watcher/profile"
+state_file = "~/.local/share/checkmate-watcher/state.json"
+
+[signature]
+file = "~/.config/checkmate-watcher/signature.json"
+padding_ratio = 0.9
+
+[updates]
+# Verifie les nouvelles versions au demarrage et notifie une fois par version.
+enabled = true
+include_prerelease = true
+
+[notifications]
+app_name = "CheckMate"
+icon = "dialog-information"
+# false = aucune notification ni confirmation (utile pour les tests).
+enabled = true
+
+# Les selecteurs par defaut correspondent au site actuel.
+# A ne modifier que si CESAR change de structure.
+# [selectors]
+# attendance_button = ["button.buttonPresent"]
+# signature_canvas = ["canvas[data-written-signature-target='canvas']"]
+# signature_save = ["button[data-live-action-param='signed']"]
+# confirmation = [".swal2-html-container"]

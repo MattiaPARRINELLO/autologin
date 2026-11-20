@@ -1,0 +1,995 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CheckMate - l'émargement CESAR sans y penser</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500&family=IBM+Plex+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* ===========================================
+     VIEWPORT FITTING: MANDATORY BASE STYLES
+     =========================================== */
+
+  /* 1. Lock html/body to viewport */
+  html, body {
+      height: 100%;
+      overflow-x: hidden;
+  }
+
+  html {
+      scroll-snap-type: y mandatory;
+      scroll-behavior: smooth;
+  }
+
+  /* 2. Each slide = exact viewport height */
+  .slide {
+      width: 100vw;
+      height: 100vh;
+      height: 100dvh; /* Dynamic viewport height for mobile browsers */
+      overflow: hidden; /* CRITICAL: Prevent ANY overflow */
+      scroll-snap-align: start;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+  }
+
+  /* 3. Content container with flex for centering */
+  .slide-content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      max-height: 100%;
+      overflow: hidden; /* Double-protection against overflow */
+      padding: var(--slide-padding);
+  }
+
+  /* 4. ALL typography uses clamp() for responsive scaling */
+  :root {
+      /* Titles scale from mobile to desktop */
+      --title-size: clamp(1.5rem, 5vw, 4rem);
+      --h2-size: clamp(1.25rem, 3.5vw, 2.5rem);
+      --h3-size: clamp(1rem, 2.5vw, 1.75rem);
+
+      /* Body text */
+      --body-size: clamp(0.75rem, 1.5vw, 1.125rem);
+      --small-size: clamp(0.65rem, 1vw, 0.875rem);
+
+      /* Spacing scales with viewport */
+      --slide-padding: clamp(1rem, 4vw, 4rem);
+      --content-gap: clamp(0.5rem, 2vw, 2rem);
+      --element-gap: clamp(0.25rem, 1vw, 1rem);
+  }
+
+  /* 5. Cards/containers use viewport-relative max sizes */
+  .card, .container, .content-box {
+      max-width: min(90vw, 1000px);
+      max-height: min(80vh, 700px);
+  }
+
+  /* 6. Lists auto-scale with viewport */
+  .feature-list, .bullet-list {
+      gap: clamp(0.4rem, 1vh, 1rem);
+  }
+
+  .feature-list li, .bullet-list li {
+      font-size: var(--body-size);
+      line-height: 1.4;
+  }
+
+  /* 7. Grids adapt to available space */
+  .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr));
+      gap: clamp(0.5rem, 1.5vw, 1rem);
+  }
+
+  /* 8. Images constrained to viewport */
+  img, .image-container {
+      max-width: 100%;
+      max-height: min(50vh, 400px);
+      object-fit: contain;
+  }
+
+  /* ===========================================
+     RESPONSIVE BREAKPOINTS
+     =========================================== */
+
+  /* Short viewports (< 700px height) */
+  @media (max-height: 700px) {
+      :root {
+          --slide-padding: clamp(0.75rem, 3vw, 2rem);
+          --content-gap: clamp(0.4rem, 1.5vw, 1rem);
+          --title-size: clamp(1.25rem, 4.5vw, 2.5rem);
+          --h2-size: clamp(1rem, 3vw, 1.75rem);
+      }
+  }
+
+  /* Very short viewports (< 600px height) */
+  @media (max-height: 600px) {
+      :root {
+          --slide-padding: clamp(0.5rem, 2.5vw, 1.5rem);
+          --content-gap: clamp(0.3rem, 1vw, 0.75rem);
+          --title-size: clamp(1.1rem, 4vw, 2rem);
+          --body-size: clamp(0.7rem, 1.2vw, 0.95rem);
+      }
+
+      /* Hide non-essential elements */
+      .nav-dots, .keyboard-hint, .decorative {
+          display: none;
+      }
+  }
+
+  /* Extremely short (landscape phones, < 500px height) */
+  @media (max-height: 500px) {
+      :root {
+          --slide-padding: clamp(0.4rem, 2vw, 1rem);
+          --title-size: clamp(1rem, 3.5vw, 1.5rem);
+          --h2-size: clamp(0.9rem, 2.5vw, 1.25rem);
+          --body-size: clamp(0.65rem, 1vw, 0.85rem);
+      }
+  }
+
+  /* Narrow viewports (< 600px width) */
+  @media (max-width: 600px) {
+      :root {
+          --title-size: clamp(1.25rem, 7vw, 2.5rem);
+      }
+
+      /* Stack grids vertically */
+      .grid {
+          grid-template-columns: 1fr;
+      }
+  }
+
+  /* ===========================================
+     REDUCED MOTION
+     =========================================== */
+  @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+          animation-duration: 0.01ms !important;
+          transition-duration: 0.2s !important;
+      }
+
+      html {
+          scroll-behavior: auto;
+      }
+  }
+
+  /* ===========================================
+     THEME: PAPER AND INK
+     =========================================== */
+
+  :root {
+    --paper: #f7f4ee;
+    --card: #fdfbf7;
+    --raised: #efe9df;
+    --ink: #1f1b16;
+    --ink-2: #5e554a;
+    --muted: #7b7266;
+    --line: rgba(31, 27, 22, 0.14);
+    --accent: #2f6f4f;
+    --accent-soft: #e3ece5;
+    --ok: #2f6f4f;
+    --font-display: "Fraunces", Georgia, serif;
+    --font-body: "Instrument Sans", system-ui, sans-serif;
+    --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+    --ease: cubic-bezier(0.22, 1, 0.36, 1);
+    --title-size: clamp(2.4rem, 6.6vw, 6rem);
+    --h2-size: clamp(1.6rem, 3.8vw, 3.4rem);
+    --h3-size: clamp(1rem, 1.7vw, 1.35rem);
+    --body-size: clamp(0.85rem, 1.15vw, 1.05rem);
+    --small-size: clamp(0.68rem, 0.85vw, 0.82rem);
+    --slide-padding: clamp(1.25rem, 4.5vw, 4rem);
+  }
+
+  *, *::before, *::after { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--font-body);
+    font-size: var(--body-size);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .slide { width: 100%; }
+  .slide-content {
+    width: min(1180px, 100%);
+    margin: 0 auto;
+    padding: clamp(1.5rem, 4.5vw, 4rem) clamp(1.25rem, 5vw, 4.5rem);
+    justify-content: center;
+  }
+
+  /* === SHARED CHROME === */
+
+  .slide-meta {
+    position: absolute;
+    top: clamp(1rem, 2.5vw, 1.75rem);
+    left: clamp(1.25rem, 5vw, 4.5rem);
+    right: clamp(1.25rem, 5vw, 4.5rem);
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-family: var(--font-mono);
+    font-size: var(--small-size);
+    color: var(--muted);
+  }
+  .slide-meta .brand { color: var(--ink); letter-spacing: 0.01em; }
+  .slide-meta .brand::before {
+    content: "";
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--accent);
+    margin-right: 8px;
+    vertical-align: 1px;
+  }
+
+  .slide-number {
+    position: absolute;
+    right: clamp(1.25rem, 5vw, 4.5rem);
+    bottom: clamp(1rem, 2.5vw, 1.75rem);
+    font-family: var(--font-mono);
+    font-size: var(--small-size);
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .kicker {
+    margin: 0 0 clamp(0.75rem, 1.5vh, 1.25rem);
+    font-family: var(--font-mono);
+    font-size: var(--small-size);
+    color: var(--accent);
+  }
+
+  h1, h2, h3, p { margin: 0; }
+  h1 {
+    font-family: var(--font-display);
+    font-size: var(--title-size);
+    line-height: 1.02;
+    font-weight: 500;
+    letter-spacing: -0.015em;
+    max-width: 12ch;
+  }
+  h1 .accent { color: var(--accent); }
+  h2 {
+    font-family: var(--font-display);
+    font-size: var(--h2-size);
+    line-height: 1.08;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+    max-width: 20ch;
+  }
+  h3 {
+    font-family: var(--font-body);
+    font-size: var(--h3-size);
+    font-weight: 600;
+    line-height: 1.25;
+  }
+  .lede {
+    margin-top: clamp(0.9rem, 2vh, 1.5rem);
+    max-width: 58ch;
+    color: var(--ink-2);
+    font-size: clamp(0.9rem, 1.25vw, 1.15rem);
+    line-height: 1.55;
+  }
+  .mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+  /* === MOTION === */
+
+  .reveal {
+    opacity: 0;
+    transform: translateY(14px);
+    transition:
+      opacity 600ms var(--ease),
+      transform 600ms var(--ease);
+    transition-delay: var(--d, 0s);
+  }
+  .slide.visible .reveal { opacity: 1; transform: none; }
+
+  /* === PROGRESS AND DOTS === */
+
+  .progress-bar {
+    position: fixed;
+    left: 0;
+    bottom: 0;
+    height: 2px;
+    width: 0;
+    background: var(--accent);
+    z-index: 20;
+    transition: width 180ms var(--ease);
+  }
+
+  .nav-dots {
+    position: fixed;
+    right: clamp(0.75rem, 2vw, 1.5rem);
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    z-index: 20;
+  }
+  .nav-dots button {
+    width: 7px;
+    height: 7px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: rgba(31, 27, 22, 0.22);
+    cursor: pointer;
+    transition: background-color 150ms var(--ease), transform 150ms var(--ease);
+  }
+  .nav-dots button.active {
+    background: var(--accent);
+    transform: scale(1.35);
+  }
+
+  /* === SLIDE 1: TITLE === */
+
+  .title-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.15fr) minmax(280px, 0.85fr);
+    gap: clamp(2rem, 5vw, 6rem);
+    align-items: center;
+  }
+  .title-sub {
+    margin-top: clamp(1rem, 2.5vh, 1.75rem);
+    max-width: 44ch;
+    color: var(--ink-2);
+    font-size: clamp(0.95rem, 1.35vw, 1.2rem);
+    line-height: 1.55;
+  }
+  .title-foot {
+    margin-top: clamp(1.25rem, 3vh, 2.25rem);
+    font-family: var(--font-mono);
+    font-size: var(--small-size);
+    color: var(--muted);
+  }
+
+  .timetable-card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    padding: clamp(1.1rem, 2vw, 1.75rem);
+    box-shadow: 0 1px 2px rgba(31, 27, 22, 0.05);
+  }
+  .tt-label {
+    margin: 0 0 clamp(0.75rem, 1.5vh, 1rem);
+    font-family: var(--font-mono);
+    font-size: var(--small-size);
+    color: var(--muted);
+  }
+  .tt-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 1rem;
+    padding: clamp(0.55rem, 1.2vh, 0.8rem) 0;
+    border-top: 1px solid var(--line);
+    font-family: var(--font-mono);
+    font-size: clamp(0.8rem, 1.1vw, 0.98rem);
+    color: var(--ink-2);
+    font-variant-numeric: tabular-nums;
+  }
+  .tt-row.active { color: var(--ink); }
+  .tt-row .state { font-family: var(--font-body); font-size: var(--small-size); color: var(--muted); }
+  .tt-row.active .time::before {
+    content: "";
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--accent);
+    margin-right: 8px;
+    vertical-align: 1px;
+  }
+  .tt-foot {
+    margin: clamp(0.75rem, 1.5vh, 1rem) 0 0;
+    font-size: var(--small-size);
+    color: var(--muted);
+    line-height: 1.45;
+  }
+
+  /* === SLIDE 2: PROBLEM === */
+
+  .problem-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(300px, 1fr);
+    gap: clamp(2rem, 5vw, 5rem);
+    align-items: center;
+  }
+  .timeline {
+    position: relative;
+    padding: clamp(1.5rem, 3vh, 2.5rem) 0 clamp(0.5rem, 1vh, 1rem);
+  }
+  .timeline::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 50%;
+    height: 1px;
+    background: var(--line);
+  }
+  .windows {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: clamp(1rem, 3vw, 2.5rem);
+    position: relative;
+  }
+  .window-block {
+    border-top: 3px solid var(--ink);
+    padding-top: 10px;
+  }
+  .window-block.active { border-color: var(--accent); }
+  .window-time {
+    font-family: var(--font-mono);
+    font-size: clamp(0.78rem, 1.05vw, 0.95rem);
+    font-variant-numeric: tabular-nums;
+    color: var(--ink);
+  }
+  .window-label {
+    margin-top: 4px;
+    font-size: var(--small-size);
+    color: var(--muted);
+  }
+  .refresh-note {
+    margin-top: clamp(1rem, 2.5vh, 1.75rem);
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--card);
+    font-family: var(--font-mono);
+    font-size: var(--small-size);
+    color: var(--ink-2);
+  }
+  .refresh-note::before {
+    content: "";
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--accent);
+  }
+  .stat-list {
+    display: flex;
+    flex-direction: column;
+    gap: clamp(0.75rem, 1.6vh, 1.1rem);
+    border-top: 1px solid var(--line);
+    padding-top: clamp(1rem, 2vh, 1.5rem);
+  }
+  .stat-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem;
+    color: var(--ink-2);
+    font-size: clamp(0.82rem, 1vw, 0.95rem);
+  }
+  .stat-row strong {
+    font-family: var(--font-mono);
+    font-size: clamp(1.1rem, 1.8vw, 1.5rem);
+    font-weight: 500;
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* === SLIDE 3: LOOP === */
+
+  .loop-head { max-width: 60ch; }
+  .steps {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: clamp(1rem, 2.5vw, 2.5rem);
+    margin-top: clamp(1.5rem, 4vh, 3rem);
+    position: relative;
+  }
+  .steps::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: var(--line);
+  }
+  .step { padding-top: clamp(0.8rem, 1.6vh, 1.2rem); }
+  .step-num {
+    font-family: var(--font-mono);
+    font-size: var(--small-size);
+    color: var(--accent);
+  }
+  .step h3 { margin: 8px 0 6px; }
+  .step p { color: var(--ink-2); font-size: clamp(0.82rem, 1vw, 0.95rem); line-height: 1.5; max-width: 30ch; }
+  .step-meta {
+    display: inline-block;
+    margin-top: 10px;
+    font-family: var(--font-mono);
+    font-size: var(--small-size);
+    color: var(--muted);
+  }
+
+  /* === SLIDE 4: PRODUCT === */
+
+  .split {
+    display: grid;
+    grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
+    gap: clamp(2rem, 5vw, 5rem);
+    align-items: center;
+  }
+  .bullets {
+    list-style: none;
+    margin: clamp(1.25rem, 3vh, 2rem) 0 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .bullets li {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    color: var(--ink-2);
+    font-size: clamp(0.85rem, 1.05vw, 1rem);
+  }
+  .bullets li::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    margin-top: 7px;
+    flex: none;
+  }
+  .shot { margin: 0; display: flex; flex-direction: column; gap: 10px; align-items: center; }
+  .shot img {
+    width: auto;
+    max-width: 100%;
+    max-height: min(60vh, 560px);
+    object-fit: contain;
+    object-position: top;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--card);
+    box-shadow: 0 10px 30px rgba(31, 27, 22, 0.08);
+  }
+  .shot figcaption { font-family: var(--font-mono); font-size: var(--small-size); color: var(--muted); }
+
+  /* === SLIDE 5: PRIVACY === */
+
+  .privacy-grid {
+    display: grid;
+    grid-template-columns: minmax(220px, 0.75fr) minmax(0, 1.25fr);
+    gap: clamp(2rem, 4vw, 4rem);
+    align-items: center;
+  }
+  .stamp {
+    width: clamp(150px, 18vw, 220px);
+    aspect-ratio: 1;
+    border: 1.5px solid var(--accent);
+    border-radius: 50%;
+    display: grid;
+    place-content: center;
+    text-align: center;
+    color: var(--accent);
+    transform: rotate(-6deg);
+  }
+  .stamp .big {
+    font-family: var(--font-display);
+    font-size: clamp(1.8rem, 3.2vw, 3rem);
+    line-height: 1;
+    font-weight: 500;
+  }
+  .stamp .small {
+    font-family: var(--font-mono);
+    font-size: var(--small-size);
+    margin-top: 6px;
+  }
+  .privacy-copy h2 { max-width: 18ch; }
+  .privacy-list {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: clamp(1rem, 2.5vw, 2rem);
+    margin-top: clamp(1.25rem, 3vh, 2rem);
+  }
+  .privacy-list h3 { font-size: var(--small-size); font-family: var(--font-mono); color: var(--muted); font-weight: 400; }
+  .privacy-list ul { margin: 8px 0 0; padding-left: 16px; color: var(--ink-2); font-size: clamp(0.8rem, 1vw, 0.95rem); line-height: 1.65; }
+
+  /* === SLIDE 6: INSTALL === */
+
+  .install-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: clamp(1rem, 2.5vw, 2rem);
+    margin-top: clamp(1.5rem, 3.5vh, 2.5rem);
+  }
+  .install-card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: clamp(1rem, 2vw, 1.5rem);
+  }
+  .install-card .os {
+    font-family: var(--font-mono);
+    font-size: var(--small-size);
+    color: var(--accent);
+  }
+  .install-card h3 { margin: 8px 0 10px; font-size: clamp(1rem, 1.4vw, 1.2rem); }
+  .install-card p, .install-card li { color: var(--ink-2); font-size: clamp(0.78rem, 0.98vw, 0.92rem); line-height: 1.55; }
+  .install-card ol { margin: 0; padding-left: 18px; }
+  .code {
+    display: inline-block;
+    margin-top: 10px;
+    padding: 7px 10px;
+    border-radius: 7px;
+    background: var(--raised);
+    font-family: var(--font-mono);
+    font-size: var(--small-size);
+    color: var(--ink);
+  }
+  .note { margin-top: 10px; font-size: var(--small-size); color: var(--muted); line-height: 1.45; }
+  .install-foot {
+    margin-top: clamp(1rem, 2.5vh, 1.5rem);
+    font-family: var(--font-mono);
+    font-size: var(--small-size);
+    color: var(--muted);
+  }
+
+  /* === SLIDE 7: CLOSING === */
+
+  .closing .slide-content { align-items: flex-start; }
+  .closing-hour {
+    font-family: var(--font-display);
+    font-size: clamp(4rem, 12vw, 10rem);
+    line-height: 0.9;
+    font-weight: 400;
+    letter-spacing: -0.02em;
+    color: var(--accent);
+  }
+  .closing-line {
+    margin-top: clamp(1rem, 2.5vh, 1.5rem);
+    max-width: 32ch;
+    font-size: clamp(1rem, 1.6vw, 1.35rem);
+    color: var(--ink-2);
+  }
+  .closing-strip {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 220px));
+    gap: clamp(1rem, 2.5vw, 2rem);
+    margin-top: clamp(1.5rem, 4vh, 2.5rem);
+    padding-top: 14px;
+    border-top: 1px solid var(--line);
+  }
+  .closing-strip .tt-row { border: 0; padding: 0; }
+
+  /* === RESPONSIVE TWEAKS === */
+
+  @media (max-width: 900px) {
+    .title-grid, .problem-grid, .split, .privacy-grid { grid-template-columns: 1fr; }
+    .title-grid { gap: 2rem; }
+    .title-copy h1 { max-width: 14ch; }
+    .timetable-card { max-width: 420px; }
+    .problem-grid { gap: 2rem; }
+    .stat-list { display: none; }
+    .steps { grid-template-columns: 1fr; gap: 0.75rem; }
+    .steps::before { display: none; }
+    .step { border-top: 1px solid var(--line); }
+    .split { gap: 1.5rem; }
+    .shot img { max-height: 34vh; }
+    .privacy-grid { gap: 1.5rem; }
+    .stamp { width: 120px; }
+    .install-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="progress-bar" id="progress"></div>
+<nav class="nav-dots" id="dots" aria-label="Navigation des diapositives"></nav>
+
+<!-- === SLIDE 1: TITLE === -->
+<section class="slide title-slide visible">
+  <div class="slide-meta"><span class="brand">CheckMate</span><span>Émargement CESAR</span></div>
+  <div class="slide-content title-grid">
+    <div class="title-copy">
+      <p class="kicker reveal">CheckMate · 2026</p>
+      <h1 class="reveal" style="--d:.08s">L'émargement CESAR,<br><span class="accent">sans y penser.</span></h1>
+      <p class="title-sub reveal" style="--d:.16s">CheckMate surveille tes créneaux et signe quand le formateur ouvre. Une notification, un clic, c'est fait.</p>
+      <p class="title-foot reveal" style="--d:.24s">Local. Sans serveur. Sans onglet ouvert.</p>
+    </div>
+    <aside class="timetable-card reveal" style="--d:.2s" aria-label="Créneaux du jour">
+      <p class="tt-label">Aujourd'hui</p>
+      <div class="tt-row active"><span class="time">09:00-12:00</span><span class="state">en cours</span></div>
+      <div class="tt-row"><span class="time">13:30-16:30</span><span class="state">à venir</span></div>
+      <p class="tt-foot">Surveillance locale, 10 s entre deux vérifications.</p>
+    </aside>
+  </div>
+  <span class="slide-number">01 / 07</span>
+</section>
+
+<!-- === SLIDE 2: PROBLEM === -->
+<section class="slide">
+  <div class="slide-meta"><span class="brand">CheckMate</span><span>Le problème</span></div>
+  <div class="slide-content problem-grid">
+    <div>
+      <h2 class="reveal">Le bouton n'apparaît qu'au refresh.</h2>
+      <p class="lede reveal" style="--d:.08s">Deux créneaux par jour, une fenêtre de quelques minutes pour signer. Rester devant CESAR ne suffit pas.</p>
+      <div class="timeline reveal" style="--d:.16s">
+        <div class="windows">
+          <div class="window-block active"><div class="window-time">09:00-12:00</div><div class="window-label">cours du matin</div></div>
+          <div class="window-block"><div class="window-time">13:30-16:30</div><div class="window-label">cours de l'après-midi</div></div>
+        </div>
+        <div class="refresh-note">refresh toutes les 10 s</div>
+      </div>
+    </div>
+    <div class="stat-list reveal" style="--d:.24s">
+      <div class="stat-row"><span>Créneaux par jour</span><strong>02</strong></div>
+      <div class="stat-row"><span>Attente avant détection</span><strong>10 s</strong></div>
+      <div class="stat-row"><span>Onglet à garder ouvert</span><strong>0</strong></div>
+      <div class="stat-row"><span>Fenêtre de signature</span><strong>quelques min</strong></div>
+    </div>
+  </div>
+  <span class="slide-number">02 / 07</span>
+</section>
+
+<!-- === SLIDE 3: LOOP === -->
+<section class="slide">
+  <div class="slide-meta"><span class="brand">CheckMate</span><span>La boucle</span></div>
+  <div class="slide-content">
+    <div class="loop-head">
+      <h2 class="reveal">La boucle tourne en local.</h2>
+      <p class="lede reveal" style="--d:.08s">Aucune fenêtre pendant l'attente. Le navigateur visible ne s'ouvre que pour signer.</p>
+    </div>
+    <div class="steps">
+      <div class="step reveal" style="--d:.14s">
+        <span class="step-num">01</span>
+        <h3>Détecte</h3>
+        <p>Refresh de CESAR toutes les 10 secondes, uniquement dans les créneaux.</p>
+        <span class="step-meta">10 s</span>
+      </div>
+      <div class="step reveal" style="--d:.22s">
+        <span class="step-num">02</span>
+        <h3>Demande</h3>
+        <p>Notification et fenêtre "Je suis présent" ou "Absent".</p>
+        <span class="step-meta">1 clic</span>
+      </div>
+      <div class="step reveal" style="--d:.3s">
+        <span class="step-num">03</span>
+        <h3>Signe</h3>
+        <p>Navigateur visible, tracé de la signature, confirmation, fermeture.</p>
+        <span class="step-meta">5 s</span>
+      </div>
+    </div>
+  </div>
+  <span class="slide-number">03 / 07</span>
+</section>
+
+<!-- === SLIDE 4: PRODUCT === -->
+<section class="slide">
+  <div class="slide-meta"><span class="brand">CheckMate</span><span>L'interface</span></div>
+  <div class="slide-content split">
+    <div class="split-copy">
+      <p class="kicker reveal">Onboarding</p>
+      <h2 class="reveal" style="--d:.08s">Cinq écrans, puis plus rien à faire.</h2>
+      <ul class="bullets">
+        <li class="reveal" style="--d:.14s">Connexion CESAR testée en vrai avant d'enregistrer</li>
+        <li class="reveal" style="--d:.2s">Signature dessinée une fois, rejouée à l'identique</li>
+        <li class="reveal" style="--d:.26s">Planning, notification et démarrage auto dans la même page</li>
+      </ul>
+    </div>
+    <figure class="shot reveal" style="--d:.18s">
+      <img src="assets/onboarding-card.png" alt="Écran de connexion de l'onboarding CheckMate">
+      <figcaption>Configuration locale, 127.0.0.1 uniquement</figcaption>
+    </figure>
+  </div>
+  <span class="slide-number">04 / 07</span>
+</section>
+
+<!-- === SLIDE 5: PRIVACY === -->
+<section class="slide">
+  <div class="slide-meta"><span class="brand">CheckMate</span><span>Vie privée</span></div>
+  <div class="slide-content privacy-grid">
+    <div class="stamp reveal">
+      <div class="big">100 %</div>
+      <div class="small">local</div>
+    </div>
+    <div class="privacy-copy">
+      <h2 class="reveal">Rien ne sort de la machine.</h2>
+      <div class="privacy-list">
+        <div class="reveal" style="--d:.1s">
+          <h3>Reste ici</h3>
+          <ul>
+            <li>Identifiant et mot de passe</li>
+            <li>Signature et planning</li>
+            <li>Logs et état des créneaux</li>
+          </ul>
+        </div>
+        <div class="reveal" style="--d:.18s">
+          <h3>Sort de la machine</h3>
+          <ul>
+            <li>Les requêtes vers CESAR</li>
+            <li>Rien d'autre</li>
+            <li>Aucun serveur CheckMate</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+  <span class="slide-number">05 / 07</span>
+</section>
+
+<!-- === SLIDE 6: INSTALL === -->
+<section class="slide">
+  <div class="slide-meta"><span class="brand">CheckMate</span><span>Installation</span></div>
+  <div class="slide-content">
+    <h2 class="reveal">Deux façons d'installer.</h2>
+    <p class="lede reveal" style="--d:.08s">L'onboarding fait le reste : connexion, signature, planning, notification, démarrage auto.</p>
+    <div class="install-grid">
+      <div class="install-card reveal" style="--d:.14s">
+        <span class="os">Windows</span>
+        <h3>CheckMate-Setup.exe</h3>
+        <ol>
+          <li>Télécharger depuis les releases</li>
+          <li>Lancer l'installeur, sans droits admin</li>
+          <li>Suivre l'onboarding</li>
+        </ol>
+        <p class="note">SmartScreen : Plus d'infos, puis Exécuter quand même.</p>
+      </div>
+      <div class="install-card reveal" style="--d:.22s">
+        <span class="os">Linux</span>
+        <h3>Archive + install.sh</h3>
+        <ol>
+          <li>Extraire l'archive</li>
+          <li>Lancer l'installateur</li>
+          <li>Suivre l'onboarding</li>
+        </ol>
+        <span class="code">./install.sh</span>
+      </div>
+    </div>
+    <p class="install-foot reveal" style="--d:.3s">Edge ou Chrome sur Windows, uv sur Linux.</p>
+  </div>
+  <span class="slide-number">06 / 07</span>
+</section>
+
+<!-- === SLIDE 7: CLOSING === -->
+<section class="slide closing">
+  <div class="slide-meta"><span class="brand">CheckMate</span><span>Demain</span></div>
+  <div class="slide-content">
+    <p class="kicker reveal">Demain matin</p>
+    <div class="closing-hour reveal" style="--d:.08s">09:00</div>
+    <p class="closing-line reveal" style="--d:.16s">La surveillance reprend. Une notification, un clic, c'est signé.</p>
+    <div class="closing-strip reveal" style="--d:.24s">
+      <div class="tt-row active"><span class="time">09:00-12:00</span><span class="state">en cours</span></div>
+      <div class="tt-row"><span class="time">13:30-16:30</span><span class="state">à venir</span></div>
+    </div>
+    <p class="install-foot reveal" style="--d:.3s">La machine doit être allumée et la session ouverte.</p>
+  </div>
+  <span class="slide-number">07 / 07</span>
+</section>
+
+<script>
+/* ===========================================
+   SLIDE PRESENTATION CONTROLLER
+   =========================================== */
+class SlidePresentation {
+  constructor() {
+    this.slides = [...document.querySelectorAll(".slide")];
+    this.dotsContainer = document.getElementById("dots");
+    this.progress = document.getElementById("progress");
+    this.current = 0;
+    this.locked = false;
+
+    this.buildDots();
+    this.observeSlides();
+    this.bindKeyboard();
+    this.bindWheel();
+    this.bindTouch();
+    this.update();
+
+    const initial = this.slides.findIndex((slide) => slide.classList.contains("visible"));
+    this.current = initial >= 0 ? initial : 0;
+    this.update();
+  }
+
+  buildDots() {
+    this.dotsContainer.innerHTML = "";
+    this.slides.forEach((slide, index) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.setAttribute("aria-label", `Diapositive ${index + 1}`);
+      button.addEventListener("click", () => this.go(index));
+      this.dotsContainer.appendChild(button);
+    });
+    this.dots = [...this.dotsContainer.querySelectorAll("button")];
+  }
+
+  observeSlides() {
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (!entry.isIntersecting) return;
+        entry.target.classList.add("visible");
+        const index = this.slides.indexOf(entry.target);
+        if (index >= 0) {
+          this.current = index;
+          this.update();
+        }
+      });
+    }, { threshold: 0.5 });
+    this.slides.forEach((slide) => observer.observe(slide));
+  }
+
+  bindKeyboard() {
+    window.addEventListener("keydown", (event) => {
+      if (["ArrowRight", "ArrowDown", " ", "PageDown"].includes(event.key)) {
+        event.preventDefault();
+        this.go(this.current + 1);
+      } else if (["ArrowLeft", "ArrowUp", "PageUp"].includes(event.key)) {
+        event.preventDefault();
+        this.go(this.current - 1);
+      } else if (event.key === "Home") {
+        event.preventDefault();
+        this.go(0);
+      } else if (event.key === "End") {
+        event.preventDefault();
+        this.go(this.slides.length - 1);
+      }
+    });
+  }
+
+  bindWheel() {
+    window.addEventListener("wheel", (event) => {
+      if (this.locked) return;
+      const direction = event.deltaY > 0 ? 1 : -1;
+      if (Math.abs(event.deltaY) < 12) return;
+      event.preventDefault();
+      this.locked = true;
+      this.go(this.current + direction);
+      setTimeout(() => { this.locked = false; }, 650);
+    }, { passive: false });
+  }
+
+  bindTouch() {
+    let startY = null;
+    window.addEventListener("touchstart", (event) => {
+      startY = event.touches[0].clientY;
+    }, { passive: true });
+    window.addEventListener("touchend", (event) => {
+      if (startY === null) return;
+      const delta = startY - event.changedTouches[0].clientY;
+      if (Math.abs(delta) > 50) {
+        this.go(this.current + (delta > 0 ? 1 : -1));
+      }
+      startY = null;
+    }, { passive: true });
+  }
+
+  go(index) {
+    const target = Math.max(0, Math.min(this.slides.length - 1, index));
+    this.slides[target].scrollIntoView({ behavior: "smooth", block: "start" });
+    this.current = target;
+    this.update();
+  }
+
+  update() {
+    if (!this.dots) return;
+    this.dots.forEach((dot, index) => {
+      dot.classList.toggle("active", index === this.current);
+    });
+    const max = document.documentElement.scrollHeight - window.innerHeight;
+    const ratio = max > 0 ? window.scrollY / max : 0;
+    this.progress.style.width = `${Math.max(2, ratio * 100)}%`;
+  }
+}
+
+const deck = new SlidePresentation();
+window.addEventListener("scroll", () => deck.update(), { passive: true });
+</script>
+</body>
+</html>
