@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 from types import SimpleNamespace
+
+import pytest
 
 from checkmate_watcher import autostart
 from checkmate_watcher.autostart import (
@@ -17,6 +20,7 @@ def ok_result():
     return SimpleNamespace(returncode=0, stdout="", stderr="")
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="unite systemd Linux")
 def test_unite_systemd_generee():
     unit = _linux_unit(
         Path("/opt/check mate/checkmate-watcher"),
@@ -86,10 +90,11 @@ def test_dispatch_linux(monkeypatch):
     assert called["path"] == Path("/config.toml")
 
 
-def test_commande_courante(monkeypatch):
+def test_commande_courante(monkeypatch, tmp_path):
+    candidate = tmp_path / "checkmate-watcher"
     monkeypatch.setattr(
         autostart,
         "sys",
-        SimpleNamespace(platform="linux", argv=["/opt/checkmate/checkmate-watcher"]),
+        SimpleNamespace(platform="linux", argv=[str(candidate)]),
     )
-    assert current_executable() == Path("/opt/checkmate/checkmate-watcher")
+    assert current_executable() == candidate.resolve()
