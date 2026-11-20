@@ -8,9 +8,9 @@
   ![Linux](https://img.shields.io/badge/Linux-systemd-FCC624)
   ![Licence](https://img.shields.io/badge/licence-MIT-green)
   ![Tests](https://img.shields.io/badge/tests-75%20passing-brightgreen)
-  ![Statut](https://img.shields.io/badge/statut-beta%20ferm%C3%A9e-orange)
+  ![Statut](https://img.shields.io/badge/statut-pr%C3%A9--version-orange)
 
-  [Télécharger](DOWNLOAD.md) ·
+  [Télécharger](https://github.com/MattiaPARRINELLO/autologin/releases/tag/watcher-v0.1.1) ·
   [Documentation](watcher/docs/README.md) ·
   [Présentation](watcher/presentation/index.html) ·
   [Vie privée](PRIVACY.md)
@@ -84,20 +84,15 @@ Tu restes responsable de l'usage de ta signature et du respect des règles de to
 
 ### Les étapes
 
-La beta desktop est fermée. Les builds sont distribués aux testeurs invités via
-un dépôt privé. Pour demander une invitation, ouvre une
-[issue](https://github.com/MattiaPARRINELLO/autologin/issues/new) ou contacte le
-mainteneur. La version publique ouvrira après la mise en place de la signature
-de code.
-
-Quand tu as reçu l'installeur `CheckMate-Setup-0.1.1.exe` :
-
-1. Lance l'installeur. Il s'installe dans ton dossier utilisateur, sans demander
+1. Va sur la page de la pré-version :
+   [CheckMate desktop 0.1.1](https://github.com/MattiaPARRINELLO/autologin/releases/tag/watcher-v0.1.1).
+2. Télécharge `CheckMate-Setup-0.1.1.exe`.
+3. Lance l'installeur. Il s'installe dans ton dossier utilisateur, sans demander
    les droits administrateur.
-2. Windows peut afficher un avertissement SmartScreen. C'est normal tant que la
+4. Windows peut afficher un avertissement SmartScreen. C'est normal tant que la
    signature de code n'est pas active : clique sur "Informations
    complémentaires", puis "Exécuter quand même".
-3. À la fin de l'installation, l'assistant de configuration s'ouvre dans ton
+5. À la fin de l'installation, l'assistant de configuration s'ouvre dans ton
    navigateur.
 
 L'installeur crée un raccourci dans le menu Démarrer. L'assistant propose
@@ -106,10 +101,9 @@ cochée par défaut.
 
 ### Mettre à jour
 
-Pendant la beta, les nouveaux builds sont déposés dans le dépôt privé et
-annoncés aux testeurs. La version publique utilisera les releases GitHub.
-L'installation reste manuelle : télécharge le nouvel installeur et lance-le. La
-configuration et la signature sont conservées.
+Aujourd'hui, la mise à jour est manuelle : télécharge le nouvel installeur
+depuis la page des releases et lance-le. La configuration et la signature sont
+conservées.
 
 CheckMate vérifie aussi les nouvelles versions au démarrage et affiche une
 notification avec le lien de téléchargement, une seule fois par version. Pour
@@ -132,8 +126,6 @@ la signature de code, pour ne pas exécuter un binaire non signé.
 - Chromium, Google Chrome ou Microsoft Edge
 
 ### Les étapes
-
-L'archive `CheckMate-linux-0.1.1.tar.gz` est fournie aux testeurs invités.
 
 ```bash
 tar -xzf CheckMate-linux-0.1.1.tar.gz
@@ -350,7 +342,7 @@ rm -rf ~/.config/checkmate-watcher
 
 ## État du projet
 
-- Version actuelle : **0.1.1**, beta fermée sur invitation.
+- Version actuelle : **0.1.1**, pré-version publique.
 - Validation Windows effectuée sur un runner GitHub Actions : bundle,
   connexion, signature, toast, Credential Manager, tâche planifiée et
   installeur.
