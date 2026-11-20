@@ -98,7 +98,7 @@ def _enable_windows(executable: Path, config_path: Path) -> bool:
     _remove_legacy_windows_task()
     try:
         winreg = _winreg()
-        with winreg.OpenKey(
+        with winreg.CreateKeyEx(
             winreg.HKEY_CURRENT_USER,
             RUN_KEY,
             0,

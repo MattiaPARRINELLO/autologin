@@ -55,6 +55,9 @@ class FakeWinreg:
     def OpenKey(self, root, path, reserved=0, access=0):
         return FakeKey(self.values, path)
 
+    def CreateKeyEx(self, root, path, reserved=0, access=0):
+        return FakeKey(self.values, path)
+
     def SetValueEx(self, key, name, reserved, value_type, value):
         key.store[(key.path, name)] = value
 
