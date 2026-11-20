@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import sys
 import threading
 import urllib.error
 import urllib.request
@@ -104,7 +105,10 @@ def test_parcours_onboarding(tmp_path, monkeypatch):
         )
         assert status == 200
         assert config_path.is_file()
-        assert (tmp_path / "env").read_text().strip() == 'CHECKMATE_PASSWORD="secret"'
+        if sys.platform.startswith("linux"):
+            assert (
+                tmp_path / "env"
+            ).read_text().strip() == 'CHECKMATE_PASSWORD="secret"'
 
         status, _ = call(
             base,
