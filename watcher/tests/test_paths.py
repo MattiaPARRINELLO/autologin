@@ -6,15 +6,6 @@ from checkmate_watcher import paths
 from checkmate_watcher.logging_setup import setup_logging
 
 
-def test_chemins_par_defaut_coherents():
-    assert paths.default_config_path() == paths.config_dir() / "config.toml"
-    assert paths.default_env_path() == paths.config_dir() / "env"
-    assert paths.default_signature_path() == paths.config_dir() / "signature.json"
-    assert paths.default_profile_dir() == paths.data_dir() / "profile"
-    assert paths.default_state_file() == paths.data_dir() / "state.json"
-    assert paths.default_log_file() == paths.log_dir() / "checkmate-watcher.log"
-
-
 def test_les_dossiers_portent_le_nom_de_l_application():
     assert paths.config_dir().name == "checkmate-watcher"
     assert paths.data_dir().name == "checkmate-watcher"

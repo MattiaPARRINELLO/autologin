@@ -78,12 +78,14 @@ def test_navigateur_force(monkeypatch):
     assert opened == ["http://127.0.0.1:8080/"]
 
 
-def test_fermeture_automatique():
-    handle = FakeWindow()
+def test_fermeture_automatique(monkeypatch):
+    backend = FakeBackend()
+    monkeypatch.setattr(window, "_load_backend", lambda: backend)
     done = threading.Event()
+    assert window.show("http://127.0.0.1:8080/", close_event=done) is True
+
     done.set()
-    window._close_when_done(handle, done)
-    assert handle.destroyed.is_set()
+    assert backend.windows[0]["handle"].destroyed.wait(1)
 
 
 def test_fermeture_ignore_les_erreurs():
