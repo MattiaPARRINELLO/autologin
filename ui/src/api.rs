@@ -7,11 +7,9 @@ use std::time::Duration;
 
 pub const APP_NAME: &str = "checkmate-watcher";
 
-#[allow(dead_code)]
 #[derive(Debug, Clone, Deserialize, Default)]
 pub struct Schedule {
     pub enabled: bool,
-    pub days: Vec<String>,
     pub windows: Vec<String>,
 }
 
@@ -23,16 +21,11 @@ pub struct Counters {
     pub errors: u64,
 }
 
-// Ces structures refletent le JSON de l'API locale : tous les champs ne sont
-// pas encore affiches dans l'interface, mais doivent rester deserialises.
-#[allow(dead_code)]
 #[derive(Debug, Clone, Deserialize, Default)]
 pub struct Status {
     pub version: String,
     pub build: String,
     pub started_at: String,
-    pub now: String,
-    pub uptime_seconds: u64,
     pub mode: String,
     pub label: String,
     pub window: Option<String>,
@@ -43,24 +36,17 @@ pub struct Status {
     pub counters: Counters,
     pub last_signed_at: Option<String>,
     pub last_detection_at: Option<String>,
-    pub last_error_at: Option<String>,
     pub restart_required: bool,
-    pub log_file: String,
 }
 
-#[allow(dead_code)]
 #[derive(Debug, Clone, Deserialize)]
 pub struct Runtime {
-    pub pid: u32,
     pub port: u16,
     pub token: String,
-    pub url: String,
 }
 
-#[allow(dead_code)]
 #[derive(Debug, Clone, Deserialize, Default)]
 pub struct ActionResponse {
-    pub ok: bool,
     pub message: Option<String>,
     pub available: Option<bool>,
     pub url: Option<String>,
