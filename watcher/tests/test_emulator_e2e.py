@@ -19,6 +19,7 @@ from checkmate_watcher.config import (
     NotificationConfig,
     Selectors,
     SignatureConfig,
+    UpdatesConfig,
     WatcherConfig,
 )
 from checkmate_watcher.signature import Point, save_signature
@@ -104,6 +105,7 @@ def test_le_watcher_detecte_et_signe_sur_l_emulateur(tmp_path):
             ),
             signature=SignatureConfig(file=signature_file, padding_ratio=0.9),
             notifications=NotificationConfig(enabled=False),
+            updates=UpdatesConfig(enabled=False),
             selectors=Selectors.from_dict({}),
         )
 

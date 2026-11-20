@@ -130,6 +130,12 @@ class SignatureConfig:
 
 
 @dataclass(frozen=True)
+class UpdatesConfig:
+    enabled: bool = True
+    include_prerelease: bool = True
+
+
+@dataclass(frozen=True)
 class NotificationConfig:
     app_name: str = "CheckMate"
     icon: str = "dialog-information"
@@ -144,6 +150,7 @@ class Config:
     notifications: NotificationConfig
     selectors: Selectors
     schedule: Schedule = field(default_factory=Schedule)
+    updates: UpdatesConfig = field(default_factory=UpdatesConfig)
 
 
 def _require(table: dict, key: str, table_name: str) -> str:
@@ -199,6 +206,7 @@ def default_config() -> Config:
             days=(0, 1, 2, 3, 4),
             windows=parse_windows(DEFAULT_WINDOWS),
         ),
+        updates=UpdatesConfig(),
     )
 
 
@@ -258,6 +266,10 @@ def config_to_dict(
             "days": _days_to_names(config.schedule.days),
             "windows": [str(window) for window in config.schedule.windows],
         },
+        "updates": {
+            "enabled": config.updates.enabled,
+            "include_prerelease": config.updates.include_prerelease,
+        },
         "selectors": {
             "attendance_button": list(config.selectors.attendance_button),
             "signature_canvas": list(config.selectors.signature_canvas),
@@ -304,6 +316,7 @@ def load_config(path: str | Path, *, require_password: bool = True) -> Config:
     notification_table = data.get("notifications", {})
     selectors_table = data.get("selectors", {})
     schedule_table = data.get("schedule", {})
+    updates_table = data.get("updates", {})
 
     if not isinstance(cesar_table, dict):
         raise ConfigError("[cesar] doit etre une table TOML")
@@ -373,6 +386,10 @@ def load_config(path: str | Path, *, require_password: bool = True) -> Config:
     )
 
     selectors = Selectors.from_dict(selectors_table)
+    updates = UpdatesConfig(
+        enabled=bool(updates_table.get("enabled", True)),
+        include_prerelease=bool(updates_table.get("include_prerelease", True)),
+    )
 
     try:
         schedule = Schedule(
@@ -399,4 +416,5 @@ def load_config(path: str | Path, *, require_password: bool = True) -> Config:
         notifications=notifications,
         selectors=selectors,
         schedule=schedule,
+        updates=updates,
     )

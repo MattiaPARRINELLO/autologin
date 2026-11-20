@@ -39,8 +39,8 @@ release publie l'installeur non signé.
 ## 3. Publier une version
 
 ```bash
-git tag v1.0.0
-git push origin v1.0.0
+git tag watcher-v1.0.0
+git push origin watcher-v1.0.0
 ```
 
 Le workflow :

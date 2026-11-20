@@ -3,7 +3,7 @@ name: Release
 on:
   push:
     tags:
-      - "v*"
+      - "watcher-v*"
 
 permissions:
   contents: write
@@ -34,7 +34,7 @@ jobs:
       - name: Construire l'installeur
         shell: pwsh
         run: |
-          $version = $env:GITHUB_REF_NAME -replace '^v',''
+          $version = $env:GITHUB_REF_NAME -replace '^watcher-v','' -replace '^v',''
           & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "/DMyAppVersion=$version" "packaging\checkmate.iss"
 
       - name: Publier l'installeur non signe
@@ -83,7 +83,7 @@ jobs:
         run: uv sync
 
       - name: Archive Linux
-        run: bash packaging/build-linux.sh "${GITHUB_REF_NAME#v}"
+        run: bash packaging/build-linux.sh "${GITHUB_REF_NAME#watcher-v}"
 
       - uses: actions/upload-artifact@v4
         with:

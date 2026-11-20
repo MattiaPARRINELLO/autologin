@@ -72,6 +72,7 @@ checkmate-watcher set-password       # stocke le mot de passe dans le trousseau
 checkmate-watcher install-autostart  # tache planifiee / service systemd
 checkmate-watcher uninstall-autostart
 checkmate-watcher support-bundle
+checkmate-watcher check-update
 ```
 
 ## Installation

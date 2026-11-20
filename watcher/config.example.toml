@@ -47,6 +47,11 @@ state_file = "~/.local/share/checkmate-watcher/state.json"
 file = "~/.config/checkmate-watcher/signature.json"
 padding_ratio = 0.9
 
+[updates]
+# Verifie les nouvelles versions au demarrage et notifie une fois par version.
+enabled = true
+include_prerelease = true
+
 [notifications]
 app_name = "CheckMate"
 icon = "dialog-information"

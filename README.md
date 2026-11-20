@@ -101,8 +101,20 @@ cochée par défaut.
 
 ### Mettre à jour
 
-Télécharge le nouvel installeur depuis la page des releases et lance-le. La
-configuration et la signature sont conservées.
+Aujourd'hui, la mise à jour est manuelle : télécharge le nouvel installeur
+depuis la page des releases et lance-le. La configuration et la signature sont
+conservées.
+
+CheckMate vérifie aussi les nouvelles versions au démarrage et affiche une
+notification avec le lien de téléchargement, une seule fois par version. Pour
+forcer la vérification :
+
+```bash
+checkmate-watcher check-update
+```
+
+L'installation automatique des mises à jour arrivera après la mise en place de
+la signature de code, pour ne pas exécuter un binaire non signé.
 
 ## Installation sur Linux
 

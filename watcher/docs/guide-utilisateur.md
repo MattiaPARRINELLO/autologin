@@ -102,6 +102,21 @@ Puis redémarre le service :
 systemctl --user restart checkmate-watcher
 ```
 
+## Mises à jour
+
+CheckMate vérifie les nouvelles versions au démarrage et affiche une
+notification avec le lien de téléchargement, une seule fois par version.
+
+Pour vérifier manuellement :
+
+```bash
+checkmate-watcher check-update
+```
+
+L'installation est encore manuelle : télécharge le nouvel installeur depuis les
+releases. L'OTA complet sera activé après la mise en place de la signature de
+code.
+
 ## Vérifier l'installation
 
 ```bash

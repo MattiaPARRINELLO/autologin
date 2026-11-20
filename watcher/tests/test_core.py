@@ -35,6 +35,16 @@ def test_state_deduplique_puis_expire(tmp_path):
     assert reloaded.seen("abc", now=1030)
 
 
+def test_state_memorise_une_meta(tmp_path):
+    path = tmp_path / "state.json"
+    store = StateStore(path, ttl=60)
+    store.set_meta("update_notified", "watcher-v0.2.0")
+    assert store.get_meta("update_notified") == "watcher-v0.2.0"
+
+    reloaded = StateStore(path, ttl=60)
+    assert reloaded.get_meta("update_notified") == "watcher-v0.2.0"
+
+
 def test_state_ignore_un_fichier_corrompu(tmp_path):
     path = tmp_path / "state.json"
     path.write_text("pas du json", encoding="utf-8")

@@ -16,6 +16,7 @@ class StateStore:
         self.ttl = ttl
         self._signals: dict[str, float] = {}
         self._windows: dict[str, float] = {}
+        self._meta: dict[str, str] = {}
         self._load()
 
     def _load(self) -> None:
@@ -40,10 +41,21 @@ class StateStore:
                 for key, value in windows.items()
                 if isinstance(value, (int, float))
             }
+        meta = data.get("meta") if isinstance(data, dict) else None
+        if isinstance(meta, dict):
+            self._meta = {
+                str(key): str(value)
+                for key, value in meta.items()
+                if isinstance(value, str)
+            }
 
     def _save(self) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        payload = {"signals": self._signals, "windows": self._windows}
+        payload = {
+            "signals": self._signals,
+            "windows": self._windows,
+            "meta": self._meta,
+        }
         tmp = self.path.with_suffix(".tmp")
         tmp.write_text(
             json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8"
@@ -72,6 +84,13 @@ class StateStore:
     def mark(self, key: str, now: float | None = None) -> None:
         self._signals[key] = time.time() if now is None else now
         self.prune(now)
+        self._save()
+
+    def get_meta(self, key: str) -> str | None:
+        return self._meta.get(key)
+
+    def set_meta(self, key: str, value: str) -> None:
+        self._meta[key] = value
         self._save()
 
     def window_done(self, key: str) -> bool:

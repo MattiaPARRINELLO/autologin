@@ -6,6 +6,7 @@ import asyncio
 import logging
 from datetime import datetime, timedelta
 
+from . import __version__
 from .cesar import (
     AttendanceSignal,
     CesarError,
@@ -17,6 +18,7 @@ from .config import Config
 from .notifications import Notifier
 from .signature import load_signature
 from .state import StateStore
+from .updates import check_for_update
 
 logger = logging.getLogger(__name__)
 
@@ -67,6 +69,36 @@ async def _wait_for_new_window(schedule, current_key: str | None) -> None:
         # Precis a 15 s pres du debut, sinon tranches de 5 min pour gerer la veille.
         chunk = 300.0 if remaining > 600 else 5.0
         await asyncio.sleep(min(max(remaining, 0.5), chunk))
+
+
+async def _check_update(config: Config, state: StateStore) -> None:
+    if not config.updates.enabled:
+        return
+    try:
+        release = await asyncio.wait_for(
+            asyncio.to_thread(
+                check_for_update,
+                __version__,
+                include_prerelease=config.updates.include_prerelease,
+            ),
+            timeout=10,
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.debug("verification de mise a jour impossible : %s", exc)
+        return
+    if release is None:
+        return
+    if state.get_meta("update_notified") == release.tag:
+        return
+    logger.info("mise a jour disponible : %s", release.tag)
+    await _send(
+        config,
+        "Mise a jour disponible",
+        f"CheckMate {release.version_text} est disponible.\n{release.url}",
+        icon="dialog-information",
+        urgency="normal",
+    )
+    state.set_meta("update_notified", release.tag)
 
 
 async def sign_with_visibility(
@@ -184,6 +216,7 @@ async def run_loop(
         points = []
 
     state = StateStore(config.watcher.state_file, ttl=config.watcher.dedupe_ttl)
+    await _check_update(config, state)
     session = CesarSession(config)
     poll_headless = True if config.watcher.visible_on_sign else config.watcher.headless
     schedule = config.schedule

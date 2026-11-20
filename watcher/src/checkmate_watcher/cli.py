@@ -36,6 +36,7 @@ from .paths import default_config_path, default_log_file
 from .setup_server import run_setup
 from .signature import SignatureError, load_signature, parse_points, save_signature
 from .support import build_support_bundle
+from .updates import check_for_update
 from .watcher import run_loop
 
 logger = logging.getLogger(__name__)
@@ -155,6 +156,7 @@ def build_parser() -> argparse.ArgumentParser:
             "setup",
             "support-bundle",
             "import-signature",
+            "check-update",
         ],
     )
     parser.add_argument(
@@ -406,6 +408,23 @@ def command_import_signature(config: Config, file_path: str | None) -> int:
     return 0
 
 
+def command_check_update(config: Config) -> int:
+    try:
+        release = check_for_update(
+            __version__,
+            include_prerelease=config.updates.include_prerelease,
+        )
+    except Exception as exc:  # noqa: BLE001
+        print(f"verification impossible : {exc}")
+        return 1
+    if release is None:
+        print(f"CheckMate {__version__} est a jour")
+        return 0
+    print(f"Mise a jour disponible : {release.tag}")
+    print(release.url)
+    return 0
+
+
 def command_install_autostart(config_path: Path) -> int:
     executable = current_executable()
     config_path = config_path.expanduser().resolve()
@@ -464,6 +483,8 @@ def main(argv: list[str] | None = None) -> int:
         )
     if args.command == "import-signature":
         return command_import_signature(config, args.file)
+    if args.command == "check-update":
+        return command_check_update(config)
     if args.command == "check-config":
         return command_check_config(config)
     if args.command == "test-notification":
