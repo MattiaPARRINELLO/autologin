@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
 
 from . import BUILD, __version__, analytics
+from . import remote_selectors as remote_selectors_module
 from .cesar import (
     AttendanceSignal,
     CesarError,
@@ -49,6 +51,13 @@ DRY_RUN = "dry_run"
 
 def _notifier(config: Config) -> Notifier:
     return Notifier.from_config(config)
+
+
+def _remote_selectors_enabled(config: Config) -> bool:
+    value = os.environ.get("CHECKMATE_REMOTE_SELECTORS", "").strip().lower()
+    if value in {"0", "false", "non", "off"}:
+        return False
+    return bool(config.updates.remote_selectors)
 
 
 async def _send(
@@ -275,6 +284,23 @@ async def run_loop(
     if not dry_run:
         analytics.record_startup(config, state)
     logger.info("CheckMate %s (build %s)", __version__, BUILD)
+
+    if not dry_run and _remote_selectors_enabled(config):
+        remote = remote_selectors_module.load()
+        if remote_selectors_module.requires_update(remote):
+            logger.warning(
+                "les selecteurs distants exigent la version %s",
+                remote.min_version,
+            )
+            await _send(
+                config,
+                "Mise a jour requise",
+                f"Les selecteurs CESAR demandent CheckMate {remote.min_version} "
+                "ou plus recent.",
+                icon="dialog-warning",
+            )
+        else:
+            config = remote_selectors_module.apply(config, remote)
 
     status_session: StatusSession | None = None
     status_server = None

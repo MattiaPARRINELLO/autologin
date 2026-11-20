@@ -46,6 +46,7 @@ active.
 | `autostart.py` | service systemd utilisateur ou tache planifiee Windows |
 | `updates.py` | lecture des releases GitHub, choix du canal et verification du SHA256 |
 | `analytics.py` | compteurs d'usage anonymes : installation et signature |
+| `remote_selectors.py` | selecteurs CSS distants valides et caches, sans code executable |
 | `self_update.py` | installation d'une mise a jour par un processus detache |
 | `support.py` | archive de diagnostic sans mot de passe ni signature |
 | `paths.py`, `logging_setup.py` | emplacements portables et journalisation avec rotation |

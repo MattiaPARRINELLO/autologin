@@ -138,6 +138,7 @@ class SignatureConfig:
 class UpdatesConfig:
     enabled: bool = True
     channel: str = STABLE_CHANNEL
+    remote_selectors: bool = True
 
 
 @dataclass(frozen=True)
@@ -293,6 +294,7 @@ def config_to_dict(
         "updates": {
             "enabled": config.updates.enabled,
             "channel": config.updates.channel,
+            "remote_selectors": config.updates.remote_selectors,
         },
         "analytics": {
             "enabled": config.analytics.enabled,
@@ -451,6 +453,9 @@ def load_config(path: str | Path, *, require_password: bool = True) -> Config:
     updates = UpdatesConfig(
         enabled=bool(updates_table.get("enabled", updates_defaults.enabled)),
         channel=parse_updates_channel(updates_table),
+        remote_selectors=bool(
+            updates_table.get("remote_selectors", updates_defaults.remote_selectors)
+        ),
     )
 
     analytics_table = data.get("analytics", {})

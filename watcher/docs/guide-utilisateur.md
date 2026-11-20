@@ -214,6 +214,23 @@ autre choix à faire. Pour revenir aux versions stables, remets
 L'ancienne clé `include_prerelease = true` reste acceptée et équivaut à
 `channel = "beta"` si `channel` est absent.
 
+### Sélecteurs CESAR à distance
+
+CheckMate relit au démarrage un petit fichier JSON hébergé sur GitHub
+(`selectors.json`) pour corriger les sélecteurs CSS sans réinstallation. Le
+fichier ne peut contenir que des listes de sélecteurs : aucune URL, aucun
+JavaScript, aucun code. Un fichier invalide est ignoré en entier, le cache local
+sert de secours, puis les sélecteurs par défaut.
+
+Pour désactiver cette récupération :
+
+```toml
+[updates]
+remote_selectors = false
+```
+
+ou avec `CHECKMATE_REMOTE_SELECTORS=0`.
+
 ### Désactiver les statistiques anonymes
 
 CheckMate compte les installations et les signatures avec un identifiant
