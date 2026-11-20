@@ -6,7 +6,7 @@ import asyncio
 import logging
 from datetime import datetime, timedelta
 
-from . import __version__
+from . import BUILD, __version__
 from .cesar import (
     AttendanceSignal,
     CesarError,
@@ -216,6 +216,8 @@ async def run_loop(
         points = []
 
     state = StateStore(config.watcher.state_file, ttl=config.watcher.dedupe_ttl)
+    state.increment("stats.starts")
+    logger.info("CheckMate %s (build %s)", __version__, BUILD)
     await _check_update(config, state)
     session = CesarSession(config)
     poll_headless = True if config.watcher.visible_on_sign else config.watcher.headless
@@ -335,6 +337,7 @@ async def run_loop(
                 ):
                     logger.debug("nouvelle demande en attente pour %s", signal.key)
                 else:
+                    state.increment("stats.detections")
                     decision = await handle_signal(
                         config,
                         signal,
@@ -357,6 +360,7 @@ async def run_loop(
                             )
                         except CesarError as exc:
                             logger.error("echec de la signature : %s", exc)
+                            state.increment("stats.errors")
                             prompt_cooldowns[signal.key] = (
                                 asyncio.get_running_loop().time()
                                 + config.watcher.prompt_retry
@@ -369,6 +373,7 @@ async def run_loop(
                             )
                         else:
                             state.mark(signal.key)
+                            state.increment("stats.signed")
                             if window_key:
                                 state.mark_window(window_key)
                             if is_success_confirmation(confirmation):
@@ -392,6 +397,7 @@ async def run_loop(
 
             except Exception as exc:  # noqa: BLE001
                 consecutive_errors += 1
+                state.increment("stats.errors")
                 logger.error("erreur pendant la surveillance : %s", exc)
                 if consecutive_errors >= MAX_CONSECUTIVE_ERRORS:
                     logger.warning(

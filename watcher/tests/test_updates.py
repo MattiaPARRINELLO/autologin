@@ -28,6 +28,19 @@ def test_parse_version():
     assert parse_version("pas une version") is None
 
 
+def test_parse_release_compte_les_telechargements():
+    parsed = parse_release(
+        {
+            "tag_name": "watcher-v0.2.0",
+            "html_url": "https://example.com/release",
+            "name": "CheckMate 0.2.0",
+            "assets": [{"download_count": 5}, {"download_count": 7}],
+        }
+    )
+    assert parsed is not None
+    assert parsed.downloads == 12
+
+
 def test_parse_release_ignore_les_tags_de_l_extension():
     assert parse_release({"tag_name": "v1.6.0"}) is None
     parsed = parse_release(

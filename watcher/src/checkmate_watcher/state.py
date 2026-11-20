@@ -93,6 +93,16 @@ class StateStore:
         self._meta[key] = value
         self._save()
 
+    def counter(self, key: str) -> int:
+        try:
+            return int(self._meta.get(key, "0"))
+        except ValueError:
+            return 0
+
+    def increment(self, key: str, amount: int = 1) -> None:
+        self._meta[key] = str(self.counter(key) + amount)
+        self._save()
+
     def window_done(self, key: str) -> bool:
         return key in self._windows
 

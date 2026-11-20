@@ -10,7 +10,7 @@ from pathlib import Path
 
 import tomli_w
 
-from . import __version__, paths
+from . import BUILD, __version__, paths
 from .autostart import autostart_enabled
 from .config import Config, config_to_dict
 from .credentials import keyring_available
@@ -49,7 +49,7 @@ def diagnostics(config: Config, config_path: Path) -> str:
 
     return "\n".join(
         [
-            f"version: {__version__}",
+            f"version: {__version__} (build {BUILD})",
             f"os: {platform.platform()}",
             f"python: {sys.version.split()[0]}",
             f"config: {config_path}",

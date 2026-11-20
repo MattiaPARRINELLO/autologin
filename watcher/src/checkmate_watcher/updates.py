@@ -22,6 +22,7 @@ class Release:
     url: str
     name: str
     prerelease: bool
+    downloads: int = 0
 
     @property
     def version_text(self) -> str:
@@ -42,12 +43,19 @@ def parse_release(data: dict) -> Release | None:
     version = parse_version(tag)
     if version is None:
         return None
+    assets = data.get("assets") or []
+    downloads = sum(
+        int(asset.get("download_count") or 0)
+        for asset in assets
+        if isinstance(asset, dict)
+    )
     return Release(
         tag=tag,
         version=version,
         url=str(data.get("html_url") or ""),
         name=str(data.get("name") or tag),
         prerelease=bool(data.get("prerelease")),
+        downloads=downloads,
     )
 
 

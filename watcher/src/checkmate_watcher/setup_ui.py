@@ -406,7 +406,7 @@ SETUP_HTML = """<!doctype html>
       <div class="slot" data-slot="0"><span class="time">09:00–12:00</span><span class="slot-state"></span></div>
       <div class="slot" data-slot="1"><span class="time">13:30–16:30</span><span class="slot-state"></span></div>
     </div>
-    <p class="rail-foot">Identifiants et signature restent sur cet ordinateur.</p>
+    <p class="rail-foot">CheckMate __VERSION__<br>Identifiants et signature restent sur cet ordinateur.</p>
   </aside>
 
   <main class="panel">

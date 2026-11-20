@@ -12,7 +12,7 @@ import shutil
 import sys
 from pathlib import Path
 
-from . import __version__
+from . import BUILD, __version__
 from .autostart import (
     autostart_enabled,
     current_executable,
@@ -35,8 +35,9 @@ from .notifications import Notifier
 from .paths import default_config_path, default_log_file
 from .setup_server import run_setup
 from .signature import SignatureError, load_signature, parse_points, save_signature
+from .state import StateStore
 from .support import build_support_bundle
-from .updates import check_for_update
+from .updates import check_for_update, fetch_releases
 from .watcher import run_loop
 
 logger = logging.getLogger(__name__)
@@ -157,6 +158,7 @@ def build_parser() -> argparse.ArgumentParser:
             "support-bundle",
             "import-signature",
             "check-update",
+            "stats",
         ],
     )
     parser.add_argument(
@@ -181,7 +183,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--verbose", "-v", action="store_true")
     parser.add_argument(
-        "--version", action="version", version=f"%(prog)s {__version__}"
+        "--version",
+        action="version",
+        version=f"%(prog)s {__version__} (build {BUILD})",
     )
     return parser
 
@@ -193,6 +197,7 @@ def _mask(value: str) -> str:
 
 
 def command_check_config(config: Config) -> int:
+    print(f"CheckMate {__version__} (build {BUILD})")
     print("Configuration chargee")
     print(f"  CESAR          : {config.cesar.base_url}")
     print(f"  Utilisateur    : {config.cesar.username}")
@@ -408,6 +413,27 @@ def command_import_signature(config: Config, file_path: str | None) -> int:
     return 0
 
 
+def command_stats(config: Config) -> int:
+    state = StateStore(config.watcher.state_file)
+    print(f"CheckMate {__version__} (build {BUILD})")
+    print("Statistiques locales")
+    print(f"  Demarrages        : {state.counter('stats.starts')}")
+    print(f"  Detections        : {state.counter('stats.detections')}")
+    print(f"  Signatures        : {state.counter('stats.signed')}")
+    print(f"  Erreurs           : {state.counter('stats.errors')}")
+    try:
+        releases = fetch_releases()
+    except Exception as exc:  # noqa: BLE001
+        print(f"  Telechargements   : indisponibles ({exc})")
+        return 0
+    downloads = sum(release.downloads for release in releases)
+    print(f"  Telechargements   : {downloads} (artefacts GitHub)")
+    if releases:
+        latest = max(releases, key=lambda release: release.version)
+        print(f"  Derniere version  : {latest.tag}")
+    return 0
+
+
 def command_check_update(config: Config) -> int:
     try:
         release = check_for_update(
@@ -485,6 +511,8 @@ def main(argv: list[str] | None = None) -> int:
         return command_import_signature(config, args.file)
     if args.command == "check-update":
         return command_check_update(config)
+    if args.command == "stats":
+        return command_stats(config)
     if args.command == "check-config":
         return command_check_config(config)
     if args.command == "test-notification":

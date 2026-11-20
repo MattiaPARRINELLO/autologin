@@ -13,6 +13,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
+from . import BUILD, __version__
 from .autostart import (
     current_executable,
     enable_autostart,
@@ -377,7 +378,9 @@ class _Handler(BaseHTTPRequestHandler):
             if token != self.session.token:
                 self._send(403, b"Jeton invalide", "text/plain; charset=utf-8")
                 return
-            html = SETUP_HTML.replace("__TOKEN__", self.session.token)
+            html = SETUP_HTML.replace("__TOKEN__", self.session.token).replace(
+                "__VERSION__", f"{__version__} - build {BUILD}"
+            )
             self._send(200, html.encode("utf-8"), "text/html; charset=utf-8")
             return
         if parsed.path == "/favicon.ico":
