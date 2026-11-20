@@ -13,6 +13,7 @@ from pathlib import Path
 
 import pytest
 
+from checkmate_watcher.cesar import CesarSession
 from checkmate_watcher.config import (
     CesarConfig,
     Config,
@@ -119,6 +120,86 @@ def test_le_watcher_detecte_et_signe_sur_l_emulateur(tmp_path):
         state = wait_for_state(base_url)
         assert state["signed"] is True
         assert state["signature_points"] >= 2
+    finally:
+        process.terminate()
+        try:
+            process.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            process.kill()
+
+
+def test_sign_attend_la_disparition_du_bouton(tmp_path):
+    executable = chromium_path()
+    if executable is None:
+        pytest.skip("aucun Chromium disponible")
+
+    port = free_port()
+    environment = {**os.environ, "ATTENDANCE_CLOSE_DELAY_MS": "2000"}
+    process = subprocess.Popen(
+        [sys.executable, str(EMULATOR), "--port", str(port)],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        env=environment,
+    )
+    base_url = f"http://127.0.0.1:{port}"
+
+    try:
+        wait_for_state(base_url)
+        post(base_url, "/api/attendance/open")
+
+        signature_file = tmp_path / "signature.json"
+        save_signature(
+            signature_file,
+            [Point(10, 10, "start"), Point(60, 40, "move"), Point(120, 20, "end")],
+        )
+
+        config = Config(
+            cesar=CesarConfig(
+                base_url=base_url,
+                username="demo",
+                password="demo",
+                login_path="/connexion",
+                dashboard_path="/",
+            ),
+            watcher=WatcherConfig(
+                poll_interval=15,
+                auto_sign=True,
+                auto_sign_delay=0,
+                headless=True,
+                visible_on_sign=False,
+                executable_path=executable,
+                profile_dir=tmp_path / "profile",
+                state_file=tmp_path / "state.json",
+            ),
+            signature=SignatureConfig(file=signature_file, padding_ratio=0.9),
+            notifications=NotificationConfig(enabled=False),
+            updates=UpdatesConfig(enabled=False),
+            selectors=Selectors.from_dict({}),
+        )
+
+        async def scenario() -> tuple[str, float]:
+            session = CesarSession(config)
+            await session.open(headless=True)
+            try:
+                await session._goto_dashboard()
+                await session._ensure_logged_in()
+                started = time.monotonic()
+                confirmation = await session.sign(
+                    [
+                        Point(10, 10, "start"),
+                        Point(60, 40, "move"),
+                        Point(120, 20, "end"),
+                    ]
+                )
+                return confirmation, time.monotonic() - started
+            finally:
+                await session.close()
+
+        confirmation, elapsed = asyncio.run(asyncio.wait_for(scenario(), timeout=120))
+
+        assert "prise en compte" in confirmation.lower()
+        assert elapsed >= 2.0
+        assert wait_for_state(base_url)["signed"] is True
     finally:
         process.terminate()
         try:

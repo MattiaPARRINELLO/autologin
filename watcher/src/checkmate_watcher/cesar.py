@@ -6,6 +6,7 @@ import asyncio
 import hashlib
 import logging
 import re
+import time
 import unicodedata
 from dataclasses import dataclass
 from datetime import date
@@ -294,10 +295,23 @@ class CesarSession:
         )
         await confirm_button.click()
 
+        started = time.monotonic()
         confirmation = await self._wait_for_confirmation(previous, 15000)
         if confirmation is None:
             raise SignError("aucune confirmation affichee apres la signature")
         logger.info("confirmation du site : %s", confirmation)
+
+        hidden = await self._wait_for_hidden(self.selectors.attendance_button, 15000)
+        elapsed = time.monotonic() - started
+        if not hidden:
+            raise SignError(
+                "bouton d'emargement toujours visible 15 s apres la signature"
+            )
+        logger.info(
+            "bouton d'emargement disparu apres %.1f s (confirmation : %s)",
+            elapsed,
+            confirmation,
+        )
         return confirmation
 
     async def _draw(self, box: dict, points: list[FittedPoint]) -> None:
@@ -325,6 +339,20 @@ class CesarSession:
         raise SignError(
             f"element introuvable apres {timeout_ms}ms : {' | '.join(selectors)}"
         )
+
+    async def _wait_for_hidden(
+        self, selectors: tuple[str, ...], timeout_ms: int
+    ) -> bool:
+        """Attend qu'aucun des selecteurs ne soit plus visible."""
+        if self.page is None:
+            return False
+        deadline = asyncio.get_running_loop().time() + timeout_ms / 1000
+        while asyncio.get_running_loop().time() < deadline:
+            locator = await self._first_visible(selectors)
+            if locator is None:
+                return True
+            await self.page.wait_for_timeout(250)
+        return await self._first_visible(selectors) is None
 
     async def _confirmation_text(self) -> str:
         if self.page is None:

@@ -16,6 +16,7 @@ from __future__ import annotations
 import argparse
 import errno
 import json
+import os
 import secrets
 import sys
 import threading
@@ -39,11 +40,19 @@ class AttendanceState:
 
 
 class Emulator:
-    def __init__(self, username: str, password: str, token: str, run_id: str) -> None:
+    def __init__(
+        self,
+        username: str,
+        password: str,
+        token: str,
+        run_id: str,
+        attendance_close_delay_ms: int = 0,
+    ) -> None:
         self.username = username
         self.password = password
         self.token = token
         self.run_id = run_id
+        self.attendance_close_delay_ms = max(0, attendance_close_delay_ms)
         self.lock = threading.Lock()
         self.state = AttendanceState()
 
@@ -192,6 +201,10 @@ DASHBOARD_SCRIPT = """
       const data = await response.json();
       swal.textContent = data.message;
       save.disabled = true;
+      window.setTimeout(() => {
+        if (trigger) trigger.remove();
+        if (canvas) canvas.remove();
+      }, __ATTENDANCE_CLOSE_DELAY_MS__);
     });
   }
 """
@@ -242,7 +255,9 @@ def render_login(error: bool = False) -> bytes:
     return render_page("CESAR - connexion", body)
 
 
-def render_dashboard(state: AttendanceState, run_id: str) -> bytes:
+def render_dashboard(
+    state: AttendanceState, run_id: str, close_delay_ms: int = 0
+) -> bytes:
     if state.signed:
         attendance = (
             '<div class="card"><p class="status open">Presence signee</p>'
@@ -299,7 +314,14 @@ def render_dashboard(state: AttendanceState, run_id: str) -> bytes:
 </main>
 {modal}
 """
-    return render_page("CESAR - tableau de bord", body, script=DASHBOARD_SCRIPT)
+    script = dashboard_script(close_delay_ms)
+    return render_page("CESAR - tableau de bord", body, script=script)
+
+
+def dashboard_script(close_delay_ms: int) -> str:
+    return DASHBOARD_SCRIPT.replace(
+        "__ATTENDANCE_CLOSE_DELAY_MS__", str(max(0, close_delay_ms))
+    )
 
 
 def render_admin(state: AttendanceState) -> bytes:
@@ -440,7 +462,13 @@ class Handler(BaseHTTPRequestHandler):
             if not self.is_authenticated():
                 self.redirect("/connexion")
                 return
-            self.send_html(render_dashboard(self.emulator.state, self.emulator.run_id))
+            self.send_html(
+                render_dashboard(
+                    self.emulator.state,
+                    self.emulator.run_id,
+                    self.emulator.attendance_close_delay_ms,
+                )
+            )
             return
 
         self.send_html(b"<h1>404</h1>", status=404)
@@ -519,6 +547,15 @@ def main() -> int:
         action="store_true",
         help="ouvre un emargement au demarrage",
     )
+    parser.add_argument(
+        "--attendance-close-delay-ms",
+        type=int,
+        default=int(os.environ.get("ATTENDANCE_CLOSE_DELAY_MS", "0")),
+        help=(
+            "delai en millisecondes avant de retirer le bouton d'emargement "
+            "apres une signature (defaut : ATTENDANCE_CLOSE_DELAY_MS ou 0)"
+        ),
+    )
     args = parser.parse_args()
 
     EMULATOR = Emulator(
@@ -526,6 +563,7 @@ def main() -> int:
         args.password,
         secrets.token_urlsafe(24),
         secrets.token_hex(3),
+        attendance_close_delay_ms=args.attendance_close_delay_ms,
     )
     if args.open:
         EMULATOR.open_attendance()
