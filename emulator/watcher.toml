@@ -34,6 +34,9 @@ state_file = "~/.local/share/checkmate-watcher/emulator-state.json"
 file = "~/.config/checkmate-watcher/signature.json"
 padding_ratio = 0.9
 
+[updates]
+enabled = false
+
 [notifications]
 app_name = "CheckMate (emulateur)"
 icon = "dialog-information"
