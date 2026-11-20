@@ -29,8 +29,7 @@
       '.swal2-container button.btn-primary'
     ],
     confirmationPopup: [
-      '.swal2-html-container',
-      '.swal2-popup .swal2-html-container'
+      '.swal2-html-container'
     ]
   };
 
@@ -539,10 +538,9 @@
     await attendre(100);
     bouton.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
     await attendre(50);
-    bouton.click();
     bouton.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
     bouton.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
-    bouton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    bouton.click();
 
     return true;
   }
@@ -572,7 +570,11 @@
             log('Étape 1/8 — Bouton signature trouvé');
           } catch (e) {
             log('Étape 1/8 — Bouton signature introuvable après 30s, aucun cours à signer');
-            sendResponse({ success: false, error: 'Aucun bouton de signature trouvé sur la page' });
+            sendResponse({
+              success: false,
+              code: 'button-missing',
+              error: 'Aucun bouton de signature trouvé sur la page'
+            });
             return;
           }
 

@@ -3,9 +3,14 @@
 // Gestion de la configuration et du canvas signature
 // =============================================
 
-import { EXECUTION_LOG_KEY, appendExecutionLog as persistExecutionLog } from './shared.js';
+import {
+  EXECUTION_LOG_KEY,
+  GITHUB_REPO,
+  PROGRESS_STORAGE_KEY,
+  appendExecutionLog as persistExecutionLog,
+  progressState
+} from './shared.js';
 
-const PROGRESS_STORAGE_KEY = 'pointageProgress';
 const PROGRESS_STALE_MS = 5 * 60 * 1000;
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -449,7 +454,7 @@ document.addEventListener('DOMContentLoaded', () => {
         '...\n\n' +
         `## Infos techniques\n- Version CheckMate: ${version}\n- Navigateur: ${browser}`
       );
-      const url = `https://github.com/MattiaPARRINELLO/CheckMate/issues/new?title=${title}&body=${body}`;
+      const url = `https://github.com/${GITHUB_REPO}/issues/new?title=${title}&body=${body}`;
       chrome.tabs.create({ url });
     });
   }
@@ -547,7 +552,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         setStartButtonLoading();
       updateStatusBar('Lancement du pointage...');
-      updateProgressBar({ message: 'Lancement du pointage…', pourcentage: 5, enCours: true, ts: Date.now() }, true);
+      updateProgressBar(progressState('Lancement du pointage…', 5, true), true);
       appendExecutionLog('Pointage', 'Demarrage du pointage', 'info');
 
         chrome.runtime.sendMessage({ action: 'lancerPointage' }, (response) => {

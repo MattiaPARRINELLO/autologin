@@ -3,7 +3,12 @@
 // Orchestre les étapes du pointage automatisé
 // =============================================
 
-import { appendExecutionLog as persistExecutionLog } from './shared.js';
+import {
+  GITHUB_REPO,
+  PROGRESS_STORAGE_KEY,
+  appendExecutionLog as persistExecutionLog,
+  progressState
+} from './shared.js';
 
 // --- Constantes ---
 const SITE_ORIGIN = 'https://cesar.emineo-education.fr';
@@ -14,8 +19,6 @@ const TIMEOUT_REDIRECTION = 30000;
 const NOTIFICATION_STATUS_ID = 'checkmate-pointage-status';
 const NOTIFICATION_PROGRESS_ID = 'checkmate-pointage-progress';
 const NOTIFICATION_DEDUPE_MS = 1800;
-const PROGRESS_STORAGE_KEY = 'pointageProgress';
-const GITHUB_REPO = 'MattiaPARRINELLO/CheckMate';
 const GITHUB_API_HEADERS = {
   Accept: 'application/vnd.github+json',
   'X-GitHub-Api-Version': '2022-11-28'
@@ -246,11 +249,9 @@ function afficherNotification(titre, message, options = {}) {
   });
 }
 
-let notificationProgressionCreee = false;
-
 /**
  * Met à jour la notification de progression du pointage.
- * Une seule notification est créée puis mise à jour à chaque étape (pas de spam).
+ * Une seule notification est mise à jour à chaque étape (pas de spam).
  * L'état est aussi publié dans le storage pour que le popup l'affiche en direct.
  * @param {string} message - Étape en cours
  * @param {number} pourcentage - Avancement (0-100)
@@ -259,7 +260,7 @@ function notifierProgression(message, pourcentage) {
   const progress = Math.max(0, Math.min(100, Math.round(pourcentage)));
 
   chrome.storage.local.set({
-    [PROGRESS_STORAGE_KEY]: { message, pourcentage: progress, enCours: true, ts: Date.now() }
+    [PROGRESS_STORAGE_KEY]: progressState(message, progress, true)
   });
 
   const options = {
@@ -271,24 +272,13 @@ function notifierProgression(message, pourcentage) {
     silent: true
   };
 
-  if (notificationProgressionCreee) {
-    chrome.notifications.update(NOTIFICATION_PROGRESS_ID, options, (maj) => {
-      if (chrome.runtime.lastError) return;
-      // La notification a été fermée par l'utilisateur → la recréer
-      if (!maj) {
-        notificationProgressionCreee = false;
-        notifierProgression(message, progress);
+  chrome.notifications.update(NOTIFICATION_PROGRESS_ID, options, (maj) => {
+    if (chrome.runtime.lastError || maj) return;
+    chrome.notifications.create(NOTIFICATION_PROGRESS_ID, options, () => {
+      if (chrome.runtime.lastError) {
+        console.warn('Notification de progression échouée:', chrome.runtime.lastError.message);
       }
     });
-    return;
-  }
-
-  chrome.notifications.create(NOTIFICATION_PROGRESS_ID, options, () => {
-    if (chrome.runtime.lastError) {
-      console.warn('Notification de progression échouée:', chrome.runtime.lastError.message);
-      return;
-    }
-    notificationProgressionCreee = true;
   });
 }
 
@@ -296,10 +286,9 @@ function notifierProgression(message, pourcentage) {
  * Retire la notification de progression et clôt l'état partagé avec le popup.
  */
 function terminerProgression() {
-  notificationProgressionCreee = false;
   chrome.notifications.clear(NOTIFICATION_PROGRESS_ID, () => {});
   chrome.storage.local.set({
-    [PROGRESS_STORAGE_KEY]: { message: '', pourcentage: 0, enCours: false, ts: Date.now() }
+    [PROGRESS_STORAGE_KEY]: progressState('', 0, false)
   });
 }
 
@@ -717,6 +706,7 @@ async function lancerPointage() {
       const continuer = await confirmerSignatureSiVersionObsolete(tabId, updateInfo);
       if (!continuer) {
         log('Pointage', "Processus annulé par l'utilisateur (version non à jour)", 'error');
+        terminerProgression();
         try { chrome.tabs.remove(tabId); } catch (_) { }
         return {
           success: false,
@@ -772,7 +762,7 @@ async function lancerPointage() {
     let resultatSignature = await lancerSignatureViaContentScript(tabId);
 
     // Retry ciblé: cas fréquent juste après login où le DOM met encore quelques secondes à stabiliser.
-    if (!resultatSignature.success && resultatSignature.error && resultatSignature.error.includes('Aucun bouton de signature trouvé')) {
+    if (!resultatSignature.success && resultatSignature.code === 'button-missing') {
       log('Pointage', 'Étape 5 — Premier essai sans bouton trouvé, attente supplémentaire de 10s puis retry...');
       notifierProgression('Bouton absent — nouvel essai…', 75);
       await new Promise((resolve) => setTimeout(resolve, 10000));
