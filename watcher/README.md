@@ -20,7 +20,7 @@ La detection arrive au pire un intervalle apres l'ouverture par le formateur.
 | macOS | osascript | tkinter | Chrome / Edge installe | launchd prevu |
 
 Les chemins sont portables via `platformdirs` : `~/.config/checkmate-watcher` sur
-Linux, `%APPDATA%\checkmate-watcher` sur Windows. Les logs tournent dans
+Linux, `%LOCALAPPDATA%\checkmate-watcher` sur Windows. Les logs tournent dans
 `checkmate-watcher.log` avec rotation, en plus de stdout.
 
 ## Documentation

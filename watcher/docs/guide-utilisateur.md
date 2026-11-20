@@ -141,7 +141,7 @@ Sur Windows : `%LOCALAPPDATA%\checkmate-watcher\Logs\checkmate-watcher.log`.
 
 **Windows** : Paramètres, Applications, CheckMate, Désinstaller. Le démarrage
 automatique est supprimé. La configuration et la signature restent dans
-`%APPDATA%\checkmate-watcher` si tu veux les supprimer à la main.
+`%LOCALAPPDATA%\checkmate-watcher` si tu veux les supprimer à la main.
 
 **Linux** :
 

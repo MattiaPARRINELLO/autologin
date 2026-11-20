@@ -10,7 +10,7 @@
   ![Tests](https://img.shields.io/badge/tests-76%20passing-brightgreen)
   ![Statut](https://img.shields.io/badge/statut-pr%C3%A9--version-orange)
 
-  [Télécharger](https://github.com/MattiaPARRINELLO/autologin/releases/tag/watcher-v0.1.5) ·
+  [Télécharger](https://github.com/MattiaPARRINELLO/autologin/releases/tag/watcher-v0.1.6) ·
   [Documentation](watcher/docs/README.md) ·
   [Présentation](watcher/presentation/index.html) ·
   [Vie privée](PRIVACY.md)
@@ -85,8 +85,8 @@ Tu restes responsable de l'usage de ta signature et du respect des règles de to
 ### Les étapes
 
 1. Va sur la page de la pré-version :
-   [CheckMate desktop 0.1.5](https://github.com/MattiaPARRINELLO/autologin/releases/tag/watcher-v0.1.5).
-2. Télécharge `CheckMate-Setup-0.1.5.exe`.
+   [CheckMate desktop 0.1.6](https://github.com/MattiaPARRINELLO/autologin/releases/tag/watcher-v0.1.6).
+2. Télécharge `CheckMate-Setup-0.1.6.exe`.
 3. Lance l'installeur. Il s'installe dans ton dossier utilisateur, sans demander
    les droits administrateur.
 4. Windows peut afficher un avertissement SmartScreen. C'est normal tant que la
@@ -128,8 +128,8 @@ la signature de code, pour ne pas exécuter un binaire non signé.
 ### Les étapes
 
 ```bash
-tar -xzf CheckMate-linux-0.1.5.tar.gz
-cd CheckMate-linux-0.1.5
+tar -xzf CheckMate-linux-0.1.6.tar.gz
+cd CheckMate-linux-0.1.6
 ./install.sh
 ```
 
@@ -332,7 +332,7 @@ attendant, SmartScreen affiche un avertissement au premier lancement.
 Paramètres, Applications, CheckMate, Désinstaller. Le démarrage automatique
 est supprimé.
 
-La configuration et la signature restent dans `%APPDATA%\checkmate-watcher`.
+La configuration et la signature restent dans `%LOCALAPPDATA%\checkmate-watcher`.
 Supprime ce dossier si tu veux tout effacer.
 
 ### Linux
@@ -346,7 +346,7 @@ rm -rf ~/.config/checkmate-watcher
 
 ## État du projet
 
-- Version actuelle : **0.1.5**, pré-version publique.
+- Version actuelle : **0.1.6**, pré-version publique.
 - Validation Windows effectuée sur un runner GitHub Actions : bundle,
   connexion, signature, toast, Credential Manager, tâche planifiée et
   installeur.

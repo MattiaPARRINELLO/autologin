@@ -23,7 +23,7 @@ No data is sent to the maintainers or to any third party.
 Uninstalling the application leaves configuration and signature in place. Users
 can delete them from:
 
-- Windows: `%APPDATA%\checkmate-watcher`
+- Windows: `%LOCALAPPDATA%\checkmate-watcher`
 - Linux: `~/.config/checkmate-watcher` and `~/.local/share/checkmate-watcher`
 
 ## Contact

@@ -113,5 +113,5 @@ Envoie :
 - la configuration **sans le mot de passe** (`check-config` masque déjà le
   secret).
 
-Ne partage jamais `~/.config/checkmate-watcher/env`, `%APPDATA%\checkmate-watcher\config.toml`
+Ne partage jamais `~/.config/checkmate-watcher/env`, `%LOCALAPPDATA%\checkmate-watcher\config.toml`
 s'il contient `password`, ni le dossier du profil Chromium.

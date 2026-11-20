@@ -48,7 +48,7 @@ aléatoire dans l'URL. Elle ne charge aucune ressource externe et ne peut pas
 Désinstaller l'application ne supprime pas la configuration ni la signature.
 Pour tout effacer :
 
-**Windows** : supprime `%APPDATA%\checkmate-watcher`.
+**Windows** : supprime `%LOCALAPPDATA%\checkmate-watcher`.
 **Linux** :
 
 ```bash
