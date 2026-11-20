@@ -7,10 +7,10 @@
   ![Windows](https://img.shields.io/badge/Windows-10%20%2F%2011-0078D4)
   ![Linux](https://img.shields.io/badge/Linux-systemd-FCC624)
   ![Licence](https://img.shields.io/badge/licence-MIT-green)
-  ![Tests](https://img.shields.io/badge/tests-75%20passing-brightgreen)
+  ![Tests](https://img.shields.io/badge/tests-76%20passing-brightgreen)
   ![Statut](https://img.shields.io/badge/statut-pr%C3%A9--version-orange)
 
-  [Télécharger](https://github.com/MattiaPARRINELLO/autologin/releases/tag/watcher-v0.1.1) ·
+  [Télécharger](https://github.com/MattiaPARRINELLO/autologin/releases/tag/watcher-v0.1.3) ·
   [Documentation](watcher/docs/README.md) ·
   [Présentation](watcher/presentation/index.html) ·
   [Vie privée](PRIVACY.md)
@@ -85,8 +85,8 @@ Tu restes responsable de l'usage de ta signature et du respect des règles de to
 ### Les étapes
 
 1. Va sur la page de la pré-version :
-   [CheckMate desktop 0.1.1](https://github.com/MattiaPARRINELLO/autologin/releases/tag/watcher-v0.1.1).
-2. Télécharge `CheckMate-Setup-0.1.1.exe`.
+   [CheckMate desktop 0.1.3](https://github.com/MattiaPARRINELLO/autologin/releases/tag/watcher-v0.1.3).
+2. Télécharge `CheckMate-Setup-0.1.3.exe`.
 3. Lance l'installeur. Il s'installe dans ton dossier utilisateur, sans demander
    les droits administrateur.
 4. Windows peut afficher un avertissement SmartScreen. C'est normal tant que la
@@ -128,8 +128,8 @@ la signature de code, pour ne pas exécuter un binaire non signé.
 ### Les étapes
 
 ```bash
-tar -xzf CheckMate-linux-0.1.1.tar.gz
-cd CheckMate-linux-0.1.1
+tar -xzf CheckMate-linux-0.1.3.tar.gz
+cd CheckMate-linux-0.1.3
 ./install.sh
 ```
 
@@ -342,7 +342,7 @@ rm -rf ~/.config/checkmate-watcher
 
 ## État du projet
 
-- Version actuelle : **0.1.1**, pré-version publique.
+- Version actuelle : **0.1.3**, pré-version publique.
 - Validation Windows effectuée sur un runner GitHub Actions : bundle,
   connexion, signature, toast, Credential Manager, tâche planifiée et
   installeur.
