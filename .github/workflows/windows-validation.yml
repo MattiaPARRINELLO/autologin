@@ -97,6 +97,30 @@ jobs:
           if (-not $state.signed) { throw "signature non enregistree" }
           Write-Host "pointage Windows OK"
 
+      - name: Tableau de bord
+        shell: pwsh
+        run: |
+          $process = Start-Process -FilePath ".\dist\CheckMate\CheckMate.exe" -ArgumentList "--config", "$env:RUNNER_TEMP\config.toml", "run" -PassThru
+          try {
+            $runtimePath = Join-Path $env:LOCALAPPDATA "checkmate-watcher\runtime.json"
+            for ($i = 0; $i -lt 40; $i++) {
+              if (Test-Path $runtimePath) { break }
+              Start-Sleep -Milliseconds 500
+            }
+            if (-not (Test-Path $runtimePath)) { throw "tableau de bord non demarre" }
+            $runtime = Get-Content $runtimePath -Raw | ConvertFrom-Json
+            $headers = @{ "X-CheckMate-Token" = $runtime.token }
+            $status = Invoke-RestMethod -Uri "http://127.0.0.1:$($runtime.port)/api/status" -Headers $headers
+            if ($status.version -ne "0.2.0") { throw "version inattendue : $($status.version)" }
+            Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:$($runtime.port)/api/action" -Headers $headers -ContentType "application/json" -Body '{"action":"quit"}' | Out-Null
+            $process.WaitForExit(30000) | Out-Null
+            if (-not $process.HasExited) { throw "CheckMate ne s'est pas arrete" }
+            if (Test-Path $runtimePath) { throw "fichier runtime non nettoye" }
+            Write-Host "tableau de bord OK"
+          } finally {
+            if (-not $process.HasExited) { Stop-Process -Id $process.Id -Force }
+          }
+
       - name: Notification Windows
         shell: pwsh
         run: |

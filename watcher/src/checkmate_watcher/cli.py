@@ -9,7 +9,10 @@ import json
 import logging
 import os
 import shutil
+import subprocess
 import sys
+import time
+import webbrowser
 from pathlib import Path
 
 from . import BUILD, __version__
@@ -36,6 +39,7 @@ from .paths import default_config_path, default_log_file
 from .setup_server import run_setup
 from .signature import SignatureError, load_signature, parse_points, save_signature
 from .state import StateStore
+from .status_server import read_runtime, status_alive
 from .support import build_support_bundle
 from .updates import check_for_update, fetch_releases
 from .watcher import run_loop
@@ -159,6 +163,7 @@ def build_parser() -> argparse.ArgumentParser:
             "import-signature",
             "check-update",
             "stats",
+            "status",
         ],
     )
     parser.add_argument(
@@ -413,6 +418,40 @@ def command_import_signature(config: Config, file_path: str | None) -> int:
     return 0
 
 
+def command_status(config: Config, config_path: Path) -> int:
+    runtime = read_runtime()
+    if runtime and status_alive(runtime):
+        webbrowser.open(str(runtime["url"]))
+        return 0
+
+    executable = current_executable()
+    command = [str(executable), "--config", str(config_path), "run"]
+    if sys.platform.startswith("win"):
+        subprocess.Popen(command, close_fds=True, creationflags=0x00000008)
+    else:
+        systemctl = shutil.which("systemctl")
+        started = False
+        if systemctl:
+            result = subprocess.run(
+                [systemctl, "--user", "start", "checkmate-watcher.service"],
+                check=False,
+                capture_output=True,
+                timeout=20,
+            )
+            started = result.returncode == 0
+        if not started:
+            subprocess.Popen(command, close_fds=True, start_new_session=True)
+
+    for _ in range(40):
+        runtime = read_runtime()
+        if runtime and status_alive(runtime):
+            webbrowser.open(str(runtime["url"]))
+            return 0
+        time.sleep(0.5)
+    print("CheckMate n'a pas demarre. Consulte les logs.")
+    return 1
+
+
 def command_stats(config: Config) -> int:
     state = StateStore(config.watcher.state_file)
     print(f"CheckMate {__version__} (build {BUILD})")
@@ -513,6 +552,8 @@ def main(argv: list[str] | None = None) -> int:
         return command_check_update(config)
     if args.command == "stats":
         return command_stats(config)
+    if args.command == "status":
+        return command_status(config, Path(args.config).expanduser())
     if args.command == "check-config":
         return command_check_config(config)
     if args.command == "test-notification":
@@ -535,6 +576,7 @@ def main(argv: list[str] | None = None) -> int:
                 once=args.once,
                 dry_run=args.dry_run,
                 auto_override=True if args.auto else None,
+                config_path=Path(args.config).expanduser(),
             )
         )
     except KeyboardInterrupt:

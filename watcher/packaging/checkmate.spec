@@ -3,6 +3,8 @@
 
 from pathlib import Path
 
+import sys
+
 from PyInstaller.utils.hooks import collect_all
 
 PROJECT = Path(SPECPATH).parent
@@ -18,7 +20,17 @@ hiddenimports = playwright_hidden + [
     "tomli_w",
     "tkinter",
     "tkinter.messagebox",
+    "pystray",
+    "PIL.Image",
+    "PIL.ImageDraw",
 ]
+
+if sys.platform.startswith("win"):
+    hiddenimports.append("pystray._win32")
+elif sys.platform == "darwin":
+    hiddenimports.append("pystray._darwin")
+else:
+    hiddenimports.append("pystray._xorg")
 
 a = Analysis(
     [str(PROJECT / "packaging" / "entrypoint.py")],
