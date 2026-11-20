@@ -220,15 +220,15 @@ class SetupSession:
         if not self.config.signature.file.is_file():
             raise SetupError("enregistre d'abord la signature")
 
+        with self.lock:
+            self._persist()
+
         autostart_requested = bool(payload.get("autostart", True))
         autostart_ok = True
         if autostart_requested:
             autostart_ok = enable_autostart(current_executable(), self.config_path)
             if autostart_ok:
                 restart_autostart()
-
-        with self.lock:
-            self._persist()
 
         if not autostart_requested:
             message = (

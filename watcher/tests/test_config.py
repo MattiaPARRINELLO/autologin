@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import textwrap
+from pathlib import Path
 
 import pytest
 
@@ -59,6 +60,25 @@ def test_surcharge_les_valeurs(tmp_path):
 def test_refuse_un_intervalle_trop_court(tmp_path):
     with pytest.raises(ConfigError):
         load_config(write_config(tmp_path, "[watcher]\npoll_interval = 5"))
+
+
+def test_save_config_retente_apres_verrou(tmp_path, monkeypatch):
+    from checkmate_watcher.config import default_config, save_config
+
+    path = tmp_path / "config.toml"
+    original = Path.replace
+    calls = {"count": 0}
+
+    def flaky(self, target):
+        calls["count"] += 1
+        if calls["count"] == 1:
+            raise PermissionError("fichier verrouille")
+        return original(self, target)
+
+    monkeypatch.setattr(Path, "replace", flaky)
+    save_config(path, default_config(), password_env="CHECKMATE_PASSWORD")
+    assert calls["count"] >= 2
+    assert path.is_file()
 
 
 def test_refuse_un_mot_de_passe_absent(tmp_path):

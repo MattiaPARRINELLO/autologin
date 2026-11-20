@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import logging
 import os
+import stat
+import time
 import tomllib
+import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -295,11 +298,35 @@ def save_config(
     payload = tomli_w.dumps(
         config_to_dict(config, password=password, password_env=password_env)
     )
-    temporary = target.with_suffix(target.suffix + ".tmp")
-    temporary.write_text(payload, encoding="utf-8")
-    temporary.chmod(0o600)
-    temporary.replace(target)
-    return target
+    temporary = target.with_name(f".{target.name}.{uuid.uuid4().hex}.tmp")
+    try:
+        temporary.write_text(payload, encoding="utf-8")
+        temporary.chmod(0o600)
+        last_error: OSError | None = None
+        for attempt in range(4):
+            if target.exists():
+                try:
+                    target.chmod(stat.S_IWRITE | stat.S_IREAD)
+                except OSError:
+                    pass
+            try:
+                temporary.replace(target)
+                return target
+            except OSError as exc:
+                last_error = exc
+                logger.warning(
+                    "ecriture de la configuration retentee (%s/4) : %s",
+                    attempt + 1,
+                    exc,
+                )
+                time.sleep(0.15 * (attempt + 1))
+        assert last_error is not None
+        raise last_error
+    finally:
+        try:
+            temporary.unlink()
+        except FileNotFoundError:
+            pass
 
 
 def load_config(path: str | Path, *, require_password: bool = True) -> Config:
