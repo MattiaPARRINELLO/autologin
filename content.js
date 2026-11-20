@@ -255,21 +255,8 @@
         throw new Error(`Canvas cible introuvable : ${normaliserSelecteurs(canvasSelectors).join(' | ')}`);
       }
 
-      // Dimensions du canvas source (popup) et cible
       const SOURCE_WIDTH_DEFAULT = 320;
       const SOURCE_HEIGHT_DEFAULT = 150;
-
-      // Robustesse legacy: d'anciennes signatures peuvent avoir été capturées
-      // dans des dimensions CSS différentes. On adapte la source si nécessaire.
-      let inferredMaxX = 0;
-      let inferredMaxY = 0;
-      for (const point of signatureData) {
-        if (typeof point.x === 'number' && point.x > inferredMaxX) inferredMaxX = point.x;
-        if (typeof point.y === 'number' && point.y > inferredMaxY) inferredMaxY = point.y;
-      }
-
-      const sourceWidth = Math.max(SOURCE_WIDTH_DEFAULT, Math.ceil(inferredMaxX));
-      const sourceHeight = Math.max(SOURCE_HEIGHT_DEFAULT, Math.ceil(inferredMaxY));
       const rect = await attendreCanvasStable(canvasCible);
 
       // IMPORTANT : utiliser les dimensions CSS d'affichage (rect), pas la résolution
@@ -296,8 +283,8 @@
       if (!Number.isFinite(minX) || !Number.isFinite(minY)) {
         minX = 0;
         minY = 0;
-        maxX = sourceWidth;
-        maxY = sourceHeight;
+        maxX = SOURCE_WIDTH_DEFAULT;
+        maxY = SOURCE_HEIGHT_DEFAULT;
       }
 
       const sourceBoxWidth = Math.max(1, maxX - minX);
@@ -315,12 +302,9 @@
       const offsetX = (displayWidth - drawWidth) / 2;
       const offsetY = (displayHeight - drawHeight) / 2;
 
-      console.log(`[Signature] Scale: ${scale}`);
-      console.log(`[Signature] Source bbox: min(${minX},${minY}) max(${maxX},${maxY})`);
-      console.log(`[Signature] Canvas source estimé: ${sourceWidth}x${sourceHeight}`);
-      console.log(`[Signature] Canvas cible (affichage CSS): ${displayWidth}x${displayHeight}`);
-      console.log(`[Signature] Canvas cible (résolution interne): ${canvasCible.width}x${canvasCible.height}`);
-      console.log(`[Signature] Nombre de points: ${signatureData.length}`);
+      console.log(
+        `[Signature] ${signatureData.length} points, canvas ${displayWidth}x${displayHeight}, echelle ${scale.toFixed(3)}`
+      );
 
       // Rejouer chaque point de la signature
       for (let i = 0; i < signatureData.length; i++) {
@@ -386,22 +370,21 @@
   // =============================================
 
   /**
-   * Affiche une alerte modale dans la page quand l'extension est obsolète.
-   * @param {string} currentVersion
-   * @param {string} latestVersion
+   * Construit le cadre commun d'une modale (fond, carte, zone d'actions).
+   * @param {{id:string, width:string, cardBackground:string, borderColor:string, overlay:string}} options
    */
-  function afficherAlerteMiseAJourPage(currentVersion, latestVersion, latestUrl) {
-    const ancienBackdrop = document.getElementById('checkmate-update-backdrop');
+  function creerModale({ id, width, cardBackground, borderColor, overlay }) {
+    const ancienBackdrop = document.getElementById(id);
     if (ancienBackdrop) {
       ancienBackdrop.remove();
     }
 
     const backdrop = document.createElement('div');
-    backdrop.id = 'checkmate-update-backdrop';
+    backdrop.id = id;
     backdrop.style.cssText = [
       'position: fixed',
       'inset: 0',
-      'background: rgba(5, 8, 24, 0.78)',
+      `background: ${overlay}`,
       'display: flex',
       'align-items: center',
       'justify-content: center',
@@ -411,9 +394,9 @@
 
     const card = document.createElement('div');
     card.style.cssText = [
-      'width: min(720px, 100%)',
-      'background: linear-gradient(165deg, #ffffff 0%, #fff7ed 100%)',
-      'border: 3px solid #ef4444',
+      `width: ${width}`,
+      `background: ${cardBackground}`,
+      `border: 3px solid ${borderColor}`,
       'border-radius: 18px',
       'box-shadow: 0 30px 70px rgba(0,0,0,0.45)',
       'padding: 28px',
@@ -422,78 +405,52 @@
       'text-align: center'
     ].join(';');
 
-    const badge = document.createElement('div');
-    badge.textContent = 'ACTION REQUISE';
-    badge.style.cssText = [
-      'display:inline-block',
-      'background:#ef4444',
-      'color:#fff',
-      'font-weight:800',
-      'font-size:12px',
-      'letter-spacing:1px',
-      'padding:7px 12px',
-      'border-radius:999px',
-      'margin-bottom:14px'
-    ].join(';');
-
-    const title = document.createElement('h2');
-    title.textContent = 'Votre extension CheckMate n\'est pas a jour';
-    title.style.cssText = 'margin:0 0 12px 0; font-size:34px; line-height:1.15; color:#7f1d1d; font-weight:900;';
-
-    const desc = document.createElement('p');
-    desc.textContent = `Version installee: ${currentVersion || 'inconnue'} | Derniere version: ${latestVersion || 'inconnue'}`;
-    desc.style.cssText = 'margin:0 0 10px 0; color:#1f2937; font-size:18px; line-height:1.5; font-weight:700;';
-
-    const hint = document.createElement('p');
-    hint.textContent = 'Mettez a jour maintenant pour corriger les bugs et garantir la fiabilite du pointage.';
-    hint.style.cssText = 'margin:0 0 22px 0; color:#374151; font-size:17px; line-height:1.45;';
-
     const actions = document.createElement('div');
     actions.style.cssText = 'display:flex; justify-content:center; gap:12px; flex-wrap:wrap;';
 
-    const linkBtn = document.createElement('a');
-    linkBtn.textContent = 'Mettre a jour maintenant';
-    linkBtn.href = latestUrl || 'https://github.com';
-    linkBtn.target = '_blank';
-    linkBtn.rel = 'noopener noreferrer';
-    linkBtn.style.cssText = [
-      'background:#dc2626',
-      'text-decoration:none',
-      'border:2px solid #991b1b',
-      'color:#fff',
-      'border-radius:12px',
-      'padding:14px 22px',
-      'font-weight:800',
-      'font-size:18px',
-      'cursor:pointer',
-      'box-shadow: 0 10px 24px rgba(220,38,38,0.35)'
-    ].join(';');
+    return { backdrop, card, actions };
+  }
 
-    const closeBtn = document.createElement('button');
-    closeBtn.type = 'button';
-    closeBtn.textContent = 'Plus tard';
-    closeBtn.style.cssText = [
-      'background:#1f2937',
-      'border:none',
-      'color:#fff',
+  /**
+   * Cree un paragraphe ou titre style pour une modale.
+   */
+  function creerTexte(tag, text, style) {
+    const element = document.createElement(tag);
+    element.textContent = text;
+    element.style.cssText = style;
+    return element;
+  }
+
+  /**
+   * Cree un bouton ou lien d'action de modale.
+   */
+  function creerAction({ tag = 'button', text, background, color, border, weight, fontSize, href, onClick }) {
+    const element = document.createElement(tag);
+    element.textContent = text;
+    if (tag === 'button') {
+      element.type = 'button';
+    } else {
+      element.href = href || 'https://github.com';
+      element.target = '_blank';
+      element.rel = 'noopener noreferrer';
+    }
+    element.style.cssText = [
+      `background:${background}`,
+      `border:${border || 'none'}`,
+      `color:${color}`,
       'border-radius:12px',
       'padding:14px 22px',
-      'font-weight:700',
-      'font-size:17px',
+      `font-weight:${weight}`,
+      `font-size:${fontSize}`,
       'cursor:pointer'
     ].join(';');
-
-    closeBtn.addEventListener('click', () => backdrop.remove());
-
-    actions.appendChild(linkBtn);
-    actions.appendChild(closeBtn);
-    card.appendChild(badge);
-    card.appendChild(title);
-    card.appendChild(desc);
-    card.appendChild(hint);
-    card.appendChild(actions);
-    backdrop.appendChild(card);
-    document.body.appendChild(backdrop);
+    if (tag !== 'button') {
+      element.style.textDecoration = 'none';
+    }
+    if (onClick) {
+      element.addEventListener('click', onClick);
+    }
+    return element;
   }
 
   /**
@@ -506,108 +463,68 @@
    */
   function demanderConfirmationSignatureVersionObsolete(currentVersion, latestVersion, latestUrl) {
     return new Promise((resolve) => {
-      const ancienBackdrop = document.getElementById('checkmate-update-confirm-backdrop');
-      if (ancienBackdrop) {
-        ancienBackdrop.remove();
-      }
-
-      const backdrop = document.createElement('div');
-      backdrop.id = 'checkmate-update-confirm-backdrop';
-      backdrop.style.cssText = [
-        'position: fixed',
-        'inset: 0',
-        'background: rgba(5, 8, 24, 0.84)',
-        'display: flex',
-        'align-items: center',
-        'justify-content: center',
-        'padding: 20px',
-        'z-index: 2147483647'
-      ].join(';');
-
-      const card = document.createElement('div');
-      card.style.cssText = [
-        'width: min(760px, 100%)',
-        'background: linear-gradient(165deg, #ffffff 0%, #fef2f2 100%)',
-        'border: 3px solid #dc2626',
-        'border-radius: 18px',
-        'box-shadow: 0 30px 70px rgba(0,0,0,0.45)',
-        'padding: 28px',
-        'font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif',
-        'color: #111827',
-        'text-align: center'
-      ].join(';');
-
-      const title = document.createElement('h2');
-      title.textContent = 'Confirmation requise avant signature';
-      title.style.cssText = 'margin:0 0 10px 0; font-size:34px; line-height:1.15; color:#7f1d1d; font-weight:900;';
-
-      const desc = document.createElement('p');
-      desc.textContent = `Votre version (${currentVersion || 'inconnue'}) est depassee. Derniere version disponible: ${latestVersion || 'inconnue'}.`;
-      desc.style.cssText = 'margin:0 0 8px 0; color:#1f2937; font-size:18px; line-height:1.45; font-weight:700;';
-
-      const risk = document.createElement('p');
-      risk.textContent = 'Continuer peut provoquer des erreurs de signature ou un pointage invalide.';
-      risk.style.cssText = 'margin:0 0 18px 0; color:#991b1b; font-size:18px; line-height:1.45; font-weight:800;';
-
-      const actions = document.createElement('div');
-      actions.style.cssText = 'display:flex; justify-content:center; gap:12px; flex-wrap:wrap;';
-
-      const updateBtn = document.createElement('a');
-      updateBtn.textContent = 'Mettre a jour maintenant';
-      updateBtn.href = latestUrl || 'https://github.com';
-      updateBtn.target = '_blank';
-      updateBtn.rel = 'noopener noreferrer';
-      updateBtn.style.cssText = [
-        'background:#dc2626',
-        'text-decoration:none',
-        'border:2px solid #991b1b',
-        'color:#fff',
-        'border-radius:12px',
-        'padding:14px 22px',
-        'font-weight:800',
-        'font-size:18px',
-        'cursor:pointer'
-      ].join(';');
-
-      const continueBtn = document.createElement('button');
-      continueBtn.type = 'button';
-      continueBtn.textContent = 'Continuer quand meme';
-      continueBtn.style.cssText = [
-        'background:#f59e0b',
-        'border:none',
-        'color:#111827',
-        'border-radius:12px',
-        'padding:14px 22px',
-        'font-weight:800',
-        'font-size:18px',
-        'cursor:pointer'
-      ].join(';');
-
-      const cancelBtn = document.createElement('button');
-      cancelBtn.type = 'button';
-      cancelBtn.textContent = 'Annuler la signature';
-      cancelBtn.style.cssText = [
-        'background:#1f2937',
-        'border:none',
-        'color:#fff',
-        'border-radius:12px',
-        'padding:14px 22px',
-        'font-weight:700',
-        'font-size:17px',
-        'cursor:pointer'
-      ].join(';');
+      const { backdrop, card, actions } = creerModale({
+        id: 'checkmate-update-confirm-backdrop',
+        width: 'min(760px, 100%)',
+        cardBackground: 'linear-gradient(165deg, #ffffff 0%, #fef2f2 100%)',
+        borderColor: '#dc2626',
+        overlay: 'rgba(5, 8, 24, 0.84)'
+      });
 
       const closeWith = (value) => {
         backdrop.remove();
         resolve(value);
       };
 
-      continueBtn.addEventListener('click', () => closeWith(true));
-      cancelBtn.addEventListener('click', () => closeWith(false));
+      const title = creerTexte(
+        'h2',
+        'Confirmation requise avant signature',
+        'margin:0 0 10px 0; font-size:34px; line-height:1.15; color:#7f1d1d; font-weight:900;'
+      );
+      const desc = creerTexte(
+        'p',
+        `Votre version (${currentVersion || 'inconnue'}) est depassee. Derniere version disponible: ${latestVersion || 'inconnue'}.`,
+        'margin:0 0 8px 0; color:#1f2937; font-size:18px; line-height:1.45; font-weight:700;'
+      );
+      const risk = creerTexte(
+        'p',
+        'Continuer peut provoquer des erreurs de signature ou un pointage invalide.',
+        'margin:0 0 18px 0; color:#991b1b; font-size:18px; line-height:1.45; font-weight:800;'
+      );
 
-      actions.appendChild(updateBtn);
-      actions.appendChild(continueBtn);
-      actions.appendChild(cancelBtn);
+      actions.appendChild(
+        creerAction({
+          tag: 'a',
+          text: 'Mettre a jour maintenant',
+          href: latestUrl,
+          background: '#dc2626',
+          color: '#fff',
+          border: '2px solid #991b1b',
+          weight: 800,
+          fontSize: '18px'
+        })
+      );
+      actions.appendChild(
+        creerAction({
+          text: 'Continuer quand meme',
+          background: '#f59e0b',
+          color: '#111827',
+          weight: 800,
+          fontSize: '18px',
+          onClick: () => closeWith(true)
+        })
+      );
+      actions.appendChild(
+        creerAction({
+          text: 'Annuler la signature',
+          background: '#1f2937',
+          color: '#fff',
+          weight: 700,
+          fontSize: '17px',
+          onClick: () => closeWith(false)
+        })
+      );
+
       card.appendChild(title);
       card.appendChild(desc);
       card.appendChild(risk);
@@ -623,29 +540,19 @@
    * @returns {Promise<boolean>} true si le clic a réussi
    */
   async function clickValidation(buttonSelectors) {
-    try {
-      const bouton = await attendreElement(buttonSelectors, 5000);
-      if (!bouton) {
-        throw new Error(`Bouton de validation introuvable : ${normaliserSelecteurs(buttonSelectors).join(' | ')}`);
-      }
+    const bouton = await attendreElement(buttonSelectors, 5000);
 
-      // Simuler un survol puis un clic réaliste
-      bouton.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
-      await attendre(100);
-      bouton.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
-      await attendre(50);
-      bouton.click();
-      bouton.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
-      bouton.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
-      bouton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    // Simuler un survol puis un clic réaliste
+    bouton.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
+    await attendre(100);
+    bouton.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+    await attendre(50);
+    bouton.click();
+    bouton.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+    bouton.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+    bouton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
 
-      console.log('[Validation] Bouton de validation cliqué');
-      return true;
-
-    } catch (erreur) {
-      console.error('[Validation] Erreur:', erreur.message);
-      throw erreur;
-    }
+    return true;
   }
 
   // =============================================
@@ -769,13 +676,6 @@
     // --- Action : ping — Vérification que le content script est bien chargé ---
     if (message.action === 'ping') {
       sendResponse({ success: true, message: 'Content script actif' });
-      return false;
-    }
-
-    // --- Action : afficherAlerteMiseAJour — Affiche une modale dans la page ---
-    if (message.action === 'afficherAlerteMiseAJour') {
-      afficherAlerteMiseAJourPage(message.currentVersion, message.latestVersion, message.latestUrl);
-      sendResponse({ success: true });
       return false;
     }
 

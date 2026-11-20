@@ -3,8 +3,8 @@
 // Gestion de la configuration et du canvas signature
 // =============================================
 
-const EXECUTION_LOG_KEY = 'executionLogs';
-const MAX_EXECUTION_LOGS = 40;
+import { EXECUTION_LOG_KEY, appendExecutionLog as persistExecutionLog } from './shared.js';
+
 const PROGRESS_STORAGE_KEY = 'pointageProgress';
 const PROGRESS_STALE_MS = 5 * 60 * 1000;
 
@@ -106,20 +106,7 @@ document.addEventListener('DOMContentLoaded', () => {
    * @param {'info'|'success'|'error'} level
    */
   function appendExecutionLog(tag, message, level = 'info') {
-    const entry = {
-      id: `${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
-      ts: new Date().toISOString(),
-      source: 'popup',
-      tag,
-      message,
-      level
-    };
-
-    chrome.storage.local.get([EXECUTION_LOG_KEY], (result) => {
-      const logs = Array.isArray(result[EXECUTION_LOG_KEY]) ? result[EXECUTION_LOG_KEY] : [];
-      logs.unshift(entry);
-      chrome.storage.local.set({ [EXECUTION_LOG_KEY]: logs.slice(0, MAX_EXECUTION_LOGS) });
-    });
+    persistExecutionLog('popup', tag, message, level);
   }
 
   /**

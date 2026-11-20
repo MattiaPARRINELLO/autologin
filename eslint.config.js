@@ -10,7 +10,7 @@ export default [
     files: ["*.js"],
     languageOptions: {
       ecmaVersion: 2022,
-      sourceType: "script",
+      sourceType: "module",
       globals: {
         ...globals.browser,
         ...globals.webextensions,
