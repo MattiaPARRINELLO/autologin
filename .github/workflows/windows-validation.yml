@@ -111,7 +111,9 @@ jobs:
             $runtime = Get-Content $runtimePath -Raw | ConvertFrom-Json
             $headers = @{ "X-CheckMate-Token" = $runtime.token }
             $status = Invoke-RestMethod -Uri "http://127.0.0.1:$($runtime.port)/api/status" -Headers $headers
-            if ($status.version -ne "0.2.0") { throw "version inattendue : $($status.version)" }
+            $versionLine = Select-String -Path "pyproject.toml" -Pattern '^version = "(.+)"'
+            $expected = $versionLine.Matches[0].Groups[1].Value
+            if ($status.version -ne $expected) { throw "version inattendue : $($status.version), attendue $expected" }
             Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:$($runtime.port)/api/action" -Headers $headers -ContentType "application/json" -Body '{"action":"quit"}' | Out-Null
             $process.WaitForExit(30000) | Out-Null
             if (-not $process.HasExited) { throw "CheckMate ne s'est pas arrete" }
