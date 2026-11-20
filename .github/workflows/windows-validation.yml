@@ -2,6 +2,9 @@ name: Windows validation
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - feat/auto-detect-roll-call
 
 permissions:
   contents: read
