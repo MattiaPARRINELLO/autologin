@@ -12,7 +12,6 @@ import shutil
 import subprocess
 import sys
 import time
-import webbrowser
 from pathlib import Path
 
 from . import BUILD, __version__
@@ -43,6 +42,7 @@ from .status_server import read_runtime, status_alive
 from .support import build_support_bundle
 from .updates import check_for_update, fetch_releases
 from .watcher import run_loop
+from .window import open_url
 
 logger = logging.getLogger(__name__)
 
@@ -421,7 +421,7 @@ def command_import_signature(config: Config, file_path: str | None) -> int:
 def command_status(config: Config, config_path: Path) -> int:
     runtime = read_runtime()
     if runtime and status_alive(runtime):
-        webbrowser.open(str(runtime["url"]))
+        open_url(str(runtime["url"]))
         return 0
 
     executable = current_executable()
@@ -445,7 +445,7 @@ def command_status(config: Config, config_path: Path) -> int:
     for _ in range(40):
         runtime = read_runtime()
         if runtime and status_alive(runtime):
-            webbrowser.open(str(runtime["url"]))
+            open_url(str(runtime["url"]))
             return 0
         time.sleep(0.5)
     print("CheckMate n'a pas demarre. Consulte les logs.")

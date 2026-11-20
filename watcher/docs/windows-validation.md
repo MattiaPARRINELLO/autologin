@@ -22,7 +22,8 @@ uv run checkmate-watcher setup
 
 ## Parcours a valider
 
-- [ ] la page s'ouvre dans le navigateur par defaut, sur `127.0.0.1` avec un jeton
+- [ ] la page s'ouvre dans une fenetre CheckMate native (WebView2), sans onglet
+- [ ] si WebView2 est absent, repli sur le navigateur par defaut
 - [ ] l'onglet ne contient aucune ressource externe
 - [ ] le test de connexion CESAR reussit avec de vrais identifiants
 - [ ] le mot de passe est visible dans le Gestionnaire d'identifiants Windows

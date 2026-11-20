@@ -92,7 +92,8 @@ Tu restes responsable de l'usage de ta signature et du respect des règles de to
 4. Windows peut afficher un avertissement SmartScreen. C'est normal tant que la
    signature de code n'est pas active : clique sur "Informations
    complémentaires", puis "Exécuter quand même".
-5. À la fin de l'installation, l'assistant de configuration s'ouvre dans ton
+5. À la fin de l'installation, l'assistant de configuration s'ouvre dans une
+   fenêtre CheckMate native. Si WebView2 est absent, il s'ouvre dans ton
    navigateur.
 
 L'installeur crée un raccourci dans le menu Démarrer. Le raccourci ouvre le
@@ -212,7 +213,11 @@ reprise en quelques minutes et reprend la surveillance.
 ## Tableau de bord et icône
 
 Le raccourci "CheckMate" du menu Démarrer ouvre le tableau de bord, pas
-l'onboarding. Il affiche l'état de la surveillance, le créneau en cours, la
+l'onboarding. Il s'affiche dans une fenêtre CheckMate native, sans onglet ni
+barre d'adresse, via WebView2. Si WebView2 est absent, CheckMate retombe sur le
+navigateur par défaut.
+
+Le tableau de bord affiche l'état de la surveillance, le créneau en cours, la
 prochaine ouverture, les compteurs, la dernière détection et la dernière
 signature. Il permet aussi de reconfigurer, tester la notification, vérifier les
 mises à jour, ouvrir les logs ou quitter.

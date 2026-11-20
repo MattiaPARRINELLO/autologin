@@ -7,7 +7,6 @@ import logging
 import secrets
 import sys
 import threading
-import webbrowser
 from dataclasses import replace
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -33,6 +32,7 @@ from .paths import default_env_path
 from .schedule import Schedule, ScheduleError, parse_days, parse_windows
 from .setup_ui import SETUP_HTML
 from .signature import SignatureError, load_signature, parse_points, save_signature
+from .window import open_url
 
 logger = logging.getLogger(__name__)
 
@@ -473,7 +473,12 @@ def run_setup(
         flush=True,
     )
     if open_browser:
-        webbrowser.open(url)
+        native = open_url(url, close_event=session.finished)
+        if native and not session.finished.is_set():
+            print("Fenetre fermee avant la fin de la configuration.")
+            server.shutdown()
+            server.server_close()
+            return 1
 
     try:
         session.finished.wait(timeout)

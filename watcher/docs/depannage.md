@@ -71,6 +71,23 @@ schtasks /Run /TN CheckMate
 Si la tâche existe mais échoue, regarde les logs. Un redémarrage de session
 suffit souvent après une mise à jour.
 
+## La fenêtre CheckMate ne s'ouvre pas
+
+CheckMate affiche son tableau de bord dans une fenêtre native via WebView2. Sous
+Windows 10 et 11, WebView2 est déjà présent avec Edge. S'il manque, CheckMate
+essaie le navigateur par défaut.
+
+Si rien ne s'ouvre, installe le Runtime WebView2 depuis Microsoft, ou force le
+navigateur :
+
+```powershell
+$env:CHECKMATE_BROWSER = "1"
+CheckMate.exe status
+```
+
+Sous Linux, la fenêtre native demande GTK et WebKitGTK. Sans eux, CheckMate
+ouvre la page dans le navigateur.
+
 ## Le navigateur est introuvable
 
 Installe Microsoft Edge ou Google Chrome, ou :

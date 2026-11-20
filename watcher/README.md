@@ -23,6 +23,13 @@ Les chemins sont portables via `platformdirs` : `~/.config/checkmate-watcher` su
 Linux, `%LOCALAPPDATA%\checkmate-watcher` sur Windows. Les logs tournent dans
 `checkmate-watcher.log` avec rotation, en plus de stdout.
 
+## Fenetre native
+
+Le tableau de bord et l'onboarding s'affichent dans une fenetre native via
+`pywebview` (WebView2 sous Windows), sans onglet ni barre d'adresse. Si le moteur
+web est absent, CheckMate retombe sur le navigateur. `CHECKMATE_BROWSER=1` force
+le navigateur.
+
 ## Documentation
 
 - [Guide utilisateur](docs/guide-utilisateur.md)

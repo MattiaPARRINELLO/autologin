@@ -37,6 +37,8 @@ jobs:
         run: |
           $process = Start-Process -FilePath ".\dist\CheckMate\CheckMate.exe" -ArgumentList "--version" -Wait -PassThru
           if ($process.ExitCode -ne 0) { throw "binaire invalide ($($process.ExitCode))" }
+          if (-not (Test-Path ".\dist\CheckMate\_internal\webview")) { throw "pywebview absent du bundle" }
+          if (-not (Test-Path ".\dist\CheckMate\_internal\webview\lib\Microsoft.Web.WebView2.Core.dll")) { throw "WebView2 absent du bundle" }
 
       - name: Demarrer l'emulateur
         shell: pwsh
