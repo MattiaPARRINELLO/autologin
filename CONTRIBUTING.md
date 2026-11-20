@@ -61,6 +61,20 @@ uv run pytest -q tests/test_emulator_e2e.py
 Une fonctionnalite est d'abord integree a `beta`, puis stabilisee vers `main`.
 Ne pousse jamais directement sur `main` et ne reecris pas son historique.
 
+## Releases et changelog
+
+Les notes de release GitHub sont l'historique officiel du projet. Chaque
+publication stable et beta y est decrite, avec les changements et les
+verifications associees.
+
+Il n'y a pas de `CHANGELOG.md` separe : il devrait etre maintenu a la main en
+plus des notes de release, et les deux finiraient par diverger. Une contribution
+qui change le comportement doit donc decrire le changement dans la description
+de la pull request pour qu'il se retrouve dans les notes de release.
+
+Le parcours de support (questions, bugs, securite) est decrit dans
+[SUPPORT.md](SUPPORT.md).
+
 ## Conventions de commit
 
 Chaque commit doit rester une unite coherente et commencer par un prefixe :

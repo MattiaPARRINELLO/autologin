@@ -12,3 +12,6 @@ contact_links:
   - name: Guide de contribution
     url: https://github.com/MattiaPARRINELLO/autologin/blob/main/CONTRIBUTING.md
     about: Branches, tests, conventions de commit et procédure de PR.
+  - name: Support
+    url: https://github.com/MattiaPARRINELLO/autologin/blob/main/SUPPORT.md
+    about: Canaux de support, versions et historique des releases.
