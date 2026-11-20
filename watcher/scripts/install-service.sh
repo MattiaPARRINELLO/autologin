@@ -54,6 +54,8 @@ EOF
 chmod +x "$BIN"
 
 install -m 644 "$ROOT/systemd/checkmate-watcher.service" "$UNIT_DIR/checkmate-watcher.service"
+install -m 644 "$ROOT/systemd/checkmate-watchdog.service" "$UNIT_DIR/checkmate-watchdog.service"
+install -m 644 "$ROOT/systemd/checkmate-watchdog.timer" "$UNIT_DIR/checkmate-watchdog.timer"
 
 if [ ! -f "$CONFIG_DIR/env" ]; then
     cat > "$CONFIG_DIR/env" <<'EOF'
@@ -68,6 +70,7 @@ fi
 systemctl --user import-environment DISPLAY WAYLAND_DISPLAY XDG_RUNTIME_DIR 2>/dev/null || true
 systemctl --user daemon-reload
 systemctl --user enable checkmate-watcher.service
+systemctl --user enable --now checkmate-watchdog.timer
 systemctl --user restart checkmate-watcher.service
 systemctl --user --no-pager status checkmate-watcher.service || true
 

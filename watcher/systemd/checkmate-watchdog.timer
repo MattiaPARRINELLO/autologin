@@ -1,0 +1,11 @@
+[Unit]
+Description=Redemarre CheckMate juste avant les cours
+
+[Timer]
+OnCalendar=Mon..Fri 08:59:00
+OnCalendar=Mon..Fri 13:29:00
+Persistent=true
+AccuracySec=1s
+
+[Install]
+WantedBy=timers.target
