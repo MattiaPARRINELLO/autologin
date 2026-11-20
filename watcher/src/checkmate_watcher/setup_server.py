@@ -8,11 +8,11 @@ import secrets
 import sys
 import threading
 from dataclasses import replace
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from http.server import ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import parse_qs, urlparse
+from typing import Any
+from urllib.parse import urlparse
 
-from . import BUILD, __version__
 from .autostart import (
     current_executable,
     enable_autostart,
@@ -27,6 +27,8 @@ from .config import (
     save_config,
 )
 from .credentials import keyring_available, set_password
+from .local_http import LocalError, LocalHandler
+from .local_http import create_server as _create_server
 from .notifications import Notifier
 from .paths import default_env_path
 from .schedule import Schedule, ScheduleError, parse_days, parse_windows
@@ -40,10 +42,8 @@ MAX_BODY = 1_000_000
 MAX_TIMEOUT = 1800
 
 
-class SetupError(Exception):
-    def __init__(self, message: str, status: int = 400) -> None:
-        super().__init__(message)
-        self.status = status
+class SetupError(LocalError):
+    """Etape d'onboarding refusee."""
 
 
 class SetupSession:
@@ -337,64 +337,19 @@ def _test_connection(
     return "Connexion reussie."
 
 
-class _Handler(BaseHTTPRequestHandler):
+class _Handler(LocalHandler):
     session: SetupSession
-
-    def log_message(self, format: str, *args: object) -> None:
-        return
-
-    # --- helpers ---
-
-    def _send(self, status: int, payload: bytes, content_type: str) -> None:
-        self.send_response(status)
-        self.send_header("Content-Type", content_type)
-        self.send_header("Content-Length", str(len(payload)))
-        self.send_header("Cache-Control", "no-store")
-        self.send_header("X-Content-Type-Options", "nosniff")
-        self.send_header("Referrer-Policy", "no-referrer")
-        self.end_headers()
-        self.wfile.write(payload)
-
-    def _json(self, status: int, data: dict) -> None:
-        self._send(
-            status,
-            json.dumps(data, ensure_ascii=False).encode("utf-8"),
-            "application/json; charset=utf-8",
-        )
-
-    def _authorized(self) -> bool:
-        return self.headers.get("X-CheckMate-Token") == self.session.token
-
-    def _read_json(self) -> dict:
-        length = int(self.headers.get("Content-Length") or 0)
-        if length <= 0 or length > MAX_BODY:
-            return {}
-        raw = self.rfile.read(length)
-        try:
-            data = json.loads(raw.decode("utf-8"))
-        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-            raise SetupError("corps JSON invalide") from exc
-        if not isinstance(data, dict):
-            raise SetupError("corps JSON invalide")
-        return data
+    max_body = MAX_BODY
 
     def do_GET(self) -> None:
-        parsed = urlparse(self.path)
-        if parsed.path == "/":
-            token = (parse_qs(parsed.query).get("token") or [""])[0]
-            if token != self.session.token:
-                self._send(403, b"Jeton invalide", "text/plain; charset=utf-8")
-                return
-            html = SETUP_HTML.replace("__TOKEN__", self.session.token).replace(
-                "__VERSION__", f"{__version__} - build {BUILD}"
-            )
-            self._send(200, html.encode("utf-8"), "text/html; charset=utf-8")
+        path = urlparse(self.path).path
+        if path == "/":
+            self._serve_page(SETUP_HTML)
             return
-        if parsed.path == "/favicon.ico":
-            self.send_response(204)
-            self.end_headers()
+        if path == "/favicon.ico":
+            self._favicon()
             return
-        if parsed.path == "/api/state":
+        if path == "/api/state":
             if not self._authorized():
                 self._json(403, {"error": "acces refuse"})
                 return
@@ -409,24 +364,12 @@ class _Handler(BaseHTTPRequestHandler):
         path = urlparse(self.path).path
         try:
             payload = self._read_json()
-            if path == "/api/test-login":
-                result = self.session.test_login(payload)
-            elif path == "/api/credentials":
-                result = self.session.save_credentials(payload)
-            elif path == "/api/signature":
-                result = self.session.save_signature(payload)
-            elif path == "/api/import-signature":
-                result = self.session.import_signature(payload)
-            elif path == "/api/schedule":
-                result = self.session.save_schedule(payload)
-            elif path == "/api/test-notification":
-                result = self.session.test_notification()
-            elif path == "/api/finish":
-                result = self.session.finish(payload)
-            else:
+            handler = self._routes().get(path)
+            if handler is None:
                 self._json(404, {"error": "route inconnue"})
                 return
-        except SetupError as exc:
+            result = handler(payload)
+        except LocalError as exc:
             self._json(exc.status, {"error": str(exc)})
             return
         except Exception as exc:
@@ -437,12 +380,20 @@ class _Handler(BaseHTTPRequestHandler):
         if path == "/api/finish":
             self.session.finished.set()
 
+    def _routes(self) -> dict[str, Any]:
+        return {
+            "/api/test-login": self.session.test_login,
+            "/api/credentials": self.session.save_credentials,
+            "/api/signature": self.session.save_signature,
+            "/api/import-signature": self.session.import_signature,
+            "/api/schedule": self.session.save_schedule,
+            "/api/test-notification": lambda _: self.session.test_notification(),
+            "/api/finish": self.session.finish,
+        }
+
 
 def create_server(session: SetupSession) -> ThreadingHTTPServer:
-    handler = type("SetupHandler", (_Handler,), {"session": session})
-    server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
-    server.daemon_threads = True
-    return server
+    return _create_server(session, _Handler)
 
 
 def run_setup(
