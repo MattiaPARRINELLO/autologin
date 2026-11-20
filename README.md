@@ -441,6 +441,11 @@ cd watcher
 uv run checkmate-watcher --config ../emulator/watcher.toml run -v
 ```
 
+Pour contribuer, lire [CONTRIBUTING.md](CONTRIBUTING.md) : environnement,
+conventions de commit, checks obligatoires et cycle de release. Le projet suit
+le [code de conduite](CODE_OF_CONDUCT.md). Pour une faille de sécurité, utiliser
+la [politique de sécurité](SECURITY.md), sans issue publique.
+
 ## Ancienne extension Chrome
 
 Le dépôt contient encore l'extension historique à la racine (`manifest.json`,
