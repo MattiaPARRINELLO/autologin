@@ -1,14 +1,30 @@
 # Mentions légales et conditions d'utilisation
 
-CheckMate est un outil personnel, sans affiliation avec CESAR, Emineo Education
-ou ton établissement.
+## Avertissement
+
+CheckMate rejoue **ta** signature sur **ton** propre émargement, pour un cours
+auquel tu es réellement présent. Il ne doit pas être utilisé pour falsifier une
+présence.
+
+- **Pas de falsification.** Signer pour un cours auquel tu n'assistes pas,
+  signer à la place d'une autre personne ou contourner une règle de ton
+  établissement est un usage détourné, hors du périmètre de ce projet.
+- **Aucune responsabilité sur l'usage.** L'auteur n'est pas responsable de ce
+  qui est fait avec le logiciel ni des conséquences qui en découlent, y compris
+  une sanction scolaire ou l'invalidation d'un émargement.
+- **Aucune affiliation.** Ce projet est indépendant : il n'est ni approuvé, ni
+  sponsorisé, ni soutenu par CESAR, Emineo Education ou ton établissement.
+- **Marques.** CESAR et Emineo sont des noms et des marques appartenant à Emineo
+  Education et à leurs titulaires respectifs. Ils sont cités uniquement pour
+  décrire l'interopérabilité du logiciel ; aucun droit n'est revendiqué sur ces
+  noms.
 
 ## Usage
 
-CheckMate signe l'émargement à ta place avec une signature que tu as dessinée.
-Tu restes responsable de son utilisation et du respect des règles de ton
-établissement. Vérifie que l'automatisation du pointage est autorisée avant de
-l'utiliser.
+CheckMate signe l'émargement à ta place avec une signature que tu as dessinée,
+uniquement lorsque tu es présent. Tu restes responsable de son utilisation et du
+respect des règles de ton établissement. Vérifie que l'automatisation du pointage
+est autorisée avant de l'utiliser.
 
 ## Données
 
