@@ -1,12 +1,42 @@
 # Vie privée
 
-## Aucun serveur
+## Compteurs d'usage anonymes
 
-CheckMate tourne entièrement sur ton ordinateur. Il n'y a pas de compte
-CheckMate, pas de backend, pas de télémétrie, pas d'analytics.
+CheckMate n'a pas de compte, pas de publicité et ne suit pas ce que tu fais sur
+CESAR. Il envoie seulement deux petits événements à un compteur auto-hébergé :
 
-Le seul service contacté est CESAR Emineo, avec l'adresse configurée dans
-l'assistant. Aucune donnée n'est envoyée ailleurs.
+- `install`, une fois par ordinateur ;
+- `signature`, une fois par émargement réussi.
+
+Chaque événement contient uniquement :
+
+- un identifiant d'installation aléatoire (32 caractères hexadécimaux), créé au
+  premier lancement et stocké dans `install-id` ;
+- la version de CheckMate ;
+- la famille du système (`windows`, `linux`, `macos`, `other`) ;
+- le nom de l'événement.
+
+Le compteur ne stocke ni adresse IP, ni identifiant CESAR, ni mot de passe, ni
+le tracé de la signature, ni le planning. Ces données servent seulement à
+compter les installations et les signatures.
+
+Tu peux désactiver ces envois à tout moment dans `config.toml` :
+
+```toml
+[analytics]
+enabled = false
+```
+
+ou avec la variable d'environnement `CHECKMATE_ANALYTICS=0`. L'identifiant
+d'installation reste sur ton ordinateur ; supprimer le dossier de données le
+supprime aussi.
+
+## Services contactés
+
+- l'instance CESAR Emineo configurée dans l'assistant ;
+- l'API GitHub des releases, si les mises à jour sont activées ;
+- le compteur de statistiques (`main.mprnl.fr/cm-stats`), si les statistiques
+  sont activées.
 
 ## Ce qui est stocké
 

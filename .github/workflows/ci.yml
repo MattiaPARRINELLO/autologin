@@ -62,6 +62,20 @@ jobs:
       - name: Verifier qu'aucune version figee ne reste
         run: python3 scripts/check_doc_versions.py
 
+  stats:
+    name: Collecteur de stats
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      - name: Tests
+        run: python -m unittest discover -s stats/tests -v
+
   extension:
     name: Extension
     runs-on: ubuntu-latest

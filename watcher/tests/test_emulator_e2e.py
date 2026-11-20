@@ -17,6 +17,7 @@ import pytest
 from checkmate_watcher.browser import bundled_chromium_path
 from checkmate_watcher.cesar import CesarSession
 from checkmate_watcher.config import (
+    AnalyticsConfig,
     CesarConfig,
     Config,
     NotificationConfig,
@@ -124,6 +125,7 @@ def make_config(tmp_path, executable: str, base_url: str) -> Config:
         signature=SignatureConfig(file=signature_file, padding_ratio=0.9),
         notifications=NotificationConfig(enabled=False),
         updates=UpdatesConfig(enabled=False),
+        analytics=AnalyticsConfig(enabled=False),
         selectors=Selectors.from_dict({}),
     )
 

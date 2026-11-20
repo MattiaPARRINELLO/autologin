@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from . import BUILD, __version__
+from . import BUILD, __version__, analytics
 from .cesar import (
     AttendanceSignal,
     CesarError,
@@ -251,6 +251,8 @@ async def run_loop(
     started_at = datetime.now()
     state = StateStore(config.watcher.state_file, ttl=config.watcher.dedupe_ttl)
     state.increment("stats.starts")
+    if not dry_run:
+        analytics.record_startup(config, state)
     logger.info("CheckMate %s (build %s)", __version__, BUILD)
 
     status_session: StatusSession | None = None
@@ -391,6 +393,7 @@ async def run_loop(
                             else:
                                 state.mark(signal.key)
                                 state.increment("stats.signed")
+                                analytics.record(config, "signature")
                                 state.set_meta("last_signed_at", _now_iso())
                                 if window_key:
                                     state.mark_window(window_key)

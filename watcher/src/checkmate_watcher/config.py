@@ -13,6 +13,7 @@ from pathlib import Path
 
 import tomli_w
 
+from .analytics import DEFAULT_ENDPOINT as DEFAULT_ANALYTICS_ENDPOINT
 from .credentials import DEFAULT_SERVICE
 from .credentials import get_password as get_keyring_password
 from .paths import (
@@ -137,6 +138,12 @@ class UpdatesConfig:
     channel: str = STABLE_CHANNEL
 
 
+@dataclass(frozen=True)
+class AnalyticsConfig:
+    enabled: bool = True
+    endpoint: str = DEFAULT_ANALYTICS_ENDPOINT
+
+
 def parse_updates_channel(table: dict) -> str:
     """Lit `[updates] channel`, avec `include_prerelease` en alias historique."""
     raw_channel = table.get("channel")
@@ -167,6 +174,7 @@ class Config:
     selectors: Selectors
     schedule: Schedule = field(default_factory=Schedule)
     updates: UpdatesConfig = field(default_factory=UpdatesConfig)
+    analytics: AnalyticsConfig = field(default_factory=AnalyticsConfig)
 
 
 def _require(table: dict, key: str, table_name: str) -> str:
@@ -281,6 +289,10 @@ def config_to_dict(
         "updates": {
             "enabled": config.updates.enabled,
             "channel": config.updates.channel,
+        },
+        "analytics": {
+            "enabled": config.analytics.enabled,
+            "endpoint": config.analytics.endpoint,
         },
         "selectors": {
             "attendance_button": list(config.selectors.attendance_button),
@@ -431,6 +443,17 @@ def load_config(path: str | Path, *, require_password: bool = True) -> Config:
         channel=parse_updates_channel(updates_table),
     )
 
+    analytics_table = data.get("analytics", {})
+    if not isinstance(analytics_table, dict):
+        raise ConfigError("[analytics] doit etre une table TOML")
+    analytics_defaults = AnalyticsConfig()
+    analytics = AnalyticsConfig(
+        enabled=bool(analytics_table.get("enabled", analytics_defaults.enabled)),
+        endpoint=str(analytics_table.get("endpoint", analytics_defaults.endpoint)),
+    )
+    if analytics.enabled and not analytics.endpoint.startswith(("http://", "https://")):
+        raise ConfigError("[analytics] endpoint doit commencer par http:// ou https://")
+
     try:
         schedule = Schedule(
             enabled=bool(schedule_table.get("enabled", False)),
@@ -460,4 +483,5 @@ def load_config(path: str | Path, *, require_password: bool = True) -> Config:
         selectors=selectors,
         schedule=schedule,
         updates=updates,
+        analytics=analytics,
     )

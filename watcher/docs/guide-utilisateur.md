@@ -214,6 +214,19 @@ autre choix à faire. Pour revenir aux versions stables, remets
 L'ancienne clé `include_prerelease = true` reste acceptée et équivaut à
 `channel = "beta"` si `channel` est absent.
 
+### Désactiver les statistiques anonymes
+
+CheckMate compte les installations et les signatures avec un identifiant
+aléatoire, sans aucune donnée CESAR. Pour couper ces envois :
+
+```toml
+[analytics]
+enabled = false
+```
+
+ou lance l'application avec `CHECKMATE_ANALYTICS=0`. Voir la
+[page vie privée](vie-privee.md).
+
 ## Limites
 
 - La machine doit être allumée et la session ouverte. En veille, la reprise est
