@@ -7,6 +7,19 @@ En participant, tu acceptes le [code de conduite](CODE_OF_CONDUCT.md). Pour une
 faille de securite, ne cree pas d'issue publique : suis la
 [politique de securite](SECURITY.md).
 
+English speakers: the same rules are summarized in
+[CONTRIBUTING.en.md](CONTRIBUTING.en.md).
+
+## Licence des contributions
+
+Le depot est publie sous licence MIT (voir [LICENSE](LICENSE)). En ouvrant une
+pull request, tu acceptes que ta contribution soit publiee sous cette meme
+licence MIT, sans condition supplementaire.
+
+Aucun DCO ni accord de cession de droits (CLA) n'est demande. En soumettant une
+contribution, tu certifies simplement que tu l'as ecrite ou que tu as le droit
+de la soumettre.
+
 ## Perimetre
 
 Le depot contient :
