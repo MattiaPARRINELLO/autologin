@@ -22,4 +22,5 @@ your confirmation.
 ## Code signing
 
 Windows builds are code-signed by the
-[SignPath Foundation](https://signpath.org/).
+[SignPath Foundation](https://signpath.org/). The current `watcher-0.1.0`
+pre-release was built before signing was enabled and is unsigned.
