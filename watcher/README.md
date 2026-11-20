@@ -16,7 +16,7 @@ La detection arrive au pire un intervalle apres l'ouverture par le formateur.
 | Plateforme | Notifications | Confirmation | Navigateur | Demarrage auto |
 |------------|---------------|--------------|------------|----------------|
 | Linux | notify-send, fallback D-Bus | zenity, fallback tkinter | Chromium systeme ou bundle | systemd utilisateur |
-| Windows | toast PowerShell (fonctionnement a valider sur machine reelle) | tkinter | Edge ou Chrome installe | script PowerShell prevu |
+| Windows | toast PowerShell, valide sur runner GitHub | tkinter | Edge ou Chrome installe | tache planifiee validee |
 | macOS | osascript | tkinter | Chrome / Edge installe | launchd prevu |
 
 Les chemins sont portables via `platformdirs` : `~/.config/checkmate-watcher` sur
@@ -45,8 +45,9 @@ accessible que depuis 127.0.0.1 avec un jeton aleatoire.
 
 ## Windows
 
-L'installeur `.exe` n'est pas encore publie. En attendant, sur une machine avec
-Python et [uv](https://docs.astral.sh/uv/) :
+Une pre-version de l'installeur `.exe` est publiee dans les releases, non signee
+tant que SignPath n'est pas actif. Pour developper, sur une machine avec Python
+et [uv](https://docs.astral.sh/uv/) :
 
 ```powershell
 cd watcher

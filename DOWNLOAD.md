@@ -8,15 +8,15 @@ your confirmation.
 
 - Windows 10 or 11
 - Microsoft Edge or Google Chrome
-- Download the Windows installer from
-  [GitHub Releases](https://github.com/MattiaPARRINELLO/autologin/releases)
+- Download the current desktop pre-release:
+  [CheckMate desktop 0.1.0](https://github.com/MattiaPARRINELLO/autologin/releases/tag/watcher-0.1.0)
 - Run the installer, then follow the onboarding
 
 ## Linux
 
 - systemd
 - [uv](https://docs.astral.sh/uv/)
-- Download `CheckMate-linux-*.tar.gz` from the same releases page
+- Download `CheckMate-linux-0.1.0.tar.gz` from the same release
 - Extract it and run `./install.sh`
 
 ## Code signing

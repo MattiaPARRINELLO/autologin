@@ -20,8 +20,8 @@ journalctl --user -u checkmate-watcher -f
 checkmate-watcher check-config
 ```
 
-Sur Windows, ouvre le fichier indiqué par `check-config` dans le dossier de
-logs. Les lignes utiles contiennent `bouton d'emargement detecte`, `connexion
+Sur Windows, ouvre `%LOCALAPPDATA%\checkmate-watcher\Logs\checkmate-watcher.log`.
+Les lignes utiles contiennent `bouton d'emargement detecte`, `connexion
 reussie`, `signature` ou `ERREUR`.
 
 ## Aucune notification

@@ -75,9 +75,8 @@ Si tu ne réponds pas dans les 3 minutes, rien n'est signé. La demande revient
 
 Relance l'assistant à tout moment :
 
-```bash
-checkmate-watcher setup
-```
+- Windows : raccourci "CheckMate" du menu Démarrer
+- Linux : `checkmate-watcher setup`
 
 Pour changer le mot de passe seul :
 
@@ -111,6 +110,8 @@ checkmate-watcher self-test --notify
 
 Le diagnostic vérifie le mot de passe, la signature, le navigateur, le
 trousseau, le démarrage automatique, le planning et le dossier de données.
+Sur Windows, relance le raccourci "CheckMate" et utilise "Tester la
+notification" dans l'assistant.
 
 Le chemin des logs s'affiche avec :
 
@@ -119,8 +120,7 @@ checkmate-watcher --config ~/.config/checkmate-watcher/config.toml check-config
 ```
 
 Sur Linux : `journalctl --user -u checkmate-watcher -f`.
-Sur Windows : le fichier `checkmate-watcher.log` dans le dossier de logs affiché
-par `check-config`.
+Sur Windows : `%LOCALAPPDATA%\checkmate-watcher\Logs\checkmate-watcher.log`.
 
 ## Désinstallation
 
