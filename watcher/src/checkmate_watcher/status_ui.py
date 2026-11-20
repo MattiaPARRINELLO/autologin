@@ -161,6 +161,7 @@ STATUS_HTML = """<!doctype html>
       <button type="button" class="primary" data-action="configure">Reconfigurer</button>
       <button type="button" class="secondary" data-action="test-notification">Tester la notification</button>
       <button type="button" class="secondary" data-action="check-update">Vérifier les mises à jour</button>
+      <button type="button" class="primary" data-action="install-update" id="updateButton" hidden>Installer la mise à jour</button>
       <button type="button" class="secondary" data-action="open-logs">Ouvrir les logs</button>
       <button type="button" class="ghost" data-action="quit">Quitter CheckMate</button>
     </div>
@@ -271,11 +272,25 @@ async function runAction(action) {
   if (action === "quit") {
     if (!window.confirm("Quitter CheckMate ? La surveillance sera arretee.")) return;
   }
+  if (action === "install-update" && !window.confirm(
+    "Installer la mise a jour ? CheckMate va s'arreter puis redemarrer."
+  )) return;
   setMessage("En cours...");
   try {
     const result = await api("/api/action", { action });
     setMessage(result.message || "Fait.", "ok");
-    if (action === "quit") {
+    if (action === "check-update" && result.available) {
+      const button = document.getElementById("updateButton");
+      button.textContent = "Installer " + result.version;
+      button.hidden = false;
+    }
+    if (action === "install-update") {
+      stopped = true;
+      clearInterval(timer);
+      document.querySelectorAll("[data-action]").forEach((button) => {
+        button.disabled = true;
+      });
+    } else if (action === "quit") {
       stopped = true;
       clearInterval(timer);
       document.getElementById("stateDot").className = "state-dot outside";

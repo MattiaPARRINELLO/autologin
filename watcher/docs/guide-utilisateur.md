@@ -172,6 +172,19 @@ rm -rf ~/.local/share/checkmate-watcher
 rm -rf ~/.config/checkmate-watcher
 ```
 
+## Mettre à jour
+
+Le tableau de bord propose la mise à jour : "Vérifier les mises à jour", puis
+"Installer X.Y.Z". CheckMate télécharge le paquet, vérifie sa somme SHA256 et
+l'installe en arrière-plan. La configuration et la signature sont conservées.
+
+En terminal :
+
+```bash
+checkmate-watcher update --check
+checkmate-watcher update --yes
+```
+
 ## Limites
 
 - La machine doit être allumée et la session ouverte. En veille, la reprise est

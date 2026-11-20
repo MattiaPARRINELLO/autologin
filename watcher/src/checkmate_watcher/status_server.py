@@ -20,9 +20,10 @@ from .autostart import current_executable
 from .config import Config
 from .notifications import Notifier
 from .paths import data_dir, default_log_file
+from .self_update import update_now
 from .status_data import build_snapshot
 from .status_ui import STATUS_HTML
-from .updates import check_for_update
+from .updates import UpdateError, check_for_update
 
 logger = logging.getLogger(__name__)
 
@@ -154,6 +155,22 @@ class StatusSession:
             "message": f"Mise à jour disponible : {release.tag}",
         }
 
+    def install_update(self) -> dict:
+        try:
+            version = update_now(self.config)
+        except UpdateError as exc:
+            raise StatusError(str(exc)) from exc
+        except Exception as exc:
+            raise StatusError(f"mise a jour impossible : {exc}") from exc
+        return {
+            "ok": True,
+            "version": version,
+            "message": (
+                f"Mise a jour {version} en cours. CheckMate redemarre dans "
+                "quelques secondes."
+            ),
+        }
+
     def configure(self) -> dict:
         executable = current_executable()
         command = [
@@ -272,6 +289,8 @@ class _Handler(BaseHTTPRequestHandler):
                 result = self.session.test_notification()
             elif action == "check-update":
                 result = self.session.check_update()
+            elif action == "install-update":
+                result = self.session.install_update()
             elif action == "open-logs":
                 result = self.session.open_logs()
             elif action == "quit":

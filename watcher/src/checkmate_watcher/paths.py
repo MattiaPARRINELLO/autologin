@@ -43,3 +43,7 @@ def default_state_file() -> Path:
 
 def default_log_file() -> Path:
     return log_dir() / "checkmate-watcher.log"
+
+
+def default_update_dir() -> Path:
+    return data_dir() / "updates"

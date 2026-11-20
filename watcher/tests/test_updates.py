@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from checkmate_watcher.updates import (
     Release,
     check_for_update,
@@ -84,3 +86,128 @@ def test_check_for_update_refuse_les_prereleases():
     assert (
         check_for_update("0.1.0", include_prerelease=False, releases=releases) is None
     )
+
+
+def test_parse_release_collecte_les_assets():
+    parsed = parse_release(
+        {
+            "tag_name": "watcher-v0.4.2",
+            "assets": [
+                {
+                    "name": "CheckMate-Setup-0.4.2.exe",
+                    "browser_download_url": "https://example.com/setup.exe",
+                    "size": 42,
+                },
+                {"name": "SHA256SUMS.txt", "browser_download_url": "u"},
+            ],
+        }
+    )
+    assert parsed is not None
+    assert len(parsed.assets) == 2
+    setup = parsed.find_asset("CheckMate-Setup-", ".exe")
+    assert setup is not None
+    assert setup.size == 42
+    assert parsed.asset("SHA256SUMS.txt") is not None
+
+
+def test_platform_asset():
+    from checkmate_watcher.updates import Asset, platform_asset
+
+    assets = (
+        Asset("CheckMate-Setup-0.4.2.exe", "u"),
+        Asset("CheckMate-linux-0.4.2.tar.gz", "v"),
+        Asset("SHA256SUMS.txt", "w"),
+    )
+    parsed = Release(
+        tag="watcher-v0.4.2",
+        version=(0, 4, 2),
+        url="",
+        name="",
+        prerelease=True,
+        assets=assets,
+    )
+    assert platform_asset(parsed, "win32").name.endswith(".exe")
+    assert platform_asset(parsed, "linux").name.endswith(".tar.gz")
+    assert platform_asset(parsed, "darwin") is None
+
+
+def test_parse_checksums():
+    from checkmate_watcher.updates import parse_checksums
+
+    digest = "a" * 64
+    text = (
+        f"{digest}  CheckMate-linux-0.4.2.tar.gz\nb"
+        + "b" * 63
+        + " *autre.zip\nignore\n"
+    )
+    parsed = parse_checksums(text)
+    assert parsed["CheckMate-linux-0.4.2.tar.gz"] == digest
+    assert parsed["autre.zip"] == "b" * 64
+
+
+def test_verify_checksum(tmp_path):
+    import hashlib
+
+    from checkmate_watcher.updates import UpdateError, verify_checksum
+
+    file = tmp_path / "paquet.bin"
+    file.write_bytes(b"contenu")
+    digest = hashlib.sha256(b"contenu").hexdigest()
+    verify_checksum(file, {"paquet.bin": digest})
+    with pytest.raises(UpdateError):
+        verify_checksum(file, {"paquet.bin": "0" * 64})
+    with pytest.raises(UpdateError):
+        verify_checksum(file, {})
+
+
+def test_download_update(tmp_path):
+    import hashlib
+
+    from checkmate_watcher.updates import Asset, download_update
+
+    payload = tmp_path / "CheckMate-linux-0.4.2.tar.gz"
+    payload.write_bytes(b"archive")
+    digest = hashlib.sha256(b"archive").hexdigest()
+    sums = tmp_path / "SHA256SUMS.txt"
+    sums.write_text(f"{digest}  CheckMate-linux-0.4.2.tar.gz\n", encoding="utf-8")
+    release = Release(
+        tag="watcher-v0.4.2",
+        version=(0, 4, 2),
+        url="",
+        name="",
+        prerelease=True,
+        assets=(
+            Asset("CheckMate-linux-0.4.2.tar.gz", payload.as_uri()),
+            Asset("SHA256SUMS.txt", sums.as_uri()),
+        ),
+    )
+    target_dir = tmp_path / "download"
+    archive = download_update(release, target_dir, platform="linux")
+    assert archive.name == "CheckMate-linux-0.4.2.tar.gz"
+    assert archive.read_bytes() == b"archive"
+
+
+def test_download_update_somme_invalide(tmp_path):
+    import hashlib
+
+    from checkmate_watcher.updates import Asset, UpdateError, download_update
+
+    payload = tmp_path / "CheckMate-linux-0.4.2.tar.gz"
+    payload.write_bytes(b"archive")
+    sums = tmp_path / "SHA256SUMS.txt"
+    sums.write_text(
+        hashlib.sha256(b"autre").hexdigest() + "  CheckMate-linux-0.4.2.tar.gz\n"
+    )
+    release = Release(
+        tag="watcher-v0.4.2",
+        version=(0, 4, 2),
+        url="",
+        name="",
+        prerelease=True,
+        assets=(
+            Asset("CheckMate-linux-0.4.2.tar.gz", payload.as_uri()),
+            Asset("SHA256SUMS.txt", sums.as_uri()),
+        ),
+    )
+    with pytest.raises(UpdateError):
+        download_update(release, tmp_path / "download", platform="linux")

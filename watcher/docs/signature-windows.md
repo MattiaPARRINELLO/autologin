@@ -49,8 +49,8 @@ règles du CA/B Forum. Surdimensionné pour ce projet.
 ## Vérifier une signature
 
 ```powershell
-signtool verify /pa CheckMate-Setup-0.4.1.exe
-Get-AuthenticodeSignature .\CheckMate-Setup-0.4.1.exe
+signtool verify /pa CheckMate-Setup-0.5.0.exe
+Get-AuthenticodeSignature .\CheckMate-Setup-0.5.0.exe
 ```
 
 ## État actuel
@@ -64,5 +64,5 @@ Si tu obtiens un certificat au format PFX :
 
 ```powershell
 $env:CHECKMATE_PFX_PASSWORD = "..."
-.\packaging\sign-windows.ps1 -Pfx .\certificat.pfx -Path .\dist-installer\CheckMate-Setup-0.4.1.exe
+.\packaging\sign-windows.ps1 -Pfx .\certificat.pfx -Path .\dist-installer\CheckMate-Setup-0.5.0.exe
 ```

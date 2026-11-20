@@ -10,7 +10,7 @@
   ![Tests](https://img.shields.io/badge/tests-85%20passing-brightgreen)
   ![Statut](https://img.shields.io/badge/statut-pr%C3%A9--version-orange)
 
-  [Télécharger](https://github.com/MattiaPARRINELLO/autologin/releases/tag/watcher-v0.4.1) ·
+  [Télécharger](https://github.com/MattiaPARRINELLO/autologin/releases/tag/watcher-v0.5.0) ·
   [Documentation](watcher/docs/README.md) ·
   [Présentation](watcher/presentation/index.html) ·
   [Vie privée](PRIVACY.md)
@@ -85,8 +85,8 @@ Tu restes responsable de l'usage de ta signature et du respect des règles de to
 ### Les étapes
 
 1. Va sur la page de la pré-version :
-   [CheckMate desktop 0.4.1](https://github.com/MattiaPARRINELLO/autologin/releases/tag/watcher-v0.4.1).
-2. Télécharge `CheckMate-Setup-0.4.1.exe`.
+   [CheckMate desktop 0.5.0](https://github.com/MattiaPARRINELLO/autologin/releases/tag/watcher-v0.5.0).
+2. Télécharge `CheckMate-Setup-0.5.0.exe`.
 3. Lance l'installeur. Il s'installe dans ton dossier utilisateur, sans demander
    les droits administrateur.
 4. Windows peut afficher un avertissement SmartScreen. C'est normal tant que la
@@ -104,17 +104,26 @@ session ; la case est cochée par défaut.
 
 ### Mettre à jour
 
-Aujourd'hui, la mise à jour est manuelle : télécharge le nouvel installeur
-depuis la page des releases et lance-le. La configuration et la signature sont
-conservées.
+La mise à jour se fait depuis CheckMate, sans retélécharger à la main :
 
-CheckMate vérifie aussi les nouvelles versions au démarrage et affiche une
-notification avec le lien de téléchargement, une seule fois par version. Pour
-forcer la vérification :
+1. ouvre le tableau de bord
+2. clique sur "Vérifier les mises à jour"
+3. si une version est disponible, clique sur "Installer X.Y.Z"
+
+CheckMate télécharge le paquet, vérifie sa somme SHA256, puis l'installe en
+arrière-plan avant de redémarrer. La configuration et la signature sont
+conservées. Sur Windows, l'installeur ferme l'application puis la relance. Sur
+Linux, le service s'arrête, l'archive est déployée, puis le service redémarre.
+
+En ligne de commande :
 
 ```bash
-checkmate-watcher check-update
+checkmate-watcher update --check
+checkmate-watcher update --yes
 ```
+
+Si une mise à jour casse quelque chose, réinstalle la version précédente depuis
+la page des releases.
 
 L'installation automatique des mises à jour arrivera après la mise en place de
 la signature de code, pour ne pas exécuter un binaire non signé.
@@ -134,8 +143,8 @@ la signature de code, pour ne pas exécuter un binaire non signé.
 ### Les étapes
 
 ```bash
-tar -xzf CheckMate-linux-0.4.1.tar.gz
-cd CheckMate-linux-0.4.1
+tar -xzf CheckMate-linux-0.5.0.tar.gz
+cd CheckMate-linux-0.5.0
 ./install.sh
 ```
 
@@ -372,7 +381,7 @@ rm -rf ~/.config/checkmate-watcher
 
 ## État du projet
 
-- Version actuelle : **0.4.1**, pré-version publique.
+- Version actuelle : **0.5.0**, pré-version publique.
 - Validation Windows effectuée sur un runner GitHub Actions : bundle,
   connexion, signature, toast, Credential Manager, tâche planifiée et
   installeur.

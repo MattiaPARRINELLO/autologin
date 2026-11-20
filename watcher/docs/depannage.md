@@ -89,6 +89,18 @@ Sous Linux, la fenêtre native demande GTK et WebKitGTK. Installe `python-gobjec
 et `webkit2gtk-4.1` sur Arch et Garuda, ou `python3-gi` et `gir1.2-webkit2-4.1`
 sur Debian et Ubuntu. Sans eux, CheckMate ouvre la page dans le navigateur.
 
+## La mise à jour échoue
+
+CheckMate refuse d'installer un paquet dont la somme SHA256 ne correspond pas à
+celle publiée. Vérifie la connexion réseau, puis réessaie. En cas d'échec
+répété, télécharge l'installeur depuis la page des releases et lance-le à la
+main.
+
+Si l'application ne redémarre pas après la mise à jour, relance-la depuis le
+menu des applications. Les logs se trouvent dans
+`~/.local/state/checkmate-watcher/log/checkmate-watcher.log` sous Linux, et dans
+`%LOCALAPPDATA%\checkmate-watcher\logs` sous Windows.
+
 ## L'icône de notification est un carré plein
 
 Sous Linux, CheckMate publie une icône StatusNotifierItem avec un vrai pixmap de

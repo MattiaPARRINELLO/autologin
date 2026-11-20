@@ -35,12 +35,13 @@ from .credentials import (
 from .logging_setup import setup_logging
 from .notifications import Notifier
 from .paths import default_config_path, default_log_file
+from .self_update import update_now
 from .setup_server import run_setup
 from .signature import SignatureError, load_signature, parse_points, save_signature
 from .state import StateStore
 from .status_server import read_runtime, status_alive
 from .support import build_support_bundle
-from .updates import check_for_update, fetch_releases
+from .updates import UpdateError, check_for_update, fetch_releases
 from .watcher import run_loop
 from .window import open_url
 
@@ -162,6 +163,7 @@ def build_parser() -> argparse.ArgumentParser:
             "support-bundle",
             "import-signature",
             "check-update",
+            "update",
             "stats",
             "status",
         ],
@@ -174,6 +176,16 @@ def build_parser() -> argparse.ArgumentParser:
         "--dry-run", action="store_true", help="detecte sans notifier ni signer"
     )
     parser.add_argument("--auto", action="store_true", help="signe sans confirmation")
+    parser.add_argument(
+        "--yes",
+        action="store_true",
+        help="update : installer sans demander de confirmation",
+    )
+    parser.add_argument(
+        "--check",
+        action="store_true",
+        help="update : verifier seulement, sans installer",
+    )
     parser.add_argument("--output", help="support-bundle : chemin de l'archive")
     parser.add_argument("--file", help="import-signature : fichier JSON")
     parser.add_argument(
@@ -490,6 +502,40 @@ def command_check_update(config: Config) -> int:
     return 0
 
 
+def command_update(config: Config, *, check_only: bool, assume_yes: bool) -> int:
+    try:
+        release = check_for_update(
+            __version__,
+            include_prerelease=config.updates.include_prerelease,
+        )
+    except Exception as exc:  # noqa: BLE001
+        print(f"verification impossible : {exc}")
+        return 1
+    if release is None:
+        print(f"CheckMate {__version__} est a jour")
+        return 0
+    print(f"Mise a jour disponible : {release.tag}")
+    if check_only:
+        print(release.url)
+        return 0
+    if not assume_yes:
+        try:
+            answer = input("Installer maintenant ? [o/N] ").strip().lower()
+        except EOFError:
+            answer = ""
+        if answer not in {"o", "oui", "y", "yes"}:
+            print("Annule")
+            return 1
+    print("Telechargement et verification de la somme...")
+    try:
+        version = update_now(config)
+    except UpdateError as exc:
+        print(f"mise a jour impossible : {exc}")
+        return 1
+    print(f"Installation de {version} en cours. CheckMate redemarre.")
+    return 0
+
+
 def command_install_autostart(config_path: Path) -> int:
     executable = current_executable()
     config_path = config_path.expanduser().resolve()
@@ -550,6 +596,8 @@ def main(argv: list[str] | None = None) -> int:
         return command_import_signature(config, args.file)
     if args.command == "check-update":
         return command_check_update(config)
+    if args.command == "update":
+        return command_update(config, check_only=args.check, assume_yes=args.yes)
     if args.command == "stats":
         return command_stats(config)
     if args.command == "status":
