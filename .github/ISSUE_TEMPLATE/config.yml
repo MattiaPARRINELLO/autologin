@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Politique de sécurité
+    url: https://github.com/MattiaPARRINELLO/autologin/security/policy
+    about: Signaler une faille en privé, sans ouvrir d'issue publique.
+  - name: Guide utilisateur
+    url: https://github.com/MattiaPARRINELLO/autologin/blob/main/watcher/docs/guide-utilisateur.md
+    about: Installation, configuration, mise à jour et dépannage.
+  - name: Guide de contribution
+    url: https://github.com/MattiaPARRINELLO/autologin/blob/main/CONTRIBUTING.md
+    about: Branches, tests, conventions de commit et procédure de PR.

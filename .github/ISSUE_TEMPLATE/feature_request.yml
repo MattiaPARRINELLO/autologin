@@ -1,0 +1,48 @@
+name: Proposer une fonctionnalité
+description: Décrire un besoin et une solution envisagée
+title: "[feat] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Merci de décrire le besoin avant la solution. Les propositions doivent
+        rester dans le périmètre du projet : surveillance de l'émargement CESAR,
+        application de bureau, extension navigateur et outillage de release.
+  - type: textarea
+    id: besoin
+    attributes:
+      label: Besoin
+      description: Quel problème veux-tu résoudre, pour quel usage ?
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Solution envisagée
+      description: Décris le comportement attendu, sans imposer une implémentation.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives
+      description: Qu'as-tu essayé ou écarté ?
+    validations:
+      required: false
+  - type: dropdown
+    id: canal
+    attributes:
+      label: Canal visé
+      options:
+        - stable
+        - beta
+        - indifférent
+    validations:
+      required: true
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Vérifications
+      options:
+        - label: J'ai vérifié qu'une proposition similaire n'existe pas déjà.
+          required: true
