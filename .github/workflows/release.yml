@@ -9,7 +9,39 @@ permissions:
   contents: write
 
 jobs:
+  channel:
+    runs-on: ubuntu-latest
+    outputs:
+      prerelease: ${{ steps.detect.outputs.prerelease }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detecter le canal du tag
+        id: detect
+        env:
+          PYTHONPATH: watcher/src
+        run: |
+          output="$(python3 -m checkmate_watcher.release_channel "$GITHUB_REF_NAME")"
+          echo "$output"
+          echo "$output" >> "$GITHUB_OUTPUT"
+
+      - name: Verifier que le tag vient de la bonne branche
+        shell: bash
+        env:
+          PYTHONPATH: watcher/src
+        run: |
+          branch="$(python3 -m checkmate_watcher.release_channel "$GITHUB_REF_NAME" | sed -n 's/^branch=//p')"
+          channel="$(python3 -m checkmate_watcher.release_channel "$GITHUB_REF_NAME" | sed -n 's/^channel=//p')"
+          git fetch --no-tags origin "$branch:refs/remotes/origin/$branch"
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" "refs/remotes/origin/$branch"; then
+            echo "::error::Tag $GITHUB_REF_NAME : un tag $channel doit etre construit depuis la branche $branch."
+            exit 1
+          fi
+
   windows:
+    needs: channel
     runs-on: windows-latest
     defaults:
       run:
@@ -34,7 +66,7 @@ jobs:
       - name: Construire l'installeur
         shell: pwsh
         run: |
-          $version = $env:GITHUB_REF_NAME -replace '^watcher-v','' -replace '^v',''
+          $version = ($env:GITHUB_REF_NAME -replace '^watcher-v','' -replace '^v','') -replace '-.*$',''
           & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "/DMyAppVersion=$version" "packaging\checkmate.iss"
 
       - name: Publier l'installeur non signe
@@ -67,6 +99,7 @@ jobs:
           if-no-files-found: error
 
   linux:
+    needs: channel
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -83,7 +116,9 @@ jobs:
         run: uv sync
 
       - name: Archive Linux
-        run: bash packaging/build-linux.sh "${GITHUB_REF_NAME#watcher-v}"
+        run: |
+          version="${GITHUB_REF_NAME#watcher-v}"
+          bash packaging/build-linux.sh "${version%%-*}"
 
       - uses: actions/upload-artifact@v4
         with:
@@ -92,7 +127,7 @@ jobs:
           if-no-files-found: error
 
   release:
-    needs: [windows, linux]
+    needs: [channel, windows, linux]
     runs-on: ubuntu-latest
 
     steps:
@@ -119,5 +154,5 @@ jobs:
       - uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
-          prerelease: true
+          prerelease: ${{ needs.channel.outputs.prerelease == 'true' }}
           files: release-assets/*
