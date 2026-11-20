@@ -138,17 +138,19 @@ class StatusSession:
     def check_update(self) -> dict:
         release = check_for_update(
             __version__,
-            include_prerelease=self.config.updates.include_prerelease,
+            channel=self.config.updates.channel,
         )
         if release is None:
             return {
                 "ok": True,
                 "available": False,
+                "channel": self.config.updates.channel,
                 "message": f"CheckMate {__version__} est à jour.",
             }
         return {
             "ok": True,
             "available": True,
+            "channel": self.config.updates.channel,
             "version": release.version_text,
             "tag": release.tag,
             "url": release.url,

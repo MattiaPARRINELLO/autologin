@@ -15,6 +15,9 @@ from . import __version__
 GITHUB_REPO = "MattiaPARRINELLO/autologin"
 RELEASES_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases?per_page=30"
 TAG_PREFIX = "watcher-"
+STABLE_CHANNEL = "stable"
+BETA_CHANNEL = "beta"
+CHANNELS = (STABLE_CHANNEL, BETA_CHANNEL)
 USER_AGENT = "checkmate-watcher"
 CHECKSUMS_NAME = "SHA256SUMS.txt"
 LINUX_PREFIX = "CheckMate-linux-"
@@ -28,10 +31,31 @@ class Asset:
     size: int = 0
 
 
+@dataclass(frozen=True, order=True)
+class Version:
+    """Version ordonnable : une beta precede toujours sa version stable."""
+
+    major: int
+    minor: int
+    patch: int
+    stage: int = 1  # 0 = beta, 1 = stable
+    number: int = 0
+
+    @property
+    def is_beta(self) -> bool:
+        return self.stage == 0
+
+    def __str__(self) -> str:
+        base = f"{self.major}.{self.minor}.{self.patch}"
+        if self.is_beta:
+            return f"{base}-beta.{self.number}"
+        return base
+
+
 @dataclass(frozen=True)
 class Release:
     tag: str
-    version: tuple[int, int, int]
+    version: Version
     url: str
     name: str
     prerelease: bool
@@ -40,7 +64,7 @@ class Release:
 
     @property
     def version_text(self) -> str:
-        return ".".join(str(part) for part in self.version)
+        return str(self.version)
 
     def asset(self, name: str) -> Asset | None:
         for item in self.assets:
@@ -55,11 +79,24 @@ class Release:
         return None
 
 
-def parse_version(text: str) -> tuple[int, int, int] | None:
-    match = re.search(r"(\d+)\.(\d+)\.(\d+)", text or "")
+VERSION_PATTERN = re.compile(r"(\d+)\.(\d+)\.(\d+)(?:-(beta)(?:\.?(\d+))?)?")
+
+
+def parse_version(text: str) -> Version | None:
+    """Lit une version X.Y.Z ou X.Y.Z-beta.N, ordonnable.
+
+    Une beta est strictement inferieure a sa version stable, et deux betas
+    successives sont ordonnees. Les tags historiques sans suffixe restent lus
+    comme des versions stables.
+    """
+    match = VERSION_PATTERN.search(text or "")
     if not match:
         return None
-    return tuple(int(part) for part in match.groups())  # type: ignore[return-value]
+    major, minor, patch = (int(part) for part in match.groups()[:3])
+    if match.group(4):
+        number = int(match.group(5) or 1)
+        return Version(major, minor, patch, stage=0, number=number)
+    return Version(major, minor, patch)
 
 
 def parse_release(data: dict) -> Release | None:
@@ -95,13 +132,29 @@ def parse_release(data: dict) -> Release | None:
     )
 
 
+def include_prerelease_for(
+    channel: str = STABLE_CHANNEL,
+    include_prerelease: bool | None = None,
+) -> bool:
+    """Resout le canal en acceptation des prereleases.
+
+    `include_prerelease` reste accepte pour la compatibilite et prend le pas
+    lorsqu'il est fourni.
+    """
+    if include_prerelease is not None:
+        return include_prerelease
+    return str(channel).strip().lower() == BETA_CHANNEL
+
+
 def select_latest(
     releases: list[Release],
     *,
-    include_prerelease: bool = True,
+    channel: str = STABLE_CHANNEL,
+    include_prerelease: bool | None = None,
 ) -> Release | None:
+    accept_prerelease = include_prerelease_for(channel, include_prerelease)
     candidates = [
-        release for release in releases if include_prerelease or not release.prerelease
+        release for release in releases if accept_prerelease or not release.prerelease
     ]
     if not candidates:
         return None
@@ -130,7 +183,8 @@ def fetch_releases(timeout: int = 10) -> list[Release]:
 def check_for_update(
     current: str = __version__,
     *,
-    include_prerelease: bool = True,
+    channel: str = STABLE_CHANNEL,
+    include_prerelease: bool | None = None,
     releases: list[Release] | None = None,
 ) -> Release | None:
     current_version = parse_version(current)
@@ -138,7 +192,11 @@ def check_for_update(
         return None
     if releases is None:
         releases = fetch_releases()
-    latest = select_latest(releases, include_prerelease=include_prerelease)
+    latest = select_latest(
+        releases,
+        channel=channel,
+        include_prerelease=include_prerelease,
+    )
     if latest is None:
         return None
     if latest.version > current_version:

@@ -50,7 +50,11 @@ padding_ratio = 0.9
 [updates]
 # Verifie les nouvelles versions au demarrage et notifie une fois par version.
 enabled = true
-include_prerelease = true
+# Canal de mise a jour : "stable" (defaut) ignore les prereleases,
+# "beta" accepte les prereleases du canal beta.
+channel = "stable"
+# Ancien nom conserve : include_prerelease = true equivaut a channel = "beta"
+# lorsqu'il est present sans channel.
 
 [notifications]
 app_name = "CheckMate"

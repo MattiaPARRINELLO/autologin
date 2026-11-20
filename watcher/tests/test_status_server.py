@@ -4,9 +4,10 @@ import json
 import threading
 import urllib.error
 import urllib.request
+from dataclasses import replace
 from datetime import datetime
 
-from checkmate_watcher.config import default_config
+from checkmate_watcher.config import UpdatesConfig, default_config
 from checkmate_watcher.state import StateStore
 from checkmate_watcher.status_server import StatusSession, create_server
 
@@ -56,6 +57,7 @@ def test_tableau_de_bord(tmp_path):
         status, snapshot = call(base, "/api/status", token=session.token)
         assert status == 200
         assert snapshot["version"]
+        assert snapshot["channel"] == "stable"
         assert "counters" in snapshot
 
         session.test_notification = lambda: {"ok": True, "message": "test"}  # type: ignore[method-assign]
@@ -80,3 +82,38 @@ def test_tableau_de_bord(tmp_path):
         server.shutdown()
         server.server_close()
         thread.join(timeout=5)
+
+
+def test_check_update_utilise_le_canal(tmp_path, monkeypatch):
+    from checkmate_watcher import status_server
+    from checkmate_watcher.updates import Release, parse_version
+
+    seen = []
+    release = Release(
+        tag="watcher-v0.6.0-beta.1",
+        version=parse_version("0.6.0-beta.1"),
+        url="https://example.com",
+        name="beta",
+        prerelease=True,
+    )
+
+    def fake_check(current, **kwargs):
+        seen.append(kwargs.get("channel"))
+        return release
+
+    monkeypatch.setattr(status_server, "check_for_update", fake_check)
+    config = replace(
+        default_config(),
+        updates=UpdatesConfig(channel="beta"),
+    )
+    session = StatusSession(
+        config,
+        tmp_path / "config.toml",
+        StateStore(tmp_path / "state.json"),
+        datetime.now(),
+    )
+    result = session.check_update()
+    assert seen == ["beta"]
+    assert result["available"] is True
+    assert result["channel"] == "beta"
+    assert result["version"] == "0.6.0-beta.1"

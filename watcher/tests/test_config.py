@@ -114,3 +114,39 @@ password_env = "CHECKMATE_TEST_PASSWORD"
 def test_refuse_un_ficher_absent(tmp_path):
     with pytest.raises(ConfigError):
         load_config(tmp_path / "absent.toml")
+
+
+def test_canal_stable_par_defaut(tmp_path):
+    config = load_config(write_config(tmp_path))
+    assert config.updates.channel == "stable"
+    assert config.updates.include_prerelease is False
+
+
+def test_lit_le_canal_beta(tmp_path):
+    config = load_config(write_config(tmp_path, '[updates]\nchannel = "beta"'))
+    assert config.updates.channel == "beta"
+    assert config.updates.include_prerelease is True
+
+
+def test_alias_include_prerelease(tmp_path):
+    config = load_config(write_config(tmp_path, "[updates]\ninclude_prerelease = true"))
+    assert config.updates.channel == "beta"
+    config = load_config(
+        write_config(tmp_path, "[updates]\ninclude_prerelease = false")
+    )
+    assert config.updates.channel == "stable"
+
+
+def test_le_canal_prime_sur_l_alias(tmp_path):
+    config = load_config(
+        write_config(
+            tmp_path,
+            '[updates]\nchannel = "stable"\ninclude_prerelease = true',
+        )
+    )
+    assert config.updates.channel == "stable"
+
+
+def test_refuse_un_canal_inconnu(tmp_path):
+    with pytest.raises(ConfigError, match="channel doit valoir"):
+        load_config(write_config(tmp_path, '[updates]\nchannel = "nightly"'))

@@ -64,7 +64,7 @@ def test_install_windows_utilise_les_options_silencieuses(tmp_path):
 def test_prepare_signale_deja_a_jour(monkeypatch):
     class Config:
         class updates:
-            include_prerelease = True
+            channel = "beta"
 
     monkeypatch.setattr(self_update, "check_for_update", lambda *a, **k: None)
     with pytest.raises(UpdateError, match="deja a jour"):
