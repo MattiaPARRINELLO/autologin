@@ -2,8 +2,6 @@ from __future__ import annotations
 
 import threading
 
-import pytest
-
 from checkmate_watcher import window
 
 
@@ -38,14 +36,12 @@ class FakeBackend:
 
 def test_fenetre_native_absente(monkeypatch):
     monkeypatch.setattr(window, "_load_backend", lambda: None)
-    assert window.available() is False
     assert window.show("http://127.0.0.1:8080/?token=x") is False
 
 
 def test_fenetre_native_ouverte(monkeypatch):
     backend = FakeBackend()
     monkeypatch.setattr(window, "_load_backend", lambda: backend)
-    assert window.available() is True
     assert window.show("http://127.0.0.1:8080/?token=x") is True
     assert backend.started == 1
     opened = backend.windows[0]
@@ -96,13 +92,6 @@ def test_fermeture_ignore_les_erreurs():
     done = threading.Event()
     done.set()
     window._close_when_done(Broken(), done)
-
-
-def test_backend_reel_disponible():
-    pytest.importorskip("webview")
-    if not window._platform_ready():
-        pytest.skip("aucun moteur web de bureau sur cette machine")
-    assert window.available() is True
 
 
 def test_plateforme_sans_moteur_web(monkeypatch):

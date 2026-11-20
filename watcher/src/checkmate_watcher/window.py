@@ -72,10 +72,6 @@ def _load_backend() -> Any | None:
     return webview
 
 
-def available() -> bool:
-    return _load_backend() is not None
-
-
 def show(url: str, *, close_event: threading.Event | None = None) -> bool:
     """Ouvre une fenetre native et bloque jusqu'a sa fermeture.
 
