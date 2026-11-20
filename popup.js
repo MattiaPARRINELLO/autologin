@@ -109,7 +109,7 @@ document.addEventListener('DOMContentLoaded', () => {
    * @param {'info'|'success'|'error'} level
    */
   function appendExecutionLog(tag, message, level = 'info') {
-    persistExecutionLog('popup', tag, message, level);
+    persistExecutionLog(tag, message, level);
   }
 
   /**

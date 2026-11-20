@@ -47,7 +47,7 @@ const SITE_SELECTORS = {
 function log(tag, message, level = 'info') {
   const now = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit', fractionalSecondDigits: 3 });
   console.log(`[${now}][${tag}] ${message}`);
-  persistExecutionLog('background', tag, message, level);
+  persistExecutionLog(tag, message, level);
 }
 
 /**

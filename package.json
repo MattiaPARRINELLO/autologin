@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "lint": "eslint \"*.js\"",
-    "test:syntax": "node --check background.js && node --check content.js && node --check popup.js"
+    "test:syntax": "node --check background.js && node --check content.js && node --check popup.js && node --check shared.js"
   },
   "devDependencies": {
     "@eslint/js": "^9.34.0",

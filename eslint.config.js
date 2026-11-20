@@ -30,4 +30,10 @@ export default [
       "no-empty": ["error", { allowEmptyCatch: true }],
     },
   },
+  {
+    files: ["content.js"],
+    languageOptions: {
+      sourceType: "script",
+    },
+  },
 ];
