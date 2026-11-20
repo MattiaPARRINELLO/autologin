@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from checkmate_watcher.browser import (
     LaunchOptions,
+    bundled_browser_present,
+    bundled_chromium_path,
     platform_channel,
     resolve_launch_options,
 )
@@ -57,6 +59,19 @@ def test_aucun_navigateur_disponible(monkeypatch):
         FakeBrowserType("/absent/chrome"), config, platform="linux"
     )
     assert options == LaunchOptions()
+
+
+def test_bundled_chromium_path_trouve_le_binaire(tmp_path):
+    binary = tmp_path / "chromium-1234" / "chrome-linux" / "chrome"
+    binary.parent.mkdir(parents=True)
+    binary.write_text("")
+    assert bundled_chromium_path("linux", tmp_path) == str(binary)
+    assert bundled_browser_present("linux", tmp_path) is True
+
+
+def test_bundled_chromium_path_absent(tmp_path):
+    assert bundled_chromium_path("linux", tmp_path) is None
+    assert bundled_browser_present("linux", tmp_path) is False
 
 
 def test_windows_choisit_edge_ou_chrome():

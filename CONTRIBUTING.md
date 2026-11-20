@@ -40,12 +40,20 @@ uvx ruff format --check src tests
 uv run pytest -q
 ```
 
-Le test de bout en bout de l'emulateur est ignore si Chromium n'est pas
-disponible :
+Les tests de bout en bout (`tests/test_emulator_e2e.py`) sont ignores par
+defaut. Ils demandent Chromium et lancent eux-memes l'emulateur CESAR sur un
+port libre : rien a demarrer a la main.
 
 ```bash
-uv run pytest -q tests/test_emulator_e2e.py
+cd watcher
+uv run playwright install chromium   # ou installe Chromium, Chrome ou Edge
+CHECKMATE_E2E=1 uv run pytest -q tests/test_emulator_e2e.py
 ```
+
+Sans `CHECKMATE_E2E=1`, pytest ignore ces deux tests et affiche la raison
+(`tests e2e desactives : definir CHECKMATE_E2E=1`). Si aucun Chromium n'est
+trouve, ni celui de Playwright ni un navigateur systeme, les tests sont aussi
+ignores avec `aucun Chromium disponible`.
 
 ## Workflow de contribution
 
@@ -212,5 +220,9 @@ cd watcher
 uvx ruff check src tests
 uvx ruff format --check src tests
 uv run pytest -q
-uv run pytest -q tests/test_emulator_e2e.py
+CHECKMATE_E2E=1 uv run pytest -q tests/test_emulator_e2e.py
 ```
+
+Les tests e2e sont facultatifs pour une contribution ordinaire : la CI ne les
+lance pas. Ils servent a verifier le parcours complet detection puis signature
+sur l'emulateur.

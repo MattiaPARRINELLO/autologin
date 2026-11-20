@@ -71,17 +71,31 @@ def playwright_cache_dir(platform: str | None = None) -> Path:
     return Path.home() / ".cache/ms-playwright"
 
 
+BUNDLED_CHROMIUM_PATTERNS = (
+    "chromium-*/chrome-linux*/chrome",
+    "chromium-*/chrome-win*/chrome.exe",
+    "chromium-*/chrome-mac*/Chromium.app/Contents/MacOS/Chromium",
+)
+
+
+def bundled_chromium_path(
+    platform: str | None = None,
+    root: Path | None = None,
+) -> str | None:
+    """Chemin du Chromium installe par `playwright install chromium`."""
+    cache = root or playwright_cache_dir(platform)
+    for pattern in BUNDLED_CHROMIUM_PATTERNS:
+        for candidate in sorted(cache.glob(pattern)):
+            if candidate.is_file():
+                return str(candidate)
+    return None
+
+
 def bundled_browser_present(
     platform: str | None = None,
     root: Path | None = None,
 ) -> bool:
-    cache = root or playwright_cache_dir(platform)
-    patterns = (
-        "chromium-*/chrome-linux*/chrome",
-        "chromium-*/chrome-win*/chrome.exe",
-        "chromium-*/chrome-mac*/Chromium.app/Contents/MacOS/Chromium",
-    )
-    return any(cache.glob(pattern) for pattern in patterns)
+    return bundled_chromium_path(platform, root) is not None
 
 
 def system_chromium() -> str | None:

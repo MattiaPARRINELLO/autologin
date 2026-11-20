@@ -243,11 +243,17 @@ Ouvre `http://127.0.0.1:8787/admin` et clique sur "Ouvrir l'emargement".
 Le cycle suivant doit detecter le bouton et proposer la signature. L'etat passe
 a "signe" dans l'admin.
 
-Test complet automatise (Chromium requis) :
+Test complet automatise (Chromium requis). Le test lance lui-meme l'emulateur
+sur un port libre, il n'y a pas de serveur a demarrer :
 
 ```bash
+uv run playwright install chromium   # ou un Chromium / Chrome / Edge systeme
 CHECKMATE_E2E=1 uv run pytest tests/test_emulator_e2e.py -v
 ```
+
+Sans `CHECKMATE_E2E=1`, ces tests sont ignores et pytest affiche la raison
+(`tests e2e desactives : definir CHECKMATE_E2E=1`). Sans Chromium, ils sont
+ignores avec `aucun Chromium disponible`.
 
 ### 2. Contre le vrai CESAR, sans risque
 
