@@ -16,8 +16,10 @@ Le watcher est un processus unique qui :
 6. expose un tableau de bord local (HTTP sur `127.0.0.1`) et une icone de
    notification tant qu'il tourne.
 
-Aucun service distant de CheckMate n'intervient : le seul reseau sortant va vers
-CESAR et, si les mises a jour sont activees, vers l'API GitHub des releases.
+Aucun service CheckMate n'intervient dans la surveillance : le seul reseau
+sortant va vers CESAR, vers l'API GitHub des releases si les mises a jour sont
+activees, et vers le compteur de statistiques anonymes si `[analytics]` reste
+active.
 
 ## Carte des modules
 
@@ -43,6 +45,7 @@ CESAR et, si les mises a jour sont activees, vers l'API GitHub des releases.
 | `tray.py`, `sni.py` | icone de notification : `pystray` et StatusNotifierItem Linux |
 | `autostart.py` | service systemd utilisateur ou tache planifiee Windows |
 | `updates.py` | lecture des releases GitHub, choix du canal et verification du SHA256 |
+| `analytics.py` | compteurs d'usage anonymes : installation et signature |
 | `self_update.py` | installation d'une mise a jour par un processus detache |
 | `support.py` | archive de diagnostic sans mot de passe ni signature |
 | `paths.py`, `logging_setup.py` | emplacements portables et journalisation avec rotation |
