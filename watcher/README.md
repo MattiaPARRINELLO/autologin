@@ -23,6 +23,17 @@ Les chemins sont portables via `platformdirs` : `~/.config/checkmate-watcher` su
 Linux, `%APPDATA%\checkmate-watcher` sur Windows. Les logs tournent dans
 `checkmate-watcher.log` avec rotation, en plus de stdout.
 
+## Onboarding
+
+```bash
+checkmate-watcher setup
+```
+
+Ouvre une page locale en 5 etapes : presentation, identifiants avec test de
+connexion reel, signature, planning, test de notification et installation du
+demarrage automatique. Aucune donnee ne sort de la machine et la page n'est
+accessible que depuis 127.0.0.1 avec un jeton aleatoire.
+
 ## Windows
 
 L'installeur `.exe` n'est pas encore publie. En attendant, sur une machine avec

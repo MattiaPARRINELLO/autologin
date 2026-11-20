@@ -40,10 +40,10 @@ def set_password(service: str, username: str, password: str) -> bool:
         return False
     try:
         keyring.set_password(service, username, password)
+        return keyring.get_password(service, username) == password
     except Exception as exc:  # noqa: BLE001
         logger.warning("ecriture dans le trousseau impossible : %s", exc)
         return False
-    return True
 
 
 def delete_password(service: str, username: str) -> bool:

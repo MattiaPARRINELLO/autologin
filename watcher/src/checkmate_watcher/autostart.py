@@ -168,6 +168,24 @@ def autostart_enabled() -> bool:
     return False
 
 
+def restart_autostart() -> bool:
+    """Relance le service ou la tache apres un changement de configuration."""
+    if sys.platform.startswith("win"):
+        schtasks = shutil.which("schtasks")
+        if not schtasks:
+            return False
+        _run([schtasks, "/End", "/TN", TASK_NAME])
+        result = _run([schtasks, "/Run", "/TN", TASK_NAME])
+        return result.returncode == 0
+    if sys.platform == "linux":
+        systemctl = shutil.which("systemctl")
+        if not systemctl:
+            return False
+        result = _run([systemctl, "--user", "restart", UNIT_NAME])
+        return result.returncode == 0
+    return False
+
+
 def current_executable() -> Path:
     """Chemin de la commande a relancer au demarrage."""
     candidate = Path(sys.argv[0]).resolve()

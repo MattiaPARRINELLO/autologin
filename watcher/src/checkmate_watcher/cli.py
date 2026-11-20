@@ -31,6 +31,7 @@ from .credentials import (
 from .logging_setup import setup_logging
 from .notifications import Notifier
 from .paths import default_config_path
+from .setup_server import run_setup
 from .signature import SignatureError, load_signature, parse_points, save_signature
 from .watcher import run_loop
 
@@ -148,6 +149,7 @@ def build_parser() -> argparse.ArgumentParser:
             "set-password",
             "install-autostart",
             "uninstall-autostart",
+            "setup",
         ],
     )
     parser.add_argument(
@@ -158,6 +160,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--dry-run", action="store_true", help="detecte sans notifier ni signer"
     )
     parser.add_argument("--auto", action="store_true", help="signe sans confirmation")
+    parser.add_argument(
+        "--no-browser",
+        action="store_true",
+        help="setup : ne pas ouvrir le navigateur automatiquement",
+    )
     parser.add_argument(
         "--notify",
         action="store_true",
@@ -382,6 +389,12 @@ def command_uninstall_autostart() -> int:
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     setup_logging(args.verbose)
+
+    if args.command == "setup":
+        return run_setup(
+            Path(args.config).expanduser(),
+            open_browser=not args.no_browser,
+        )
 
     needs_password = args.command in {"run", "capture", "test-notification"}
     try:
