@@ -23,6 +23,7 @@ logger = logging.getLogger(__name__)
 MAX_CONSECUTIVE_ERRORS = 3
 
 MAX_WAIT_CHUNK = 300.0
+HEARTBEAT_SECONDS = 300.0
 
 SIGN = "sign"
 ABSENT = "absent"
@@ -227,6 +228,8 @@ async def run_loop(
     consecutive_errors = 0
     prompt_cooldowns: dict[str, float] = {}
     window_key: str | None = None
+    last_window_key: str | None = None
+    next_heartbeat = asyncio.get_running_loop().time() + HEARTBEAT_SECONDS
     try:
         while True:
             if schedule.enabled:
@@ -268,12 +271,29 @@ async def run_loop(
                     await session.open(headless=poll_headless)
                     continue
 
+            if schedule.enabled:
+                current = schedule.window_key(datetime.now())
+                if current != last_window_key:
+                    window = schedule.active_window(datetime.now())
+                    if window is not None:
+                        logger.info(
+                            "surveillance active sur le creneau %s (toutes les %ss)",
+                            window,
+                            config.watcher.poll_interval,
+                        )
+                    last_window_key = current
+
             try:
                 signal = await session.check()
                 consecutive_errors = 0
 
                 if signal is None:
                     logger.debug("rien a signer")
+                    if asyncio.get_running_loop().time() >= next_heartbeat:
+                        logger.info("surveillance active, aucun emargement detecte")
+                        next_heartbeat = (
+                            asyncio.get_running_loop().time() + HEARTBEAT_SECONDS
+                        )
                 elif state.seen(signal.key):
                     logger.debug("emargement deja traite : %s", signal.key)
                 elif (
