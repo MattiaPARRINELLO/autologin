@@ -331,8 +331,8 @@ def _test_connection(
                 watcher=replace(candidate.watcher, profile_dir=Path(profile)),
             )
             session = CesarSession(accessible)
-            await session.open(headless=True)
             try:
+                await session.open(headless=True)
                 await session.login()
             finally:
                 await session.close()

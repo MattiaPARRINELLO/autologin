@@ -253,7 +253,9 @@ async def command_capture(config: Config) -> int:
 
     print("Ouverture de la fenetre de capture...")
     async with async_playwright() as playwright:
-        options = resolve_launch_options(playwright.chromium, config).as_kwargs()
+        options = resolve_launch_options(
+            playwright.chromium, config.watcher.executable_path
+        ).as_kwargs()
         try:
             browser = await playwright.chromium.launch(headless=False, **options)
         except Exception as exc:
