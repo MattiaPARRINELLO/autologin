@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import secrets
 import sys
+import tempfile
 import threading
 from dataclasses import replace
 from http.server import ThreadingHTTPServer
@@ -18,7 +20,7 @@ from .autostart import (
     enable_autostart,
     restart_autostart,
 )
-from .browser import resolve_launch_options
+from .cesar import CesarSession
 from .config import (
     Config,
     ConfigError,
@@ -31,7 +33,7 @@ from .local_http import LocalError, LocalHandler
 from .local_http import create_server as _create_server
 from .notifications import Notifier
 from .paths import default_env_path
-from .schedule import Schedule, ScheduleError, parse_days, parse_windows
+from .schedule import DAY_NAMES, Schedule, ScheduleError, parse_days, parse_windows
 from .setup_ui import SETUP_HTML
 from .signature import SignatureError, load_signature, parse_points, save_signature
 from .window import open_url
@@ -72,15 +74,7 @@ class SetupSession:
             "has_signature": has_signature,
             "days": [
                 name
-                for name, index in (
-                    ("mon", 0),
-                    ("tue", 1),
-                    ("wed", 2),
-                    ("thu", 3),
-                    ("fri", 4),
-                    ("sat", 5),
-                    ("sun", 6),
-                )
+                for name, index in sorted(DAY_NAMES.items(), key=lambda item: item[1])
                 if index in self.config.schedule.days
             ],
             "windows": [str(window) for window in self.config.schedule.windows],
@@ -293,8 +287,7 @@ class SetupSession:
 def _test_connection(
     config: Config, base_url: str, username: str, password: str
 ) -> str:
-    from playwright.sync_api import sync_playwright
-
+    """Reproduit la connexion reelle, avec les selecteurs et le flux du watcher."""
     candidate = replace(
         config,
         cesar=replace(
@@ -304,32 +297,25 @@ def _test_connection(
             password=password,
         ),
     )
-    selectors = candidate.selectors
 
-    with sync_playwright() as playwright:
-        options = resolve_launch_options(playwright.chromium, candidate).as_kwargs()
-        browser = playwright.chromium.launch(headless=True, **options)
-        try:
-            page = browser.new_page()
-            page.set_default_timeout(20000)
-            page.goto(
-                candidate.cesar.login_url,
-                wait_until="domcontentloaded",
-                timeout=45000,
+    async def attempt() -> None:
+        with tempfile.TemporaryDirectory(prefix="checkmate-login-") as profile:
+            accessible = replace(
+                candidate,
+                watcher=replace(candidate.watcher, profile_dir=Path(profile)),
             )
-            page.locator(selectors.login_username[0]).first.fill(username)
-            page.locator(selectors.login_password[0]).first.fill(password)
-            page.locator(selectors.login_submit[0]).first.click()
-            page.wait_for_url(
-                lambda url: candidate.cesar.login_path not in url,
-                timeout=45000,
-            )
-            page.wait_for_timeout(1200)
-        except Exception as exc:
-            message = str(exc).splitlines()[0]
-            raise SetupError(f"connexion echouee : {message}") from exc
-        finally:
-            browser.close()
+            session = CesarSession(accessible)
+            await session.open(headless=True)
+            try:
+                await session.login()
+            finally:
+                await session.close()
+
+    try:
+        asyncio.run(asyncio.wait_for(attempt(), timeout=90))
+    except Exception as exc:
+        message = str(exc).splitlines()[0] or exc.__class__.__name__
+        raise SetupError(f"connexion echouee : {message}") from exc
     return "Connexion reussie."
 
 

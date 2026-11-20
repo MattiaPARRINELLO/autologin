@@ -175,6 +175,30 @@ def test_parcours_onboarding(tmp_path, monkeypatch):
         thread.join(timeout=5)
 
 
+def test_le_test_de_connexion_reutilise_la_session(tmp_path, monkeypatch):
+    calls: list[str] = []
+
+    class FakeSession:
+        def __init__(self, config):
+            calls.append("init")
+
+        async def open(self, headless=None):
+            calls.append(f"open:{headless}")
+
+        async def login(self):
+            calls.append("login")
+
+        async def close(self):
+            calls.append("close")
+
+    monkeypatch.setattr(setup_server, "CesarSession", FakeSession)
+    message = setup_server._test_connection(
+        local_config(tmp_path), "https://cesar.example.fr", "eleve", "secret"
+    )
+    assert message == "Connexion reussie."
+    assert calls == ["init", "open:True", "login", "close"]
+
+
 def test_signature_invalide_refusee(tmp_path):
     session = SetupSession(tmp_path / "config.toml", local_config(tmp_path), "jeton")
     try:

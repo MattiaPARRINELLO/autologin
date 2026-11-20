@@ -186,15 +186,15 @@ class CesarSession:
         if self.page is None:
             raise CesarError("navigateur non demarre")
         if self.config.cesar.login_path in self.page.url:
-            await self._login()
+            await self.login()
             return
 
         username = await self._first_visible(self.selectors.login_username)
         password = await self._first_visible(self.selectors.login_password)
         if username is not None and password is not None:
-            await self._login()
+            await self.login()
 
-    async def _login(self) -> None:
+    async def login(self) -> None:
         if self.page is None:
             raise LoginError("navigateur non demarre")
         logger.info("connexion a CESAR")
