@@ -91,9 +91,14 @@ Apres avoir cree la config reelle (`~/.config/checkmate-watcher/config.toml`) :
 ./scripts/install-service.sh
 ```
 
-Le script cree le lien dans `~/.local/bin`, installe l'unite systemd
-utilisateur, cree `~/.config/checkmate-watcher/env` pour le mot de passe, puis
+Le script copie l'application dans `~/.local/share/checkmate-watcher/app` avec
+son propre venv, cree `~/.local/bin/checkmate-watcher`, installe l'unite
+systemd, cree `~/.config/checkmate-watcher/env` pour le mot de passe, puis
 active et demarre le service. Il redemarre a chaque connexion.
+
+L'installation ne depend plus du dossier de travail : relance simplement
+`./scripts/install-service.sh` apres une mise a jour du code. Si le venv de
+l'application disparait, le lanceur le reconstruit automatiquement avec `uv`.
 
 ```bash
 # suivre les logs

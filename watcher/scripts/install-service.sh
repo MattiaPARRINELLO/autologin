@@ -1,16 +1,18 @@
 #!/usr/bin/env bash
-# Installe le watcher en service utilisateur systemd (demarrage a la connexion).
+# Installe le watcher dans ~/.local/share/checkmate-watcher/app et l'active
+# comme service utilisateur systemd. Re-executable pour mettre a jour.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+APP_DIR="$HOME/.local/share/checkmate-watcher/app"
 CONFIG_DIR="$HOME/.config/checkmate-watcher"
 CONFIG="$CONFIG_DIR/config.toml"
 UNIT_DIR="$HOME/.config/systemd/user"
-BIN_DIR="$HOME/.local/bin"
+BIN="$HOME/.local/bin/checkmate-watcher"
 
-if [ ! -x "$ROOT/.venv/bin/checkmate-watcher" ]; then
-    echo "Dependances absentes. Lance d'abord :"
-    echo "  cd $ROOT && uv sync"
+UV_BIN="$(command -v uv || true)"
+if [ -z "$UV_BIN" ]; then
+    echo "uv est requis : https://docs.astral.sh/uv/"
     exit 1
 fi
 
@@ -23,8 +25,34 @@ if [ ! -f "$CONFIG" ]; then
     exit 1
 fi
 
-mkdir -p "$UNIT_DIR" "$BIN_DIR" "$CONFIG_DIR"
-ln -sf "$ROOT/.venv/bin/checkmate-watcher" "$BIN_DIR/checkmate-watcher"
+mkdir -p "$APP_DIR" "$UNIT_DIR" "$CONFIG_DIR" "$HOME/.local/bin"
+
+if command -v rsync >/dev/null 2>&1; then
+    rsync -a --delete \
+        --exclude .venv \
+        --exclude __pycache__ \
+        --exclude .pytest_cache \
+        --exclude .ruff_cache \
+        "$ROOT/" "$APP_DIR/"
+else
+    find "$APP_DIR" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
+    cp -a "$ROOT/pyproject.toml" "$ROOT/uv.lock" "$ROOT/src" "$APP_DIR/"
+fi
+
+"$UV_BIN" sync --project "$APP_DIR" >/dev/null
+echo "Application installee dans $APP_DIR"
+
+rm -f "$BIN"
+cat > "$BIN" <<EOF
+#!/usr/bin/env bash
+# Reconstruit le venv automatiquement s'il a disparu.
+if [ -x "$APP_DIR/.venv/bin/checkmate-watcher" ]; then
+    exec "$APP_DIR/.venv/bin/checkmate-watcher" "\$@"
+fi
+exec "$UV_BIN" run --project "$APP_DIR" checkmate-watcher "\$@"
+EOF
+chmod +x "$BIN"
+
 install -m 644 "$ROOT/systemd/checkmate-watcher.service" "$UNIT_DIR/checkmate-watcher.service"
 
 if [ ! -f "$CONFIG_DIR/env" ]; then
@@ -34,12 +62,13 @@ if [ ! -f "$CONFIG_DIR/env" ]; then
 # CHECKMATE_PASSWORD=motdepasse
 EOF
     chmod 600 "$CONFIG_DIR/env"
-    echo "Fichier cree : $CONFIG_DIR/env"
+    echo "Fichier cree : $CONFIG_DIR/env (renseigne CHECKMATE_PASSWORD)"
 fi
 
 systemctl --user import-environment DISPLAY WAYLAND_DISPLAY XDG_RUNTIME_DIR 2>/dev/null || true
 systemctl --user daemon-reload
-systemctl --user enable --now checkmate-watcher.service
+systemctl --user enable checkmate-watcher.service
+systemctl --user restart checkmate-watcher.service
 systemctl --user --no-pager status checkmate-watcher.service || true
 
 echo
