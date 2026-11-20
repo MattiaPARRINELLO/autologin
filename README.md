@@ -92,8 +92,8 @@ signature et du respect des règles de ton école. Voir les
 
 1. Va sur la page de la dernière version stable :
    [CheckMate desktop](https://github.com/MattiaPARRINELLO/autologin/releases/latest).
-2. Télécharge `CheckMate-Setup-<version>.exe` (par exemple
-   `CheckMate-Setup-0.6.2.exe`).
+2. Télécharge `CheckMate-Setup-<version>.exe`, en remplaçant `<version>` par le
+   numéro affiché sur la page des releases.
 3. Lance l'installeur. Il s'installe dans ton dossier utilisateur, sans demander
    les droits administrateur.
 4. Windows peut afficher un avertissement SmartScreen. C'est normal tant que la
@@ -172,9 +172,9 @@ la signature de code, pour ne pas exécuter un binaire non signé.
 ### Les étapes
 
 ```bash
-# remplace 0.6.2 par la version affichee sur la page des releases
-tar -xzf CheckMate-linux-0.6.2.tar.gz
-cd CheckMate-linux-0.6.2
+# remplace <version> par le numero affiche sur la page des releases
+tar -xzf CheckMate-linux-<version>.tar.gz
+cd CheckMate-linux-<version>
 ./install.sh
 ```
 
@@ -411,8 +411,14 @@ rm -rf ~/.config/checkmate-watcher
 
 ## État du projet
 
-- Version stable actuelle : **0.6.2**. Les mises à jour suivent le canal
-  `stable` par défaut ; le canal `beta` reçoit les préversions.
+- Version stable actuelle : celle du badge **version stable** en haut de ce
+  README et de la
+  [page des releases](https://github.com/MattiaPARRINELLO/autologin/releases/latest).
+  Les mises à jour suivent le canal `stable` par défaut ; le canal `beta` reçoit
+  les préversions.
+- macOS : **pas encore supporté**. Le code contient des chemins `darwin`, mais
+  il n'existe ni release, ni démarrage automatique (`launchd` prévu), ni
+  validation réelle. Ne l'installe pas en pensant que c'est pris en charge.
 - Validation Windows effectuée sur un runner GitHub Actions : bundle,
   connexion, signature, toast, Credential Manager, tâche planifiée et
   installeur.
