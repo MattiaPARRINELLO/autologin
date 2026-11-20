@@ -128,6 +128,10 @@ plus des notes de release, et les deux finiraient par diverger. Une contribution
 qui change le comportement doit donc decrire le changement dans la description
 de la pull request pour qu'il se retrouve dans les notes de release.
 
+La documentation ne code jamais une version de release en dur : le README pointe
+sur `releases/latest` et sur le badge dynamique, et les exemples de fichiers
+utilisent `<version>`. Le job `Docs versions` refuserait un numero fige.
+
 Le parcours de support (questions, bugs, securite) est decrit dans
 [SUPPORT.md](SUPPORT.md).
 
@@ -170,7 +174,8 @@ Chaque pull request vers `main` doit passer :
 - `E2E emulateur` : pointage complet contre l'emulateur, avec Chromium ;
 - `Secrets (gitleaks)` : detection de secrets dans le diff ;
 - `Dependances (dependency-review)` : revue des dependances ajoutees ;
-- `PR title` : format conventionnel du titre.
+- `PR title` : format conventionnel du titre ;
+- `Docs versions` : aucune version de release codee en dur dans la documentation.
 
 `main` exige aussi une revue approuvee, la resolution des conversations, une
 branche a jour et un historique lineaire. Les poussees directes et les

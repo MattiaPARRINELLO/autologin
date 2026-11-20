@@ -17,7 +17,11 @@ La detection arrive au pire un intervalle apres l'ouverture par le formateur.
 |------------|---------------|--------------|------------|----------------|
 | Linux | notify-send, fallback D-Bus | zenity, fallback tkinter | Chromium systeme ou bundle | systemd utilisateur |
 | Windows | toast PowerShell, valide sur runner GitHub | tkinter | Edge ou Chrome installe | registre utilisateur valide |
-| macOS | osascript | tkinter | Chrome / Edge installe | launchd prevu |
+
+macOS n'est **pas encore supporte** : quelques chemins `darwin` existent dans le
+code (navigateur, notifications, trousseau), mais il n'y a ni release, ni
+demarrage automatique (`launchd` prevu), ni validation sur une machine reelle.
+Ne pas presenter l'application comme disponible sur macOS.
 
 Les chemins sont portables via `platformdirs` : `~/.config/checkmate-watcher` sur
 Linux, `%LOCALAPPDATA%\checkmate-watcher` sur Windows. Les logs tournent dans

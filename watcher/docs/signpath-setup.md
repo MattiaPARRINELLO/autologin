@@ -45,7 +45,7 @@ git push origin watcher-v1.0.0
 
 Le workflow :
 
-1. construit `CheckMate-Setup-1.0.0.exe`
+1. construit `CheckMate-Setup-<version>.exe`
 2. l'uploade comme artefact `windows-installer`
 3. demande la signature à SignPath
 4. uploade l'artefact `windows-installer-signed`
@@ -55,8 +55,8 @@ Le workflow :
 ## 4. Vérifier
 
 ```powershell
-signtool verify /pa CheckMate-Setup-1.0.0.exe
-Get-AuthenticodeSignature .\CheckMate-Setup-1.0.0.exe
+signtool verify /pa CheckMate-Setup-<version>.exe
+Get-AuthenticodeSignature .\CheckMate-Setup-<version>.exe
 ```
 
 La page de téléchargement mentionne déjà la SignPath Foundation :
