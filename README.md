@@ -426,10 +426,35 @@ rm -rf ~/.config/checkmate-watcher
 - [Branchement SignPath](watcher/docs/signpath-setup.md)
 - [Présentation HTML](watcher/presentation/index.html)
 
-## Pour les développeurs
+## Périmètre et statut des surfaces
 
-Le code de l'application est dans [`watcher/`](watcher/). Le README technique
-explique l'architecture, les tests, l'émulateur CESAR et les builds.
+Le dépôt contient plusieurs surfaces, avec des statuts différents :
+
+| Surface | Contenu | Statut |
+|---------|---------|--------|
+| [`watcher/`](watcher/) | application Python, CLI et tableau de bord local | maintenue, produit publié |
+| [`emulator/`](emulator/) | serveur CESAR de test | maintenue, outil de test |
+| extension à la racine | `manifest.json`, `background.js`, `content.js`, `popup.*` | figée, plus de nouvelles fonctionnalités |
+| [`ui/`](ui/) | tableau de bord expérimental en Rust (egui) | expérimentale, hors release |
+
+L'extension Chrome historique est remplacée par l'application de bureau : elle
+reste dans le dépôt pour référence, mais ne reçoit plus de fonctionnalités.
+`ui/` explore une interface native alternative ; elle n'est pas livrée avec les
+releases et peut casser sans préavis.
+
+## Architecture du watcher
+
+Le code de l'application est dans [`watcher/`](watcher/). Son architecture est
+décrite dans [watcher/docs/architecture.md](watcher/docs/architecture.md) : carte
+des modules, déroulé d'un cycle de surveillance, état persistant, tableau de
+bord, onboarding et mises à jour.
+
+En résumé, `watcher.py` porte la boucle, `cesar.py` pilote CESAR avec Playwright,
+`browser.py` choisit le navigateur, `schedule.py` décide des créneaux,
+`status_server.py` et `setup_server.py` servent les interfaces locales, et
+`self_update.py` installe les mises à jour vérifiées.
+
+## Développement
 
 ```bash
 cd watcher
@@ -449,15 +474,6 @@ Pour contribuer, lire [CONTRIBUTING.md](CONTRIBUTING.md) : environnement,
 conventions de commit, checks obligatoires et cycle de release. Le projet suit
 le [code de conduite](CODE_OF_CONDUCT.md). Pour une faille de sécurité, utiliser
 la [politique de sécurité](SECURITY.md), sans issue publique.
-
-## Ancienne extension Chrome
-
-Le dépôt contient encore l'extension historique à la racine (`manifest.json`,
-`popup.html`, `content.js`, `background.js`). Elle automatise le pointage dans
-un onglet CESAR.
-
-L'application de bureau la remplace : elle ne nécessite aucun onglet ouvert et
-garde le navigateur invisible pendant l'attente.
 
 ## Licence
 

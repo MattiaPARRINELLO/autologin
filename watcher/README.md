@@ -33,6 +33,7 @@ le navigateur.
 ## Documentation
 
 - [Guide utilisateur](docs/guide-utilisateur.md)
+- [Architecture](docs/architecture.md)
 - [Vie privée](docs/vie-privee.md)
 - [Dépannage](docs/depannage.md)
 - [Mentions légales](docs/mentions-legales.md)

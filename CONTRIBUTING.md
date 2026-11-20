@@ -22,16 +22,27 @@ de la soumettre.
 
 ## Perimetre
 
-Le depot contient :
+Le depot contient plusieurs surfaces. Leur statut indique quoi modifier et quoi
+eviter :
 
-- `watcher/` : application Python de surveillance et d'emargement, CLI et
-  tableau de bord local ;
-- l'extension navigateur a la racine (`background.js`, `content.js`, `popup.*`) ;
-- `emulator/` : serveur CESAR de test ;
-- `.github/workflows/` : CI, securite et release.
+| Surface | Contenu | Statut |
+|---------|---------|--------|
+| `watcher/` | application Python, CLI et tableau de bord local | maintenue, produit publie |
+| `emulator/` | serveur CESAR de test | maintenue, outil de test |
+| extension a la racine | `manifest.json`, `background.js`, `content.js`, `popup.*` | figee, plus de nouvelles fonctionnalites |
+| `ui/` | tableau de bord experimental en Rust (egui) | experimentale, hors release |
+| `.github/workflows/` | CI, securite et release | maintenue |
+
+L'extension Chrome historique est remplacee par l'application de bureau : elle
+reste dans le depot pour reference, mais ne recoit plus de fonctionnalites.
+`ui/` explore une interface native alternative ; elle n'est pas livree avec les
+releases et peut casser sans preavis.
 
 Les propositions doivent rester dans ce perimetre. Les problemes du site CESAR
 lui-meme ne sont pas traites ici.
+
+L'architecture du watcher est decrite dans
+[`watcher/docs/architecture.md`](watcher/docs/architecture.md).
 
 ## Environnement de developpement
 
