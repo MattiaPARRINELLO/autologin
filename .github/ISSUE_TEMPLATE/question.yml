@@ -1,0 +1,61 @@
+name: Poser une question
+description: Demander de l'aide sur l'installation, la configuration ou l'usage
+title: "[question] "
+labels: ["question"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Avant d'ouvrir cette question, consulte le guide utilisateur et le
+        guide de depannage : beaucoup de problemes d'installation, de
+        configuration ou de mise a jour y sont deja traites.
+        Ne joins jamais de mot de passe, de jeton ou de capture contenant des
+        donnees personnelles. Pour une faille de securite, utilise la politique
+        de securite.
+  - type: dropdown
+    id: composant
+    attributes:
+      label: Composant
+      description: Quelle partie du projet est concernee ?
+      options:
+        - watcher
+        - extension
+        - UI Rust
+        - emulateur
+        - CI et release
+        - autre
+    validations:
+      required: true
+  - type: textarea
+    id: question
+    attributes:
+      label: Question
+      description: Que cherches-tu a faire, et qu'as-tu deja essaye ?
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version de CheckMate
+      description: Visible dans le tableau de bord ou avec `checkmate-watcher --version`.
+    validations:
+      required: false
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Plateforme
+      options:
+        - Windows
+        - Linux
+        - Autre
+    validations:
+      required: true
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Verifications
+      options:
+        - label: J'ai consulte le guide utilisateur et le guide de depannage.
+          required: true
+        - label: J'ai retire toute donnee sensible de ce message.
+          required: true

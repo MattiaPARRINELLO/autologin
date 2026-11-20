@@ -16,6 +16,20 @@ body:
       description: Que se passe-t-il, et que devrait-il se passer ?
     validations:
       required: true
+  - type: dropdown
+    id: composant
+    attributes:
+      label: Composant
+      description: Quelle partie du projet est concernee ?
+      options:
+        - watcher
+        - extension
+        - UI Rust
+        - emulateur
+        - CI et release
+        - autre
+    validations:
+      required: true
   - type: textarea
     id: reproduction
     attributes:
