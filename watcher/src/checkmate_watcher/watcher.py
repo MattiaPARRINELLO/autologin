@@ -71,16 +71,12 @@ class Pause:
 
 
 def _pause_reason(schedule, state, now: datetime) -> Pause | None:
-    if not schedule.enabled:
+    situation = schedule.situation(now, state.window_done)
+    if situation.reason not in {"outside", "signed"}:
         return None
     resume = now + timedelta(seconds=schedule.seconds_until_next(now))
-    window = schedule.active_window(now)
-    if window is None:
-        return Pause("hors plage", resume, None)
-    key = schedule.window_key(now)
-    if key and state.window_done(key):
-        return Pause("creneau deja signe", resume, key)
-    return None
+    label = "hors plage" if situation.reason == "outside" else "creneau deja signe"
+    return Pause(label, resume, situation.key)
 
 
 async def _wait_for_new_window(
