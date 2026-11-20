@@ -122,6 +122,28 @@ checkmate-watcher update --check
 checkmate-watcher update --yes
 ```
 
+### Canal stable ou beta
+
+Par défaut, CheckMate suit le canal `stable` : les préversions ne sont jamais
+proposées. Pour recevoir les betas, ajoute ceci dans `[updates]` du fichier de
+configuration :
+
+```toml
+[updates]
+channel = "beta"
+```
+
+Le canal est affiché dans le tableau de bord, à côté de la version. Le bouton
+d'installation installe toujours la version proposée pour le canal courant,
+sans réglage supplémentaire. Pour revenir au stable, remets `channel = "stable"`
+ou supprime la clé (valeur par défaut).
+
+L'ancienne clé `include_prerelease = true` reste acceptée comme alias de
+`channel = "beta"` lorsqu'elle est présente sans `channel`.
+
+Le format des tags et la procédure de stabilisation sont décrits dans
+[CONTRIBUTING.md](CONTRIBUTING.md).
+
 Si une mise à jour casse quelque chose, réinstalle la version précédente depuis
 la page des releases.
 
