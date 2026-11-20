@@ -16,6 +16,7 @@ from pathlib import Path
 
 from . import BUILD, __version__
 from .autostart import (
+    UNIT_NAME,
     autostart_enabled,
     current_executable,
     disable_autostart,
@@ -335,7 +336,7 @@ def command_self_test(config: Config, *, notify: bool = False) -> int:
     class Probe:
         executable_path = ""
 
-    options = resolve_launch_options(Probe(), config)
+    options = resolve_launch_options(Probe(), config.watcher.executable_path)
     if options.executable_path:
         checks.append(("navigateur", True, options.executable_path))
     elif options.channel:
@@ -439,7 +440,7 @@ def command_status(config: Config, config_path: Path) -> int:
         started = False
         if systemctl:
             result = subprocess.run(
-                [systemctl, "--user", "start", "checkmate-watcher.service"],
+                [systemctl, "--user", "start", UNIT_NAME],
                 check=False,
                 capture_output=True,
                 timeout=20,

@@ -36,6 +36,7 @@ def test_script_linux_echappe_les_chemins(tmp_path):
     script = script_path.read_text(encoding="utf-8")
     assert "'" + str(archive) + "'" in script
     assert "tar -xzf" in script
+    assert "systemctl --user stop checkmate-watcher.service" in script
     assert captured["kwargs"]["start_new_session"] is True
 
 
