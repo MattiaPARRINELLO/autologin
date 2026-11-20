@@ -86,15 +86,23 @@ def test_confirmation_windows_utilise_tkinter(monkeypatch):
 
 
 def test_confirmation_linux_bascule_sur_tkinter(monkeypatch):
-    monkeypatch.setattr(
-        notifications,
-        "ask_zenity",
-        lambda *args, **kwargs: None,
-    )
+    def unavailable(*args, **kwargs):
+        raise notifications.DialogUnavailable("zenity introuvable")
+
+    monkeypatch.setattr(notifications, "ask_zenity", unavailable)
+    monkeypatch.setattr(notifications, "ask_tkinter", lambda *args, **kwargs: False)
+    notifier = Notifier(platform="linux")
+    assert notifier.ask("present ?") is False
+
+
+def test_confirmation_expiree_ne_relance_pas_tkinter(monkeypatch):
+    monkeypatch.setattr(notifications, "ask_zenity", lambda *args, **kwargs: None)
     monkeypatch.setattr(
         notifications,
         "ask_tkinter",
-        lambda *args, **kwargs: False,
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("ne doit pas etre appele")
+        ),
     )
     notifier = Notifier(platform="linux")
-    assert notifier.ask("present ?") is False
+    assert notifier.ask("present ?", timeout=1) is None
