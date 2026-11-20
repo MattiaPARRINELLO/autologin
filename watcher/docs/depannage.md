@@ -85,8 +85,9 @@ $env:CHECKMATE_BROWSER = "1"
 CheckMate.exe status
 ```
 
-Sous Linux, la fenêtre native demande GTK et WebKitGTK. Sans eux, CheckMate
-ouvre la page dans le navigateur.
+Sous Linux, la fenêtre native demande GTK et WebKitGTK. Installe `python-gobject`
+et `webkit2gtk-4.1` sur Arch et Garuda, ou `python3-gi` et `gir1.2-webkit2-4.1`
+sur Debian et Ubuntu. Sans eux, CheckMate ouvre la page dans le navigateur.
 
 ## L'icône de notification est un carré plein
 

@@ -9,6 +9,8 @@ CONFIG_DIR="$HOME/.config/checkmate-watcher"
 CONFIG="$CONFIG_DIR/config.toml"
 UNIT_DIR="$HOME/.config/systemd/user"
 BIN="$HOME/.local/bin/checkmate-watcher"
+ICON_DIR="$HOME/.local/share/icons/hicolor/256x256/apps"
+DESKTOP_DIR="$HOME/.local/share/applications"
 
 UV_BIN="$(command -v uv || true)"
 if [ -z "$UV_BIN" ]; then
@@ -43,7 +45,7 @@ else
     cp -a "$ROOT/pyproject.toml" "$ROOT/uv.lock" "$ROOT/src" "$APP_DIR/"
 fi
 
-"$UV_BIN" sync --no-dev --project "$APP_DIR" >/dev/null
+"$ROOT/scripts/create-venv.sh" "$APP_DIR"
 echo "Application installee dans $APP_DIR"
 
 rm -f "$BIN"
@@ -56,6 +58,28 @@ fi
 exec "$UV_BIN" run --project "$APP_DIR" checkmate-watcher "\$@"
 EOF
 chmod +x "$BIN"
+
+mkdir -p "$ICON_DIR" "$DESKTOP_DIR"
+install -m 644 "$ROOT/assets/checkmate.png" "$ICON_DIR/checkmate.png"
+
+cat > "$DESKTOP_DIR/checkmate.desktop" <<EOF
+[Desktop Entry]
+Type=Application
+Name=CheckMate
+Comment=Surveillance de l'emargement CESAR
+Exec="$BIN" status
+Icon=checkmate
+Terminal=false
+Categories=Utility;Education;
+StartupNotify=true
+StartupWMClass=CheckMate
+EOF
+chmod 644 "$DESKTOP_DIR/checkmate.desktop"
+
+command -v update-desktop-database >/dev/null 2>&1 &&
+    update-desktop-database "$DESKTOP_DIR" >/dev/null 2>&1 || true
+command -v gtk-update-icon-cache >/dev/null 2>&1 &&
+    gtk-update-icon-cache -f -t "$HOME/.local/share/icons/hicolor" >/dev/null 2>&1 || true
 
 install -m 644 "$ROOT/systemd/checkmate-watcher.service" "$UNIT_DIR/checkmate-watcher.service"
 install -m 644 "$ROOT/systemd/checkmate-watchdog.service" "$UNIT_DIR/checkmate-watchdog.service"
@@ -80,6 +104,7 @@ systemctl --user --no-pager status checkmate-watcher.service || true
 
 echo
 echo "Service installe et demarre a chaque connexion."
+echo "Application disponible dans le menu : CheckMate"
 echo "Logs     : journalctl --user -u checkmate-watcher -f"
 echo "Arreter  : systemctl --user stop checkmate-watcher"
 echo "Desactiver : systemctl --user disable checkmate-watcher"

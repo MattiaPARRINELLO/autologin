@@ -19,6 +19,7 @@ class FakeBackend:
     def __init__(self, *, start_error: Exception | None = None) -> None:
         self.windows: list[dict] = []
         self.started = 0
+        self.options: dict = {}
         self.start_error = start_error
 
     def create_window(self, title: str, url: str, **options) -> FakeWindow:
@@ -28,8 +29,9 @@ class FakeBackend:
         )
         return handle
 
-    def start(self) -> None:
+    def start(self, **options) -> None:
         self.started += 1
+        self.options = options
         if self.start_error is not None:
             raise self.start_error
 

@@ -41,8 +41,11 @@ Télécharge l'archive `CheckMate-linux-<version>.tar.gz`, extrais-la, puis :
 `uv` est requis : https://docs.astral.sh/uv/getting-started/installation/
 
 L'installateur installe l'application dans `~/.local/share/checkmate-watcher`,
-crée le service utilisateur systemd et lance l'onboarding si aucune
-configuration n'existe.
+crée le service utilisateur systemd, ajoute une entrée **CheckMate** dans le menu
+des applications et lance l'onboarding si aucune configuration n'existe.
+
+L'entrée du menu ouvre le tableau de bord dans une fenêtre native, si PyGObject,
+GTK 3 et WebKit2 sont installés. Sinon, il s'ouvre dans le navigateur.
 
 ## Onboarding
 

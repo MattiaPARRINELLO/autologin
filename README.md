@@ -127,6 +127,9 @@ la signature de code, pour ne pas exécuter un binaire non signé.
 - [uv](https://docs.astral.sh/uv/getting-started/installation/) pour installer
   les dépendances
 - Chromium, Google Chrome ou Microsoft Edge
+- pour la fenêtre native : PyGObject, GTK 3 et WebKit2. Sur Arch et Garuda,
+  `python-gobject` et `webkit2gtk-4.1` ; sur Debian et Ubuntu, `python3-gi` et
+  `gir1.2-webkit2-4.1`. Sans eux, le tableau de bord s'ouvre dans le navigateur.
 
 ### Les étapes
 
@@ -137,8 +140,10 @@ cd CheckMate-linux-0.3.1
 ```
 
 L'installateur installe l'application dans ton dossier utilisateur, crée le
-service qui démarre à la connexion, puis lance l'assistant si aucune
-configuration n'existe.
+service qui démarre à la connexion, ajoute une entrée **CheckMate** dans le menu
+des applications, puis lance l'assistant si aucune configuration n'existe.
+
+L'entrée du menu ouvre le tableau de bord dans une fenêtre CheckMate native.
 
 ## L'assistant de configuration
 

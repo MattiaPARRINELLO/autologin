@@ -23,7 +23,7 @@ if ! command -v uv >/dev/null 2>&1; then
     exit 1
 fi
 
-uv sync --no-dev --project "$ROOT"
+"$ROOT/scripts/create-venv.sh" "$ROOT"
 
 CONFIG="$HOME/.config/checkmate-watcher/config.toml"
 if [ ! -f "$CONFIG" ]; then
