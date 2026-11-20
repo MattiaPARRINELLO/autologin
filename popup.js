@@ -17,6 +17,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const ctx = canvas.getContext('2d');
   const placeholder = document.getElementById('canvas-placeholder');
   const btnClear = document.getElementById('btn-clear');
+  const btnExportSignature = document.getElementById('btn-export-signature');
   const btnSave = document.getElementById('btn-save');
   const btnStart = document.getElementById('btn-start');
   const btnReportBug = document.getElementById('btn-report-bug');
@@ -265,6 +266,22 @@ document.addEventListener('DOMContentLoaded', () => {
     signatureData = [];
     hasSignature = false;
     placeholder.classList.remove('hidden');
+  });
+
+  /**
+   * Exporte la signature au format JSON, importable dans CheckMate.
+   */
+  btnExportSignature.addEventListener('click', () => {
+    if (signatureData.length === 0) return;
+    const blob = new Blob([JSON.stringify(signatureData, null, 2)], {
+      type: 'application/json'
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'checkmate-signature.json';
+    link.click();
+    URL.revokeObjectURL(url);
   });
 
   /**

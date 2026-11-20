@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import getpass
+import json
 import logging
 import os
 import shutil
@@ -34,6 +35,7 @@ from .notifications import Notifier
 from .paths import default_config_path, default_log_file
 from .setup_server import run_setup
 from .signature import SignatureError, load_signature, parse_points, save_signature
+from .support import build_support_bundle
 from .watcher import run_loop
 
 logger = logging.getLogger(__name__)
@@ -151,6 +153,8 @@ def build_parser() -> argparse.ArgumentParser:
             "install-autostart",
             "uninstall-autostart",
             "setup",
+            "support-bundle",
+            "import-signature",
         ],
     )
     parser.add_argument(
@@ -161,6 +165,8 @@ def build_parser() -> argparse.ArgumentParser:
         "--dry-run", action="store_true", help="detecte sans notifier ni signer"
     )
     parser.add_argument("--auto", action="store_true", help="signe sans confirmation")
+    parser.add_argument("--output", help="support-bundle : chemin de l'archive")
+    parser.add_argument("--file", help="import-signature : fichier JSON")
     parser.add_argument(
         "--no-browser",
         action="store_true",
@@ -370,6 +376,36 @@ def command_self_test(config: Config, *, notify: bool = False) -> int:
     return 0 if failures == 0 else 1
 
 
+def command_support_bundle(
+    config: Config, config_path: Path, output: str | None
+) -> int:
+    target = build_support_bundle(
+        config,
+        config_path,
+        Path(output).expanduser() if output else None,
+    )
+    print(f"archive creee : {target}")
+    print("elle ne contient ni mot de passe ni signature")
+    return 0
+
+
+def command_import_signature(config: Config, file_path: str | None) -> int:
+    if not file_path:
+        print("indique un fichier avec --file")
+        return 1
+    path = Path(file_path).expanduser()
+    try:
+        raw = path.read_text(encoding="utf-8")
+        data = json.loads(raw)
+        points = parse_points(data)
+    except (OSError, json.JSONDecodeError, SignatureError) as exc:
+        print(f"import impossible : {exc}")
+        return 1
+    save_signature(config.signature.file, points)
+    print(f"signature importee ({len(points)} points) dans {config.signature.file}")
+    return 0
+
+
 def command_install_autostart(config_path: Path) -> int:
     executable = current_executable()
     config_path = config_path.expanduser().resolve()
@@ -422,6 +458,12 @@ def main(argv: list[str] | None = None) -> int:
         return command_install_autostart(Path(args.config))
     if args.command == "uninstall-autostart":
         return command_uninstall_autostart()
+    if args.command == "support-bundle":
+        return command_support_bundle(
+            config, Path(args.config).expanduser(), args.output
+        )
+    if args.command == "import-signature":
+        return command_import_signature(config, args.file)
     if args.command == "check-config":
         return command_check_config(config)
     if args.command == "test-notification":

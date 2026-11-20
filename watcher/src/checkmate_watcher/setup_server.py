@@ -154,6 +154,22 @@ class SetupSession:
             message = "Identifiants enregistres pour le service."
         return {"ok": True, "message": message}
 
+    def import_signature(self, payload: dict) -> dict:
+        raw = payload.get("raw")
+        try:
+            data = raw if isinstance(raw, dict) else json.loads(raw)
+        except (TypeError, json.JSONDecodeError) as exc:
+            raise SetupError("JSON de signature invalide") from exc
+        try:
+            parsed = parse_points(data)
+        except SignatureError as exc:
+            raise SetupError(str(exc)) from exc
+        save_signature(self.config.signature.file, parsed)
+        return {
+            "ok": True,
+            "message": f"Signature importee ({len(parsed)} points).",
+        }
+
     def save_signature(self, payload: dict) -> dict:
         points = payload.get("points")
         try:
@@ -389,6 +405,8 @@ class _Handler(BaseHTTPRequestHandler):
                 result = self.session.save_credentials(payload)
             elif path == "/api/signature":
                 result = self.session.save_signature(payload)
+            elif path == "/api/import-signature":
+                result = self.session.import_signature(payload)
             elif path == "/api/schedule":
                 result = self.session.save_schedule(payload)
             elif path == "/api/test-notification":

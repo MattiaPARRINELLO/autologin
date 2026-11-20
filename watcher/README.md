@@ -28,6 +28,7 @@ Linux, `%APPDATA%\checkmate-watcher` sur Windows. Les logs tournent dans
 - [Guide utilisateur](docs/guide-utilisateur.md)
 - [Vie privée](docs/vie-privee.md)
 - [Dépannage](docs/depannage.md)
+- [Mentions légales](docs/mentions-legales.md)
 - [Validation Windows](docs/windows-validation.md)
 - [Présentation HTML](presentation/index.html)
 
@@ -69,6 +70,7 @@ checkmate-watcher self-test          # diagnostic complet
 checkmate-watcher set-password       # stocke le mot de passe dans le trousseau
 checkmate-watcher install-autostart  # tache planifiee / service systemd
 checkmate-watcher uninstall-autostart
+checkmate-watcher support-bundle
 ```
 
 ## Installation

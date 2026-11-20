@@ -301,6 +301,32 @@ SETUP_HTML = """<!doctype html>
     cursor: crosshair;
     touch-action: none;
   }
+  .import-line {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 14px;
+    font-size: 12.5px;
+    color: var(--muted);
+  }
+  .file-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 34px;
+    padding: 0 14px;
+    margin: 0;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--card);
+    color: var(--ink-2);
+    font-size: 12.5px;
+    cursor: pointer;
+  }
+  .file-button:hover { background: var(--raised); }
+  .file-button input { position: absolute; width: 0; height: 0; opacity: 0; }
+
   .checkline {
     display: flex;
     align-items: center;
@@ -438,6 +464,12 @@ SETUP_HTML = """<!doctype html>
       </div>
       <p class="lede">Dessine ta signature à la souris ou au doigt. Elle sera rejouée telle quelle dans le canvas de CESAR.</p>
       <canvas id="pad" width="640" height="240" aria-label="Zone de signature"></canvas>
+      <div class="import-line">
+        <span>Signature deja dans l'extension ?</span>
+        <label class="file-button" for="signatureFile">Importer le JSON
+          <input id="signatureFile" type="file" accept=".json,application/json">
+        </label>
+      </div>
       <div class="status" id="signatureStatus" aria-live="polite"></div>
       <div class="actions">
         <button type="button" class="secondary" onclick="clearPad()">Effacer</button>
@@ -681,6 +713,23 @@ async function saveSignature() {
     setStatus("signatureStatus", error.message, "err");
   }
 }
+
+document.getElementById("signatureFile").addEventListener("change", async (event) => {
+  const file = event.target.files[0];
+  if (!file) return;
+  const raw = await file.text();
+  try {
+    const data = await api("/api/import-signature", { raw });
+    state.signatureSaved = true;
+    document.getElementById("signatureNext").disabled = false;
+    document.getElementById("signatureBadge").hidden = false;
+    setStatus("signatureStatus", data.message, "ok");
+  } catch (error) {
+    setStatus("signatureStatus", error.message, "err");
+  } finally {
+    event.target.value = "";
+  }
+});
 
 async function saveSchedule() {
   const days = [...document.querySelectorAll("#days input:checked")].map((box) => box.value);

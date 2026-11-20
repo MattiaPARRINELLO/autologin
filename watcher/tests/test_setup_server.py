@@ -108,6 +108,31 @@ def test_parcours_onboarding(tmp_path, monkeypatch):
 
         status, _ = call(
             base,
+            "/api/import-signature",
+            token="jeton-test",
+            payload={
+                "raw": json.dumps(
+                    {
+                        "signatureData": [
+                            {"x": 1, "y": 2, "type": "start"},
+                            {"x": 3, "y": 4, "type": "end"},
+                        ]
+                    }
+                )
+            },
+        )
+        assert status == 200
+
+        status, _ = call(
+            base,
+            "/api/import-signature",
+            token="jeton-test",
+            payload={"raw": "pas du json"},
+        )
+        assert status == 400
+
+        status, _ = call(
+            base,
             "/api/signature",
             token="jeton-test",
             payload={

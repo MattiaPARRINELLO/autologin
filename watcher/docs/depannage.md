@@ -98,6 +98,12 @@ compte", la signature n'a pas été validée.
 
 ## Support
 
+Crée une archive propre avec :
+
+```bash
+checkmate-watcher support-bundle
+```
+
 Envoie :
 
 - la sortie de `self-test --notify` ;

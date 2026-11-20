@@ -47,7 +47,9 @@ configuration n'existe.
 1. **Mise en route** : ce que fait CheckMate et ce qui reste sur l'ordinateur.
 2. **Connexion CESAR** : identifiant et mot de passe, avec un test de connexion
    réel dans un navigateur invisible.
-3. **Signature** : dessin à la souris ou au doigt.
+3. **Signature** : dessin à la souris ou au doigt. Si tu utilisais l'extension,
+   clique sur "Exporter" dans sa section Signature, puis "Importer le JSON"
+   dans l'assistant.
 4. **Planning** : jours et créneaux surveillés. Par défaut, du lundi au vendredi,
    09:00-12:00 et 13:30-16:30.
 5. **Finition** : test de notification, démarrage automatique, récapitulatif.
@@ -81,6 +83,12 @@ Pour changer le mot de passe seul :
 
 ```bash
 checkmate-watcher set-password
+```
+
+Pour créer une archive de diagnostic sans secret :
+
+```bash
+checkmate-watcher support-bundle
 ```
 
 Pour oublier les émargements déjà traités, par exemple après un test :
