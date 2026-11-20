@@ -6,6 +6,7 @@ import argparse
 import asyncio
 import getpass
 import logging
+import os
 import shutil
 import sys
 from pathlib import Path
@@ -386,7 +387,16 @@ def command_uninstall_autostart() -> int:
     return 0
 
 
+def _ensure_console_streams() -> None:
+    """En mode fenetre (PyInstaller windowed), stdout et stderr valent None."""
+    if sys.stdout is None:
+        sys.stdout = open(os.devnull, "w", encoding="utf-8")  # noqa: SIM115
+    if sys.stderr is None:
+        sys.stderr = open(os.devnull, "w", encoding="utf-8")  # noqa: SIM115
+
+
 def main(argv: list[str] | None = None) -> int:
+    _ensure_console_streams()
     args = build_parser().parse_args(argv)
     setup_logging(args.verbose)
 

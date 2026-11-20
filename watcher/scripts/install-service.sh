@@ -30,6 +30,10 @@ mkdir -p "$APP_DIR" "$UNIT_DIR" "$CONFIG_DIR" "$HOME/.local/bin"
 if command -v rsync >/dev/null 2>&1; then
     rsync -a --delete \
         --exclude .venv \
+        --exclude .git \
+        --exclude build \
+        --exclude dist \
+        --exclude dist-installer \
         --exclude __pycache__ \
         --exclude .pytest_cache \
         --exclude .ruff_cache \

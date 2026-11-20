@@ -36,9 +36,10 @@ def setup_logging(verbose: bool = False, log_file: Path | None = None) -> Path:
     for handler in list(root.handlers):
         root.removeHandler(handler)
 
-    stream = logging.StreamHandler(_utf8_stream(sys.stdout))
-    stream.setFormatter(logging.Formatter(LOG_FORMAT, LOG_DATEFMT))
-    root.addHandler(stream)
+    if sys.stdout is not None:
+        stream = logging.StreamHandler(_utf8_stream(sys.stdout))
+        stream.setFormatter(logging.Formatter(LOG_FORMAT, LOG_DATEFMT))
+        root.addHandler(stream)
 
     file_handler = RotatingFileHandler(
         target,

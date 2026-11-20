@@ -1,0 +1,92 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: watcher
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Dependances
+        run: uv sync
+
+      - name: Bundle PyInstaller
+        run: uv run pyinstaller packaging/checkmate.spec --noconfirm --clean
+
+      - name: Inno Setup
+        run: choco install innosetup -y --no-progress
+
+      - name: Installeur
+        shell: pwsh
+        run: |
+          $version = $env:GITHUB_REF_NAME -replace '^v',''
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "/DMyAppVersion=$version" "packaging\checkmate.iss"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer
+          path: watcher/dist-installer/*.exe
+          if-no-files-found: error
+
+  linux:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: watcher
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Dependances
+        run: uv sync
+
+      - name: Archive Linux
+        run: bash packaging/build-linux.sh "${GITHUB_REF_NAME#v}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-archive
+          path: watcher/dist/*.tar.gz
+          if-no-files-found: error
+
+  release:
+    needs: [windows, linux]
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Sommes de controle
+        run: |
+          cd artifacts
+          find . -type f \( -name "*.exe" -o -name "*.tar.gz" \) -exec sha256sum {} \; > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            artifacts/**/*.exe
+            artifacts/**/*.tar.gz
+            artifacts/SHA256SUMS.txt
