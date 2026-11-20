@@ -9,7 +9,6 @@ const PROGRESS_STORAGE_KEY = 'pointageProgress';
 const PROGRESS_STALE_MS = 5 * 60 * 1000;
 
 document.addEventListener('DOMContentLoaded', () => {
-  // --- Références DOM ---
   const body = document.body;
   const usernameInput = document.getElementById('username');
   const passwordInput = document.getElementById('password');
@@ -37,7 +36,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const updateModalConfirm = document.getElementById('update-modal-confirm');
   const updateModalMessage = document.getElementById('update-modal-message');
 
-  // --- État du dessin ---
   let isDrawing = false;
   let signatureData = []; // Tableau de coordonnées [{x, y, type}]
   let hasSignature = false;
@@ -493,7 +491,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const username = usernameInput.value.trim();
     const password = passwordInput.value;
 
-    // Validation des champs
     if (!username) {
       updateStatusBar('Veuillez saisir un identifiant');
       appendExecutionLog('Configuration', 'Identifiant manquant', 'error');
@@ -510,7 +507,6 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    // Sauvegarde dans chrome.storage.local
     const lastAction = `Configuration sauvegardée — ${formatDateHeure()}`;
 
     chrome.storage.local.set({
@@ -549,16 +545,13 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
 
-      // Désactiver le bouton pendant l'exécution
-      setStartButtonLoading();
+        setStartButtonLoading();
       updateStatusBar('Lancement du pointage...');
       updateProgressBar({ message: 'Lancement du pointage…', pourcentage: 5, enCours: true, ts: Date.now() }, true);
       appendExecutionLog('Pointage', 'Demarrage du pointage', 'info');
 
-      // Envoyer le message au background.js pour démarrer le processus
-      chrome.runtime.sendMessage({ action: 'lancerPointage' }, (response) => {
-        // Réactiver le bouton
-        setStartButtonIdle();
+        chrome.runtime.sendMessage({ action: 'lancerPointage' }, (response) => {
+            setStartButtonIdle();
         updateProgressBar({ enCours: false });
 
         if (chrome.runtime.lastError) {

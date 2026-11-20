@@ -117,20 +117,17 @@
     return new Promise((resolve, reject) => {
       const liste = normaliserSelecteurs(selecteurs);
 
-      // Vérifier si l'élément existe déjà
       const element = trouverPremierElement(liste);
       if (element) {
         resolve(element);
         return;
       }
 
-      // Timer de timeout
       const timer = setTimeout(() => {
         observer.disconnect();
         reject(new Error(`Élément introuvable après ${timeout}ms : ${liste.join(' | ')}`));
       }, timeout);
 
-      // Observer les mutations du DOM
       const observer = new MutationObserver(() => {
         const el = trouverPremierElement(liste);
         if (el) {
@@ -249,7 +246,6 @@
    */
   async function replaySignature(canvasSelectors, signatureData) {
     try {
-      // Récupérer le canvas cible
       const canvasCible = trouverPremierElement(canvasSelectors);
       if (!canvasCible) {
         throw new Error(`Canvas cible introuvable : ${normaliserSelecteurs(canvasSelectors).join(' | ')}`);
@@ -306,7 +302,6 @@
         `[Signature] ${signatureData.length} points, canvas ${displayWidth}x${displayHeight}, echelle ${scale.toFixed(3)}`
       );
 
-      // Rejouer chaque point de la signature
       for (let i = 0; i < signatureData.length; i++) {
         const point = signatureData[i];
         const normalizedX = (point.x - minX) * scale;
@@ -317,12 +312,10 @@
         // Le popup peut encore bouger légèrement : recalcul à chaque point.
         const rectCourant = canvasCible.getBoundingClientRect();
 
-        // Coordonnées dans la page (pour clientX/clientY)
-        const clientX = rectCourant.left + x;
+          const clientX = rectCourant.left + x;
         const clientY = rectCourant.top + y;
 
-        // Options communes pour les événements
-        const eventOptions = {
+          const eventOptions = {
           bubbles: true,
           cancelable: true,
           clientX: clientX,
@@ -542,7 +535,6 @@
   async function clickValidation(buttonSelectors) {
     const bouton = await attendreElement(buttonSelectors, 5000);
 
-    // Simuler un survol puis un clic réaliste
     bouton.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
     await attendre(100);
     bouton.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
@@ -573,7 +565,6 @@
 
           log('Message lancerSignature reçu — démarrage du flux');
 
-          // 1. Chercher le bouton signature (timeout 30s — site lent)
           log(`Étape 1/8 — Recherche du bouton signature (${SITE_SELECTORS.signatureButton[0]}, timeout 30s)...`);
           let boutonSignature;
           try {
@@ -585,17 +576,14 @@
             return;
           }
 
-          // 2. Cliquer sur le bouton pour ouvrir le popup de signature
           boutonSignature.click();
           log('Étape 2/8 — Clic sur le bouton signature effectué, attente du canvas...');
 
-          // 3. Attendre l'apparition du canvas de signature (timeout 15s — popup lent)
           const canvasSelectors = SITE_SELECTORS.signatureCanvas;
           log('Étape 3/8 — Attente du canvas de signature (timeout 15s)...');
           await attendreElement(canvasSelectors, 15000);
           log('Étape 3/8 — Canvas de signature détecté dans le DOM');
 
-          // 4. Récupérer les données de signature depuis le storage
           log('Étape 4/8 — Récupération des données de signature depuis chrome.storage.local...');
           const result = await new Promise(resolve => {
             chrome.storage.local.get(['signatureData'], resolve);
@@ -608,17 +596,14 @@
           }
           log(`Étape 4/8 — ${result.signatureData.length} points de signature récupérés`);
 
-          // 5. Rejouer la signature sur le canvas
           log('Étape 5/8 — Replay de la signature sur le canvas...');
           await replaySignature(canvasSelectors, result.signatureData);
           log('Étape 5/8 — Signature rejouée avec succès');
 
-          // 6. Attendre que le canvas enregistre le tracé
           log('Étape 6/8 — Pause de 500ms pour laisser le canvas enregistrer le tracé...');
           await attendre(500);
           log('Étape 6/8 — Pause terminée');
 
-          // 7. Cliquer sur le bouton "Enregistrer"
           log(`Étape 7/8 — Clic sur le bouton Enregistrer (${SITE_SELECTORS.signatureSaveButton[0]})...`);
           // Capturer le contenu actuel du swal2 AVANT le clic pour détecter le changement
           const swalAvant = trouverPremierElement(SITE_SELECTORS.confirmationPopup);
@@ -627,7 +612,6 @@
           await clickValidation(SITE_SELECTORS.signatureSaveButton);
           log('Étape 7/8 — Bouton Enregistrer cliqué');
 
-          // 8. Attendre que le popup de confirmation change (nouveau swal2 ou contenu différent)
           log('Étape 8/8 — Attente du changement de popup (timeout 15s)...');
           const POLL_INTERVAL = 300;
           const MAX_POLLS = 50; // 50 × 300ms = 15s
@@ -694,7 +678,6 @@
     }
   });
 
-  // Log de chargement pour le debug
   console.log('[Pointage Auto] Content script chargé sur:', window.location.href);
 
 })();

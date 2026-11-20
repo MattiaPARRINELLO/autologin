@@ -103,7 +103,6 @@ async function getDerniereVersionGithub() {
     try {
       errorBody = await response.text();
     } catch (_) {
-      // ignorer lecture body
     }
     log('Mise à jour', `releases/latest indisponible (${response.status}) pour ${GITHUB_REPO}${errorBody ? ` | body=${errorBody}` : ''}`, 'error');
 
@@ -345,7 +344,6 @@ function attendreRedirection(tabId, timeout = TIMEOUT_REDIRECTION) {
 
     function listener(updatedTabId, changeInfo, tab) {
       if (updatedTabId === tabId && changeInfo.status === 'complete') {
-        // Vérifier que l'URL a changé (n'est plus la page de connexion)
         if (tab.url && !tab.url.includes(LOGIN_PATH)) {
           clearTimeout(timer);
           chrome.tabs.onUpdated.removeListener(listener);
@@ -605,7 +603,6 @@ function scriptRemplirFormulaire(username, password) {
       window.HTMLInputElement.prototype, 'value'
     ).set;
 
-    // --- Champ identifiant ---
     const champUsername = document.querySelector('input#username');
     if (!champUsername) {
       throw new Error('Champ identifiant introuvable (input#username)');
@@ -617,7 +614,6 @@ function scriptRemplirFormulaire(username, password) {
     champUsername.dispatchEvent(new Event('change', { bubbles: true }));
     champUsername.dispatchEvent(new Event('blur', { bubbles: true }));
 
-    // --- Champ mot de passe ---
     const champPassword = document.querySelector('input#password');
     if (!champPassword) {
       throw new Error('Champ mot de passe introuvable (input#password)');
@@ -629,7 +625,6 @@ function scriptRemplirFormulaire(username, password) {
     champPassword.dispatchEvent(new Event('change', { bubbles: true }));
     champPassword.dispatchEvent(new Event('blur', { bubbles: true }));
 
-    // --- Bouton de connexion ---
     const boutonConnexion = document.querySelector('button[type="submit"].btn-primary');
     if (!boutonConnexion) {
       throw new Error('Bouton de connexion introuvable (button[type="submit"].btn-primary)');
@@ -741,7 +736,6 @@ async function lancerPointage() {
     log('Pointage', `Résultat vérification session : ${dejaConnecte ? 'CONNECTÉ' : 'NON CONNECTÉ'}`);
 
     if (dejaConnecte) {
-      // L'utilisateur est déjà connecté → passer directement à la signature
       log('Pointage', 'Session active détectée — étapes 2 et 3 ignorées, passage à la signature');
       notifierProgression('Session déjà active — connexion ignorée', 50);
     } else {
@@ -794,7 +788,6 @@ async function lancerPointage() {
       throw new Error(resultatSignature.error || 'Échec de la signature');
     }
 
-    // Signature réussie — Notification finale
     log('Pointage', 'Étape 5 terminée — Signature validée avec succès !', 'success');
     terminerProgression();
     afficherNotification('✅ Pointage Auto', 'Présence pointée et signée avec succès !');
@@ -831,7 +824,6 @@ async function lancerPointage() {
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === 'lancerPointage') {
-    // Exécuter le pointage de manière asynchrone et répondre au popup
     lancerPointage().then((resultat) => {
       sendResponse(resultat);
     }).catch((erreur) => {
