@@ -7,10 +7,10 @@
   ![Windows](https://img.shields.io/badge/Windows-10%20%2F%2011-0078D4)
   ![Linux](https://img.shields.io/badge/Linux-systemd-FCC624)
   ![Licence](https://img.shields.io/badge/licence-MIT-green)
-  ![Tests](https://img.shields.io/badge/tests-85%20passing-brightgreen)
-  ![Statut](https://img.shields.io/badge/statut-pr%C3%A9--version-orange)
+  ![CI](https://github.com/MattiaPARRINELLO/autologin/actions/workflows/ci.yml/badge.svg)
+  ![Version stable](https://img.shields.io/github/v/release/MattiaPARRINELLO/autologin?label=version%20stable&color=brightgreen)
 
-  [Télécharger](https://github.com/MattiaPARRINELLO/autologin/releases/tag/watcher-v0.5.1) ·
+  [Télécharger](https://github.com/MattiaPARRINELLO/autologin/releases/latest) ·
   [Documentation](watcher/docs/README.md) ·
   [Présentation](watcher/presentation/index.html) ·
   [Vie privée](PRIVACY.md)
@@ -84,9 +84,10 @@ Tu restes responsable de l'usage de ta signature et du respect des règles de to
 
 ### Les étapes
 
-1. Va sur la page de la version :
-   [CheckMate desktop 0.5.1](https://github.com/MattiaPARRINELLO/autologin/releases/tag/watcher-v0.5.1).
-2. Télécharge `CheckMate-Setup-0.5.1.exe`.
+1. Va sur la page de la dernière version stable :
+   [CheckMate desktop](https://github.com/MattiaPARRINELLO/autologin/releases/latest).
+2. Télécharge `CheckMate-Setup-<version>.exe` (par exemple
+   `CheckMate-Setup-0.6.1.exe`).
 3. Lance l'installeur. Il s'installe dans ton dossier utilisateur, sans demander
    les droits administrateur.
 4. Windows peut afficher un avertissement SmartScreen. C'est normal tant que la
@@ -165,8 +166,9 @@ la signature de code, pour ne pas exécuter un binaire non signé.
 ### Les étapes
 
 ```bash
-tar -xzf CheckMate-linux-0.5.1.tar.gz
-cd CheckMate-linux-0.5.1
+# remplace 0.6.1 par la version affichee sur la page des releases
+tar -xzf CheckMate-linux-0.6.1.tar.gz
+cd CheckMate-linux-0.6.1
 ./install.sh
 ```
 
@@ -403,13 +405,15 @@ rm -rf ~/.config/checkmate-watcher
 
 ## État du projet
 
-- Version actuelle : **0.5.1**, version publique.
+- Version stable actuelle : **0.6.1**. Les mises à jour suivent le canal
+  `stable` par défaut ; le canal `beta` reçoit les préversions.
 - Validation Windows effectuée sur un runner GitHub Actions : bundle,
   connexion, signature, toast, Credential Manager, tâche planifiée et
   installeur.
 - Vérification visuelle du toast et de l'installeur sur un Windows réel :
   à faire.
-- Signature de code Windows : dossier SignPath en cours.
+- Signature de code Windows : dossier SignPath en cours. Tant qu'elle n'est pas
+  active, l'installeur publié n'est pas signé.
 
 ## Documentation
 

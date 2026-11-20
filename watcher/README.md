@@ -52,8 +52,8 @@ accessible que depuis 127.0.0.1 avec un jeton aleatoire.
 
 ## Windows
 
-Une pre-version de l'installeur `.exe` est publiee dans les releases, non signee
-tant que SignPath n'est pas actif. Pour developper, sur une machine avec Python
+L'installeur `.exe` est publie dans les releases, non signe tant que SignPath
+n'est pas actif. Pour developper, sur une machine avec Python
 et [uv](https://docs.astral.sh/uv/) :
 
 ```powershell
