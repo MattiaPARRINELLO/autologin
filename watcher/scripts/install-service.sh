@@ -70,7 +70,7 @@ Comment=Surveillance de l'emargement CESAR
 Exec="$BIN" status
 Icon=checkmate
 Terminal=false
-Categories=Utility;Education;
+Categories=Utility;
 StartupNotify=true
 StartupWMClass=CheckMate
 EOF
