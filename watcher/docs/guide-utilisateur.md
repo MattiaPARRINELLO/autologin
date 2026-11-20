@@ -25,8 +25,9 @@ moment de signer, puis se referme.
    "Exécuter quand même".
 4. À la fin, l'onboarding s'ouvre dans ton navigateur.
 
-L'installeur crée un raccourci "CheckMate" dans le menu Démarrer et une tâche
-planifiée qui démarre CheckMate à l'ouverture de session.
+L'installeur crée un raccourci "CheckMate" dans le menu Démarrer. Le raccourci
+ouvre le tableau de bord. L'assistant installe le démarrage automatique à
+l'ouverture de session.
 
 ## Installation sur Linux
 
@@ -71,12 +72,27 @@ configuration n'existe.
 Si tu ne réponds pas dans les 3 minutes, rien n'est signé. La demande revient
 5 minutes plus tard.
 
+## Tableau de bord et icône
+
+Le raccourci "CheckMate" ouvre le tableau de bord : état de la surveillance,
+créneau en cours, prochaine ouverture, compteurs, dernière signature. Il permet
+de reconfigurer, tester la notification, vérifier les mises à jour, ouvrir les
+logs ou quitter.
+
+Une icône apparaît dans la zone de notification Windows. Elle change de couleur
+selon l'état : active, hors créneau, créneau signé ou erreur.
+
 ## Modifier la configuration
 
-Relance l'assistant à tout moment :
+Depuis le tableau de bord, clique sur "Reconfigurer". L'assistant s'ouvre dans
+un nouvel onglet. Après l'avoir terminé, quitte CheckMate puis relance-le depuis
+le menu Démarrer pour appliquer les changements.
 
-- Windows : raccourci "CheckMate" du menu Démarrer
-- Linux : `checkmate-watcher setup`
+En terminal, sur Linux :
+
+```bash
+checkmate-watcher setup
+```
 
 Pour changer le mot de passe seul :
 

@@ -73,6 +73,7 @@ checkmate-watcher install-autostart  # tache planifiee / service systemd
 checkmate-watcher uninstall-autostart
 checkmate-watcher support-bundle
 checkmate-watcher check-update
+checkmate-watcher status
 ```
 
 ## Installation
