@@ -84,7 +84,7 @@ Tu restes responsable de l'usage de ta signature et du respect des règles de to
 
 ### Les étapes
 
-1. Va sur la page de la pré-version :
+1. Va sur la page de la version :
    [CheckMate desktop 0.5.1](https://github.com/MattiaPARRINELLO/autologin/releases/tag/watcher-v0.5.1).
 2. Télécharge `CheckMate-Setup-0.5.1.exe`.
 3. Lance l'installeur. Il s'installe dans ton dossier utilisateur, sans demander
@@ -381,7 +381,7 @@ rm -rf ~/.config/checkmate-watcher
 
 ## État du projet
 
-- Version actuelle : **0.5.1**, pré-version publique.
+- Version actuelle : **0.5.1**, version publique.
 - Validation Windows effectuée sur un runner GitHub Actions : bundle,
   connexion, signature, toast, Credential Manager, tâche planifiée et
   installeur.
