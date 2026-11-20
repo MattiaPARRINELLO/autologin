@@ -1,7 +1,14 @@
 from __future__ import annotations
 
 from checkmate_watcher import notifications
+from checkmate_watcher.config import default_config
 from checkmate_watcher.notifications import Notifier, _applescript_string, _gvariant
+
+
+def test_notifier_reprend_la_configuration():
+    notifier = Notifier.from_config(default_config())
+    assert notifier.app_name == "CheckMate"
+    assert notifier.icon == "dialog-information"
 
 
 def test_gvariant_echappe_les_guillemets():

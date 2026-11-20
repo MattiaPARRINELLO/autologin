@@ -3,10 +3,16 @@
 from __future__ import annotations
 
 import logging
+import sys
 
 logger = logging.getLogger(__name__)
 
 DEFAULT_SERVICE = "checkmate-watcher"
+
+
+def prefer_keyring() -> bool:
+    """Le trousseau est fiable sur Windows et macOS ; Linux passe par le fichier env."""
+    return sys.platform.startswith(("win", "darwin"))
 
 
 def _keyring_module():

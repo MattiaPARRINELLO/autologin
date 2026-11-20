@@ -286,10 +286,7 @@ async def command_capture(config: Config) -> int:
 
 
 def command_test_notification(config: Config) -> int:
-    notifier = Notifier(
-        app_name=config.notifications.app_name,
-        icon=config.notifications.icon,
-    )
+    notifier = Notifier.from_config(config)
     sent = notifier.send(
         "CheckMate",
         "Ceci est une notification de test.",
@@ -378,10 +375,7 @@ def command_self_test(config: Config, *, notify: bool = False) -> int:
         checks.append(("dossier de donnees", True, str(log_dir)))
 
     if notify:
-        notifier = Notifier(
-            app_name=config.notifications.app_name,
-            icon=config.notifications.icon,
-        )
+        notifier = Notifier.from_config(config)
         sent = notifier.send(
             "CheckMate",
             "Test de notification reussi.",

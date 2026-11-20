@@ -315,6 +315,13 @@ def ask_tkinter(
 class Notifier:
     """Notifications et confirmations selon la plateforme."""
 
+    @classmethod
+    def from_config(cls, config) -> Notifier:
+        return cls(
+            app_name=config.notifications.app_name,
+            icon=config.notifications.icon,
+        )
+
     def __init__(
         self,
         app_name: str = "CheckMate",

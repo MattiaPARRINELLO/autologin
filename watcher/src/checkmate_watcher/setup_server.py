@@ -26,7 +26,7 @@ from .config import (
     load_config,
     save_config,
 )
-from .credentials import keyring_available, set_password
+from .credentials import keyring_available, prefer_keyring, set_password
 from .local_http import LocalError, LocalHandler
 from .local_http import create_server as _create_server
 from .notifications import Notifier
@@ -128,10 +128,9 @@ class SetupSession:
         if "\n" in password or "\r" in password:
             raise SetupError("mot de passe invalide")
 
-        prefer_keyring = sys.platform.startswith(("win", "darwin"))
         stored = (
             set_password(self.config.cesar.keyring_service, username, password)
-            if prefer_keyring
+            if prefer_keyring()
             else False
         )
         with self.lock:
@@ -149,7 +148,7 @@ class SetupSession:
 
         if stored:
             message = "Identifiants enregistres dans le trousseau du systeme."
-        elif sys.platform.startswith(("win", "darwin")):
+        elif prefer_keyring():
             message = "Identifiants enregistres dans un fichier prive."
         else:
             message = "Identifiants enregistres pour le service."
@@ -201,10 +200,7 @@ class SetupSession:
         return {"ok": True, "message": "Planning enregistre."}
 
     def test_notification(self) -> dict:
-        notifier = Notifier(
-            app_name=self.config.notifications.app_name,
-            icon=self.config.notifications.icon,
-        )
+        notifier = Notifier.from_config(self.config)
         sent = notifier.send(
             "CheckMate",
             "Si tu vois cette notification, tout fonctionne.",
@@ -266,7 +262,7 @@ class SetupSession:
     # --- persistance ---
 
     def _persist(self) -> None:
-        if sys.platform.startswith(("win", "darwin")):
+        if prefer_keyring():
             stored = False
             if self.password:
                 stored = set_password(

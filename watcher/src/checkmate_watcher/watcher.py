@@ -47,10 +47,7 @@ DRY_RUN = "dry_run"
 
 
 def _notifier(config: Config) -> Notifier:
-    return Notifier(
-        app_name=config.notifications.app_name,
-        icon=config.notifications.icon,
-    )
+    return Notifier.from_config(config)
 
 
 async def _send(

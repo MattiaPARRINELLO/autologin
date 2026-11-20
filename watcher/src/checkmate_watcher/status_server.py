@@ -137,10 +137,7 @@ class StatusSession:
         )
 
     def test_notification(self) -> dict:
-        notifier = Notifier(
-            app_name=self.config.notifications.app_name,
-            icon=self.config.notifications.icon,
-        )
+        notifier = Notifier.from_config(self.config)
         sent = notifier.send(
             "CheckMate",
             "Test de notification. Si tu ne la vois pas, coupe le mode silencieux.",
