@@ -28,7 +28,7 @@ fi
 mkdir -p "$APP_DIR" "$UNIT_DIR" "$CONFIG_DIR" "$HOME/.local/bin"
 
 if command -v rsync >/dev/null 2>&1; then
-    rsync -a --delete \
+    rsync -a --delete-excluded \
         --exclude .venv \
         --exclude .git \
         --exclude build \
