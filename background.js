@@ -5,6 +5,7 @@
 
 import {
   GITHUB_REPO,
+  PRESENCE_BUTTON_SELECTOR,
   PROGRESS_STORAGE_KEY,
   appendExecutionLog as persistExecutionLog,
   progressState
@@ -748,7 +749,7 @@ async function lancerPointage() {
     // ÉTAPE 4 — Préparer la page de signature (site potentiellement lent)
     log('Pointage', 'Étape 4 — Préparation de la page de signature (attente du bouton)...');
     notifierProgression('Recherche du bouton de signature…', 70);
-    const boutonPret = await attendreSelecteurDansOnglet(tabId, 'button.buttonPresent', 45000, 1000);
+    const boutonPret = await attendreSelecteurDansOnglet(tabId, PRESENCE_BUTTON_SELECTOR, 45000, 1000);
     if (!boutonPret) {
       throw new Error('Le bouton de signature est resté introuvable après attente prolongée (45s)');
     }
@@ -766,7 +767,7 @@ async function lancerPointage() {
       log('Pointage', 'Étape 5 — Premier essai sans bouton trouvé, attente supplémentaire de 10s puis retry...');
       notifierProgression('Bouton absent — nouvel essai…', 75);
       await new Promise((resolve) => setTimeout(resolve, 10000));
-      const boutonRetryPret = await attendreSelecteurDansOnglet(tabId, 'button.buttonPresent', 20000, 1000);
+      const boutonRetryPret = await attendreSelecteurDansOnglet(tabId, PRESENCE_BUTTON_SELECTOR, 20000, 1000);
       if (boutonRetryPret) {
         notifierProgression('Signature en cours… (2e essai)', 85);
         resultatSignature = await lancerSignatureViaContentScript(tabId);

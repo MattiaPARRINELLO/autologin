@@ -2,6 +2,7 @@ export const EXECUTION_LOG_KEY = 'executionLogs';
 export const MAX_EXECUTION_LOGS = 40;
 export const PROGRESS_STORAGE_KEY = 'pointageProgress';
 export const GITHUB_REPO = 'MattiaPARRINELLO/CheckMate';
+export const PRESENCE_BUTTON_SELECTOR = 'button.buttonPresent';
 
 export function progressState(message, pourcentage, enCours) {
   return { message, pourcentage, enCours, ts: Date.now() };
