@@ -39,12 +39,14 @@ def test_sortie_github(capsys):
     out = capsys.readouterr().out
     assert "channel=beta" in out
     assert "branch=beta" in out
+    assert "version=0.7.0" in out
     assert "prerelease=true" in out
 
     assert main(["watcher-v0.7.0"]) == 0
     out = capsys.readouterr().out
     assert "channel=stable" in out
     assert "branch=main" in out
+    assert "version=0.7.0" in out
     assert "prerelease=false" in out
 
 
