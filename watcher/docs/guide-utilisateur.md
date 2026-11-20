@@ -185,6 +185,26 @@ checkmate-watcher update --check
 checkmate-watcher update --yes
 ```
 
+### Choisir le canal stable ou beta
+
+Par défaut, ton installation suit les versions stables : une beta ne t'est
+jamais proposée. Le tableau de bord affiche le canal à côté de la version.
+
+Pour recevoir les betas, ajoute `channel = "beta"` dans la section `[updates]`
+de ta configuration :
+
+```toml
+[updates]
+channel = "beta"
+```
+
+Le bouton "Installer X.Y.Z" installe la version proposée pour ton canal, sans
+autre choix à faire. Pour revenir aux versions stables, remets
+`channel = "stable"` ou supprime la clé (c'est la valeur par défaut).
+
+L'ancienne clé `include_prerelease = true` reste acceptée et équivaut à
+`channel = "beta"` si `channel` est absent.
+
 ## Limites
 
 - La machine doit être allumée et la session ouverte. En veille, la reprise est

@@ -223,7 +223,8 @@ function render(snapshot) {
 
   document.getElementById("restartBanner").hidden = !snapshot.restart_required;
   document.getElementById("version").textContent =
-    "Version " + snapshot.version + " - build " + snapshot.build;
+    "Version " + snapshot.version + " - canal " + snapshot.channel +
+    " - build " + snapshot.build;
 
   const slots = document.getElementById("slots");
   slots.innerHTML = "";

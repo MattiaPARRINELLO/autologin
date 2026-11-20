@@ -106,7 +106,7 @@ def prepare(config) -> tuple[Release, Path]:
     """Verifie, telecharge et controle la mise a jour. Rend (version, archive)."""
     release = check_for_update(
         __version__,
-        include_prerelease=config.updates.include_prerelease,
+        channel=config.updates.channel,
     )
     if release is None:
         raise UpdateError(f"CheckMate {__version__} est deja a jour")

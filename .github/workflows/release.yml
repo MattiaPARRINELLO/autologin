@@ -9,7 +9,40 @@ permissions:
   contents: write
 
 jobs:
+  channel:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.detect.outputs.version }}
+      prerelease: ${{ steps.detect.outputs.prerelease }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detecter le canal du tag
+        id: detect
+        env:
+          PYTHONPATH: watcher/src
+        run: |
+          output="$(python3 -m checkmate_watcher.release_channel "$GITHUB_REF_NAME")"
+          echo "$output"
+          echo "$output" >> "$GITHUB_OUTPUT"
+
+      - name: Verifier que le tag vient de la bonne branche
+        shell: bash
+        env:
+          PYTHONPATH: watcher/src
+        run: |
+          branch="$(python3 -m checkmate_watcher.release_channel "$GITHUB_REF_NAME" | sed -n 's/^branch=//p')"
+          channel="$(python3 -m checkmate_watcher.release_channel "$GITHUB_REF_NAME" | sed -n 's/^channel=//p')"
+          git fetch --no-tags origin "$branch:refs/remotes/origin/$branch"
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" "refs/remotes/origin/$branch"; then
+            echo "::error::Tag $GITHUB_REF_NAME : un tag $channel doit etre construit depuis la branche $branch."
+            exit 1
+          fi
+
   windows:
+    needs: channel
     runs-on: windows-latest
     defaults:
       run:
@@ -21,18 +54,6 @@ jobs:
       - uses: astral-sh/setup-uv@v6
         with:
           enable-cache: true
-
-      - name: Determiner le statut de la release
-        id: meta
-        shell: bash
-        run: |
-          version="${GITHUB_REF_NAME#watcher-v}"
-          case "$version" in
-            *-*) prerelease=true ;;
-            *) prerelease=false ;;
-          esac
-          echo "version=${version%%-*}" >> "$GITHUB_OUTPUT"
-          echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
 
       - name: Dependances
         run: uv sync
@@ -46,7 +67,7 @@ jobs:
       - name: Construire l'installeur
         shell: pwsh
         run: |
-          $version = "${{ steps.meta.outputs.version }}"
+          $version = "${{ needs.channel.outputs.version }}"
           & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "/DMyAppVersion=$version" "packaging\checkmate.iss"
 
       - name: Publier l'installeur non signe
@@ -79,6 +100,7 @@ jobs:
           if-no-files-found: error
 
   linux:
+    needs: channel
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -94,19 +116,8 @@ jobs:
       - name: Dependances
         run: uv sync
 
-      - name: Determiner le statut de la release
-        id: meta
-        run: |
-          version="${GITHUB_REF_NAME#watcher-v}"
-          case "$version" in
-            *-*) prerelease=true ;;
-            *) prerelease=false ;;
-          esac
-          echo "version=${version%%-*}" >> "$GITHUB_OUTPUT"
-          echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
-
       - name: Archive Linux
-        run: bash packaging/build-linux.sh "${{ steps.meta.outputs.version }}"
+        run: bash packaging/build-linux.sh "${{ needs.channel.outputs.version }}"
 
       - uses: actions/upload-artifact@v4
         with:
@@ -115,7 +126,7 @@ jobs:
           if-no-files-found: error
 
   release:
-    needs: [windows, linux]
+    needs: [channel, windows, linux]
     runs-on: ubuntu-latest
 
     steps:
@@ -124,11 +135,9 @@ jobs:
         run: |
           version="${GITHUB_REF_NAME#watcher-v}"
           case "$version" in
-            *-*) prerelease=true; suffix=" beta" ;;
-            *) prerelease=false; suffix="" ;;
+            *-*) suffix=" beta" ;;
+            *) suffix="" ;;
           esac
-          echo "version=${version%%-*}" >> "$GITHUB_OUTPUT"
-          echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
           echo "name=CheckMate desktop ${version%%-*}$suffix" >> "$GITHUB_OUTPUT"
 
       - uses: actions/download-artifact@v4
@@ -155,6 +164,6 @@ jobs:
         with:
           name: ${{ steps.meta.outputs.name }}
           generate_release_notes: true
-          prerelease: ${{ steps.meta.outputs.prerelease }}
-          make_latest: ${{ steps.meta.outputs.prerelease == 'false' }}
+          prerelease: ${{ needs.channel.outputs.prerelease == 'true' }}
+          make_latest: ${{ needs.channel.outputs.prerelease == 'false' }}
           files: release-assets/*

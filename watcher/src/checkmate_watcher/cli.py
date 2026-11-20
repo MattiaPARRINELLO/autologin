@@ -489,15 +489,15 @@ def command_check_update(config: Config) -> int:
     try:
         release = check_for_update(
             __version__,
-            include_prerelease=config.updates.include_prerelease,
+            channel=config.updates.channel,
         )
     except Exception as exc:  # noqa: BLE001
         print(f"verification impossible : {exc}")
         return 1
     if release is None:
-        print(f"CheckMate {__version__} est a jour")
+        print(f"CheckMate {__version__} est a jour (canal {config.updates.channel})")
         return 0
-    print(f"Mise a jour disponible : {release.tag}")
+    print(f"Mise a jour disponible : {release.tag} (canal {config.updates.channel})")
     print(release.url)
     return 0
 
@@ -506,15 +506,15 @@ def command_update(config: Config, *, check_only: bool, assume_yes: bool) -> int
     try:
         release = check_for_update(
             __version__,
-            include_prerelease=config.updates.include_prerelease,
+            channel=config.updates.channel,
         )
     except Exception as exc:  # noqa: BLE001
         print(f"verification impossible : {exc}")
         return 1
     if release is None:
-        print(f"CheckMate {__version__} est a jour")
+        print(f"CheckMate {__version__} est a jour (canal {config.updates.channel})")
         return 0
-    print(f"Mise a jour disponible : {release.tag}")
+    print(f"Mise a jour disponible : {release.tag} (canal {config.updates.channel})")
     if check_only:
         print(release.url)
         return 0

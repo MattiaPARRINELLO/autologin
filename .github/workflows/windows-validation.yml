@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - feat/auto-detect-roll-call
+      - beta
 
 permissions:
   contents: read

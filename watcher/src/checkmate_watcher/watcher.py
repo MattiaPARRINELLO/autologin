@@ -94,7 +94,7 @@ async def _check_update(config: Config, state: StateStore) -> None:
             asyncio.to_thread(
                 check_for_update,
                 __version__,
-                include_prerelease=config.updates.include_prerelease,
+                channel=config.updates.channel,
             ),
             timeout=10,
         )

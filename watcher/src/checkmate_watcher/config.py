@@ -29,6 +29,7 @@ from .schedule import (
     parse_days,
     parse_windows,
 )
+from .updates import BETA_CHANNEL, CHANNELS, STABLE_CHANNEL
 
 logger = logging.getLogger(__name__)
 
@@ -135,7 +136,26 @@ class SignatureConfig:
 @dataclass(frozen=True)
 class UpdatesConfig:
     enabled: bool = True
-    include_prerelease: bool = True
+    channel: str = STABLE_CHANNEL
+
+    @property
+    def include_prerelease(self) -> bool:
+        """Alias de compatibilite : le canal beta accepte les prereleases."""
+        return self.channel == BETA_CHANNEL
+
+
+def parse_updates_channel(table: dict) -> str:
+    """Lit `[updates] channel`, avec `include_prerelease` en alias historique."""
+    raw_channel = table.get("channel")
+    if raw_channel is None:
+        if "include_prerelease" in table:
+            return BETA_CHANNEL if bool(table["include_prerelease"]) else STABLE_CHANNEL
+        return STABLE_CHANNEL
+    channel = str(raw_channel).strip().lower()
+    if channel not in CHANNELS:
+        values = ", ".join(f"'{item}'" for item in CHANNELS)
+        raise ConfigError(f"[updates] channel doit valoir {values}")
+    return channel
 
 
 @dataclass(frozen=True)
@@ -271,7 +291,7 @@ def config_to_dict(
         },
         "updates": {
             "enabled": config.updates.enabled,
-            "include_prerelease": config.updates.include_prerelease,
+            "channel": config.updates.channel,
         },
         "selectors": {
             "attendance_button": list(config.selectors.attendance_button),
@@ -415,7 +435,7 @@ def load_config(path: str | Path, *, require_password: bool = True) -> Config:
     selectors = Selectors.from_dict(selectors_table)
     updates = UpdatesConfig(
         enabled=bool(updates_table.get("enabled", True)),
-        include_prerelease=bool(updates_table.get("include_prerelease", True)),
+        channel=parse_updates_channel(updates_table),
     )
 
     try:
