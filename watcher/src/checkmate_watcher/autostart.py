@@ -8,6 +8,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from .paths import default_env_path
+
 logger = logging.getLogger(__name__)
 
 TASK_NAME = "CheckMate"
@@ -48,7 +50,7 @@ def _linux_unit(executable: Path, config_path: Path) -> str:
         "[Service]\n"
         "Type=simple\n"
         "WorkingDirectory=%h\n"
-        "EnvironmentFile=-%h/.config/checkmate-watcher/env\n"
+        f"EnvironmentFile=-{default_env_path()}\n"
         f"ExecStart={command}\n"
         "Restart=always\n"
         "RestartSec=10\n"

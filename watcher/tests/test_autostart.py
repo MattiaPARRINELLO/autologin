@@ -16,6 +16,7 @@ from checkmate_watcher.autostart import (
     disable_autostart,
     enable_autostart,
 )
+from checkmate_watcher.paths import default_env_path
 
 
 @pytest.mark.skipif(sys.platform == "win32", reason="unite systemd Linux")
@@ -26,7 +27,7 @@ def test_unite_systemd_generee():
     )
     assert 'ExecStart="/opt/check mate/checkmate-watcher"' in unit
     assert "--config /home/eleve/.config/checkmate-watcher/config.toml run" in unit
-    assert "EnvironmentFile=-%h/.config/checkmate-watcher/env" in unit
+    assert f"EnvironmentFile=-{default_env_path()}" in unit
     assert "Restart=always" in unit
     assert "WantedBy=graphical-session.target" in unit
 

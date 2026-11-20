@@ -35,6 +35,19 @@ def test_charge_les_valeurs_par_defaut(tmp_path):
     assert config.selectors.attendance_button[0] == "button.buttonPresent"
 
 
+def test_les_chemins_par_defaut_viennent_de_paths(tmp_path):
+    from checkmate_watcher.paths import (
+        default_profile_dir,
+        default_signature_path,
+        default_state_file,
+    )
+
+    config = load_config(write_config(tmp_path))
+    assert config.watcher.profile_dir == default_profile_dir()
+    assert config.watcher.state_file == default_state_file()
+    assert config.signature.file == default_signature_path()
+
+
 def test_surcharge_les_valeurs(tmp_path):
     config = load_config(
         write_config(
