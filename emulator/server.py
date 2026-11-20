@@ -79,6 +79,8 @@ class Emulator:
 
     def sign(self, points: list) -> tuple[bool, str]:
         with self.lock:
+            if not points:
+                return False, "Signature vide."
             if not self.state.open:
                 return False, "Aucun emargement n'est ouvert."
             if self.state.signed:
@@ -418,15 +420,16 @@ class Handler(BaseHTTPRequestHandler):
             )
         self.end_headers()
 
-    def read_json(self) -> dict:
+    def read_json(self) -> dict | None:
         length = int(self.headers.get("Content-Length") or 0)
         if length <= 0:
             return {}
         raw = self.rfile.read(length)
         try:
-            return json.loads(raw.decode("utf-8"))
+            data = json.loads(raw.decode("utf-8"))
         except (UnicodeDecodeError, json.JSONDecodeError):
-            return {}
+            return None
+        return data if isinstance(data, dict) else None
 
     # --- routes ---
 
@@ -503,9 +506,13 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json({"message": "Session expiree."}, status=401)
                 return
             payload = self.read_json()
+            if payload is None:
+                self.send_json({"message": "Corps JSON invalide."}, status=400)
+                return
             points = payload.get("points")
-            if not isinstance(points, list):
-                points = []
+            if not isinstance(points, list) or not points:
+                self.send_json({"message": "Signature vide."}, status=400)
+                return
             ok, message = self.emulator.sign(points)
             self.send_json(
                 {"success": ok, "message": message}, status=200 if ok else 409
