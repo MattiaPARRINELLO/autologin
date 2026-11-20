@@ -17,7 +17,8 @@ moment de signer, puis se referme.
 
 ## Installation sur Windows
 
-1. Télécharge `CheckMate-Setup-<version>.exe` depuis les releases GitHub.
+1. La beta est fermée : les testeurs invités reçoivent l'installeur par le
+   dépôt privé. La version publique ouvrira après la signature de code.
 2. Lance l'installeur. Il s'installe dans ton dossier utilisateur, sans droits
    administrateur.
 3. Windows SmartScreen peut afficher un avertissement tant que l'exécutable
@@ -30,7 +31,8 @@ planifiée qui démarre CheckMate à l'ouverture de session.
 
 ## Installation sur Linux
 
-Télécharge l'archive `CheckMate-linux-<version>.tar.gz`, extrais-la, puis :
+Les testeurs invités reçoivent l'archive `CheckMate-linux-<version>.tar.gz`.
+Extrais-la, puis :
 
 ```bash
 ./install.sh
@@ -113,9 +115,9 @@ Pour vérifier manuellement :
 checkmate-watcher check-update
 ```
 
-L'installation est encore manuelle : télécharge le nouvel installeur depuis les
-releases. L'OTA complet sera activé après la mise en place de la signature de
-code.
+Pendant la beta, les nouveaux builds sont déposés dans le dépôt privé.
+L'installation reste manuelle. L'OTA complet sera activé après la mise en place
+de la signature de code.
 
 ## Vérifier l'installation
 
