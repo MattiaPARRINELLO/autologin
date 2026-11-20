@@ -346,6 +346,10 @@ class _Handler(BaseHTTPRequestHandler):
             html = SETUP_HTML.replace("__TOKEN__", self.session.token)
             self._send(200, html.encode("utf-8"), "text/html; charset=utf-8")
             return
+        if parsed.path == "/favicon.ico":
+            self.send_response(204)
+            self.end_headers()
+            return
         if parsed.path == "/api/state":
             if not self._authorized():
                 self._json(403, {"error": "acces refuse"})

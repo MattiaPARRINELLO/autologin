@@ -50,6 +50,9 @@ uv run checkmate-watcher --config "$env:APPDATA\checkmate-watcher\config.toml" s
 
 Le mot de passe part dans le Credential Manager, le demarrage auto dans une tache
 planifiee au logon, et les notifications utilisent les toasts Windows.
+La checklist de validation reelle est dans
+[`docs/windows-validation.md`](docs/windows-validation.md), avec
+`scripts/windows-check.ps1`.
 
 Commandes utiles partout :
 
