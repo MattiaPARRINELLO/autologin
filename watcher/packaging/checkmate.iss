@@ -18,6 +18,7 @@ Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
 SetupIconFile=..\assets\checkmate.ico
+SetupMutex=CheckMateSetupMutex
 UninstallDisplayIcon={app}\CheckMate.exe
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
