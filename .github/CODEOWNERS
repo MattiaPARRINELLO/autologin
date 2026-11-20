@@ -1,0 +1,6 @@
+# Propriétaires du code.
+# Les pull requests qui touchent ces chemins demandent une revue du propriétaire.
+* @MattiaPARRINELLO
+
+/.github/ @MattiaPARRINELLO
+/watcher/ @MattiaPARRINELLO

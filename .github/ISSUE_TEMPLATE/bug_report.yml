@@ -1,0 +1,70 @@
+name: Signaler un bug
+description: Décrire un comportement inattendu reproductible
+title: "[bug] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Merci de vérifier qu'une issue similaire n'existe pas déjà.
+        Ne joins jamais de mot de passe, de jeton ou de capture contenant des
+        données personnelles. Pour une faille de sécurité, utilise la politique
+        de sécurité au lieu de cette issue.
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: Que se passe-t-il, et que devrait-il se passer ?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Étapes de reproduction
+      placeholder: |
+        1. Lancer ...
+        2. Attendre ...
+        3. Observer ...
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version de CheckMate
+      description: Visible dans le tableau de bord ou avec `checkmate-watcher --version`.
+    validations:
+      required: true
+  - type: dropdown
+    id: channel
+    attributes:
+      label: Canal
+      options:
+        - stable
+        - beta
+        - build local
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Plateforme
+      options:
+        - Windows
+        - Linux
+        - Autre
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs utiles
+      description: Extrait des logs, sans secret ni donnée personnelle.
+      render: text
+    validations:
+      required: false
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Vérifications
+      options:
+        - label: J'ai retiré toute donnée sensible de ce rapport.
+          required: true
