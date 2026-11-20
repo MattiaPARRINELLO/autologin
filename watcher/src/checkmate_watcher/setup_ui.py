@@ -506,18 +506,12 @@ SETUP_HTML = """<!doctype html>
       <fieldset class="days-field">
         <legend>Jours</legend>
         <div class="days" id="days">
-          <label><input type="checkbox" value="mon" checked>Lun</label>
-          <label><input type="checkbox" value="tue" checked>Mar</label>
-          <label><input type="checkbox" value="wed" checked>Mer</label>
-          <label><input type="checkbox" value="thu" checked>Jeu</label>
-          <label><input type="checkbox" value="fri" checked>Ven</label>
-          <label><input type="checkbox" value="sat">Sam</label>
-          <label><input type="checkbox" value="sun">Dim</label>
+__DAYS__
         </div>
       </fieldset>
       <div class="field">
         <label for="windows">Créneaux</label>
-        <input id="windows" type="text" value="09:00-12:00, 13:30-16:30">
+        <input id="windows" type="text" value="__WINDOWS__">
       </div>
       <p class="hint">Format HH:MM-HH:MM, séparés par des virgules.</p>
       <div class="status" id="scheduleStatus" aria-live="polite"></div>

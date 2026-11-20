@@ -80,6 +80,8 @@ def test_parcours_onboarding(tmp_path, monkeypatch):
             html = response.read().decode()
         assert "CheckMate" in html
         assert "jeton-test" in html
+        assert 'value="09:00-12:00, 13:30-16:30"' in html
+        assert '<input type="checkbox" value="mon" checked>' in html
 
         status, state = call(base, "/api/state", token="jeton-test")
         assert status == 200

@@ -33,7 +33,15 @@ from .local_http import LocalError, LocalHandler
 from .local_http import create_server as _create_server
 from .notifications import Notifier
 from .paths import default_env_path
-from .schedule import DAY_NAMES, Schedule, ScheduleError, parse_days, parse_windows
+from .schedule import (
+    DAY_NAMES,
+    DEFAULT_DAYS,
+    DEFAULT_WINDOWS,
+    Schedule,
+    ScheduleError,
+    parse_days,
+    parse_windows,
+)
 from .setup_ui import SETUP_HTML
 from .signature import SignatureError, load_signature, parse_points, save_signature
 from .window import open_url
@@ -42,6 +50,24 @@ logger = logging.getLogger(__name__)
 
 MAX_BODY = 1_000_000
 MAX_TIMEOUT = 1800
+DAY_LABELS = {
+    "mon": "Lun",
+    "tue": "Mar",
+    "wed": "Mer",
+    "thu": "Jeu",
+    "fri": "Ven",
+    "sat": "Sam",
+    "sun": "Dim",
+}
+
+
+def _days_html(days: tuple[int, ...]) -> str:
+    ordered = sorted(DAY_NAMES.items(), key=lambda item: item[1])
+    return "\n".join(
+        f'<label><input type="checkbox" value="{name}"'
+        f"{' checked' if index in days else ''}>{DAY_LABELS[name]}</label>"
+        for name, index in ordered
+    )
 
 
 class SetupError(LocalError):
@@ -326,7 +352,13 @@ class _Handler(LocalHandler):
     def do_GET(self) -> None:
         path = urlparse(self.path).path
         if path == "/":
-            self._serve_page(SETUP_HTML)
+            self._serve_page(
+                SETUP_HTML,
+                {
+                    "DAYS": _days_html(parse_days(DEFAULT_DAYS)),
+                    "WINDOWS": ", ".join(DEFAULT_WINDOWS),
+                },
+            )
             return
         if path == "/favicon.ico":
             self._favicon()
