@@ -157,6 +157,27 @@ async def sign_with_visibility(
         await session.switch_headless(True)
 
 
+async def _sign_with_retry(config: Config, session: CesarSession, points):
+    """Signe, puis reessaie apres un echec transitoire avant de prevenir."""
+    attempts = 1 + max(0, config.watcher.sign_retries)
+    for attempt in range(1, attempts + 1):
+        try:
+            return await sign_with_visibility(config, session, points)
+        except CesarError as exc:
+            if attempt >= attempts:
+                raise
+            delay = max(0, config.watcher.sign_retry_delay)
+            logger.warning(
+                "signature echouee (essai %s/%s), nouvelle tentative dans %ss : %s",
+                attempt,
+                attempts,
+                delay,
+                exc,
+            )
+            await asyncio.sleep(delay)
+    raise AssertionError("boucle de nouvelle tentative terminee sans resultat")
+
+
 async def handle_signal(
     config: Config,
     signal: AttendanceSignal,
@@ -373,7 +394,7 @@ async def run_loop(
                             )
                         else:
                             try:
-                                confirmation = await sign_with_visibility(
+                                confirmation = await _sign_with_retry(
                                     config, session, points
                                 )
                             except CesarError as exc:

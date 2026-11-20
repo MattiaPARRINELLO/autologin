@@ -119,6 +119,8 @@ class WatcherConfig:
     prompt_retry: int = 300
     auto_sign: bool = False
     auto_sign_delay: int = 20
+    sign_retries: int = 1
+    sign_retry_delay: int = 15
     headless: bool = False
     visible_on_sign: bool = True
     executable_path: str | None = None
@@ -261,6 +263,8 @@ def config_to_dict(
         "prompt_retry": config.watcher.prompt_retry,
         "auto_sign": config.watcher.auto_sign,
         "auto_sign_delay": config.watcher.auto_sign_delay,
+        "sign_retries": config.watcher.sign_retries,
+        "sign_retry_delay": config.watcher.sign_retry_delay,
         "headless": config.watcher.headless,
         "visible_on_sign": config.watcher.visible_on_sign,
         "profile_dir": str(config.watcher.profile_dir),
@@ -402,6 +406,12 @@ def load_config(path: str | Path, *, require_password: bool = True) -> Config:
         auto_sign_delay=int(
             watcher_table.get("auto_sign_delay", watcher_defaults.auto_sign_delay)
         ),
+        sign_retries=int(
+            watcher_table.get("sign_retries", watcher_defaults.sign_retries)
+        ),
+        sign_retry_delay=int(
+            watcher_table.get("sign_retry_delay", watcher_defaults.sign_retry_delay)
+        ),
         headless=bool(watcher_table.get("headless", watcher_defaults.headless)),
         visible_on_sign=bool(
             watcher_table.get("visible_on_sign", watcher_defaults.visible_on_sign)
@@ -469,6 +479,10 @@ def load_config(path: str | Path, *, require_password: bool = True) -> Config:
         raise ConfigError("[watcher] confirm_timeout doit etre >= 10 secondes")
     if watcher.prompt_retry < 30:
         raise ConfigError("[watcher] prompt_retry doit etre >= 30 secondes")
+    if not 0 <= watcher.sign_retries <= 5:
+        raise ConfigError("[watcher] sign_retries doit etre entre 0 et 5")
+    if watcher.sign_retry_delay < 5:
+        raise ConfigError("[watcher] sign_retry_delay doit etre >= 5 secondes")
     if not MIN_PADDING_RATIO <= signature.padding_ratio <= MAX_PADDING_RATIO:
         raise ConfigError(
             f"[signature] padding_ratio doit etre entre "

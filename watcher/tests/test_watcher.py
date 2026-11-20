@@ -1,10 +1,23 @@
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime
 
+import pytest
+
+from checkmate_watcher import watcher as watcher_module
+from checkmate_watcher.cesar import SignError
+from checkmate_watcher.config import (
+    CesarConfig,
+    Config,
+    NotificationConfig,
+    Selectors,
+    SignatureConfig,
+    WatcherConfig,
+)
 from checkmate_watcher.schedule import Schedule, parse_windows
 from checkmate_watcher.state import StateStore
-from checkmate_watcher.watcher import _pause_reason
+from checkmate_watcher.watcher import _pause_reason, _sign_with_retry
 
 SCHEDULE = Schedule(
     enabled=True,
@@ -44,3 +57,64 @@ def test_pause_sur_creneau_deja_signe(tmp_path):
 
 def test_surveillance_active_sur_creneau_libre(tmp_path):
     assert _pause_reason(SCHEDULE, StateStore(tmp_path / "s.json"), LUNDI_10H) is None
+
+
+def retry_config(retries: int) -> Config:
+    return Config(
+        cesar=CesarConfig(
+            base_url="https://cesar.example.fr",
+            username="eleve",
+            password="secret",
+        ),
+        watcher=WatcherConfig(sign_retries=retries, sign_retry_delay=0),
+        signature=SignatureConfig(),
+        notifications=NotificationConfig(enabled=False),
+        selectors=Selectors.from_dict({}),
+    )
+
+
+def test_signature_reessayee_apres_un_echec(monkeypatch):
+    calls: list[str] = []
+
+    async def fake_sign(config, session, points):
+        calls.append("essai")
+        if len(calls) == 1:
+            raise SignError("bouton disparu")
+        return "presence enregistree"
+
+    monkeypatch.setattr(watcher_module, "sign_with_visibility", fake_sign)
+
+    result = asyncio.run(_sign_with_retry(retry_config(1), object(), []))
+
+    assert result == "presence enregistree"
+    assert calls == ["essai", "essai"]
+
+
+def test_signature_echoue_apres_toutes_les_tentatives(monkeypatch):
+    calls: list[str] = []
+
+    async def fake_sign(config, session, points):
+        calls.append("essai")
+        raise SignError("echec")
+
+    monkeypatch.setattr(watcher_module, "sign_with_visibility", fake_sign)
+
+    with pytest.raises(SignError):
+        asyncio.run(_sign_with_retry(retry_config(2), object(), []))
+
+    assert calls == ["essai", "essai", "essai"]
+
+
+def test_signature_sans_nouvelle_tentative(monkeypatch):
+    calls: list[str] = []
+
+    async def fake_sign(config, session, points):
+        calls.append("essai")
+        raise SignError("echec")
+
+    monkeypatch.setattr(watcher_module, "sign_with_visibility", fake_sign)
+
+    with pytest.raises(SignError):
+        asyncio.run(_sign_with_retry(retry_config(0), object(), []))
+
+    assert calls == ["essai"]
