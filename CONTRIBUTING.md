@@ -103,6 +103,52 @@ Sans `CHECKMATE_E2E=1`, pytest ignore ces deux tests et affiche la raison
 trouve, ni celui de Playwright ni un navigateur systeme, les tests sont aussi
 ignores avec `aucun Chromium disponible`.
 
+## Capturer un parcours CESAR
+
+Les bugs qui ne sortent qu'en conditions reelles (signature reduite a un point,
+clics qui interrompent le trace, animations Windows) se reproduisent a partir
+d'une capture de pages reelles. La capture est reservee aux mainteneurs : elle
+demande un compte CESAR et un creneau d'emargement, donc elle se fait sur un
+creneau dont la presence n'a pas d'importance.
+
+```bash
+cd watcher
+uv run python -m checkmate_watcher.capture \
+  --base-url https://cesar.example.fr \
+  --output captures/2026-11-20 \
+  --mask ".student-name" --mask "#login-display"
+```
+
+Quatre etapes sont demandees, chacune validee par Entree : page de connexion
+sans se connecter, tableau de bord avec emargement ferme, emargement ouvert,
+tableau de bord apres signature. Le script enregistre le HTML des pages, les
+ressources statiques dans `assets/`, un HAR `network.har` et une trace
+Playwright `trace.zip`.
+
+Regles de stockage et de versionnement :
+
+- `captures/` est ignore par git : une capture brute ne se commite jamais ;
+- ne capture ni ne commite une page qui montre les presences d'autres eleves
+  sans masquage ; `--mask` remplace le texte des selecteurs indiques ;
+- l'assainissement tourne automatiquement apres la capture : references des
+  ressources reecrites vers `/assets/`, formulaire de connexion ramene sur
+  `/connexion`, cookies et jetons retires du HAR, corps de reponses supprimes ;
+- apres assainissement, seul le quatuor `scenario.json`, `pages/`, `assets/` et
+  `harness.js` peut etre versionne, et seulement comme fixture de test ;
+- les captures sont datees : une page CESAR peut changer sans preavis, refais la
+  capture quand les selecteurs par defaut ne trouvent plus rien.
+
+Pour rejouer la capture :
+
+```bash
+python emulator/server.py --scenario captures/2026-11-20
+cd watcher && CHECKMATE_E2E=1 uv run pytest -q tests/test_emulator_e2e.py
+```
+
+Le `harness.js` genere est un modele. Sur un vrai CESAR, adapte-le pour ouvrir
+la modale, tracer et poster sur `/api/signature` : voir
+`emulator/scenarios/cesar-simplifie/harness.js` pour un exemple complet.
+
 ## Workflow de contribution
 
 1. Creer une branche depuis `main` : `feat/...`, `fix/...`, `docs/...`,

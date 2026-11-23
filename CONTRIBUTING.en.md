@@ -59,6 +59,44 @@ CHECKMATE_E2E=1 uv run pytest -q tests/test_emulator_e2e.py
 
 CI does not run the e2e tests.
 
+## Capturing a real CESAR session
+
+Bugs that only show up in real conditions (a signature reduced to a single
+point, clicks interrupting the stroke, Windows animations) are reproduced from
+captures of real pages. This is a maintainer task: it needs a CESAR account and
+an attendance slot whose presence does not matter.
+
+```bash
+cd watcher
+uv run python -m checkmate_watcher.capture \
+  --base-url https://cesar.example.fr \
+  --output captures/2026-11-20 \
+  --mask ".student-name"
+```
+
+Four steps are captured, each confirmed with Enter: login page, dashboard with
+attendance closed, attendance opened, dashboard after signing. The script stores
+the page HTML, static resources in `assets/`, a `network.har` file and a
+Playwright `trace.zip`.
+
+Storage rules:
+
+- `captures/` is git-ignored: a raw capture is never committed;
+- never capture or commit a page showing other students' attendance unmasked,
+  use `--mask`;
+- sanitizing runs right after capture: asset references rewritten to
+  `/assets/`, the login form action rewritten to `/connexion`, cookies and
+  tokens removed from the HAR, response bodies dropped;
+- only the sanitized `scenario.json`, `pages/`, `assets/` and `harness.js` may be
+  versioned, and only as a test fixture;
+- captures are dated: CESAR can change without notice, capture again when the
+  default selectors stop matching.
+
+Replay with `python emulator/server.py --scenario captures/<date>`.
+
+The generated `harness.js` is a template: on a real CESAR, adapt it to open the
+modal, draw and post to `/api/signature`.
+
 ## Workflow
 
 1. Create a branch from `main`: `feat/...`, `fix/...`, `docs/...`, `ci/...` or
