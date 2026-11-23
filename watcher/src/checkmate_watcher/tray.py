@@ -29,6 +29,10 @@ COLORS = {
 
 TRAY_ENV = "CHECKMATE_TRAY"
 
+# Assez court pour que l'icone repasse au vert des la reprise, assez long
+# pour ne pas reveiller l'interface de bureau inutilement.
+REFRESH_SECONDS = 10
+
 
 def status_image(mode: str):
     image = Image.new("RGBA", (64, 64), (0, 0, 0, 0))
@@ -61,6 +65,7 @@ class TrayController:
         self._thread: threading.Thread | None = None
         self._watcher: threading.Thread | None = None
         self._stop = threading.Event()
+        self._shown: tuple[str, str] | None = None
 
     def start(self) -> None:
         if self._start_sni():
@@ -162,7 +167,7 @@ class TrayController:
     def _watch(self) -> None:
         while not self._stop.is_set():
             self._refresh_icon()
-            self._stop.wait(60)
+            self._stop.wait(REFRESH_SECONDS)
 
     def _refresh_icon(self) -> None:
         try:
@@ -172,16 +177,20 @@ class TrayController:
             return
         label = snapshot.get("label", "")
         mode = snapshot.get("mode", "active")
+        if (mode, label) == self._shown:
+            return
         title = f"CheckMate - {label}" if label else "CheckMate"
         if self.sni is not None:
             try:
                 self.sni.update(title, status_pixmaps(mode), status_level(mode), label)
+                self._shown = (mode, label)
             except Exception:
                 logger.debug("mise a jour de l'icone impossible", exc_info=True)
         elif self.icon is not None:
             try:
                 self.icon.title = title
                 self.icon.icon = status_image(mode)
+                self._shown = (mode, label)
             except Exception:
                 logger.debug("mise a jour de l'icone impossible", exc_info=True)
 
