@@ -71,6 +71,10 @@ uvx ruff format --check src tests
 uv run pytest -q
 ```
 
+Pour iterer sur une page reelle sans creneau,
+`./scripts/dev-scenario.sh chemin/vers/capture` sert une capture et joue un cycle
+complet : voir [Tester avec une capture CESAR](emulator/docs/tester-sans-cesar.md).
+
 Les tests de bout en bout (`tests/test_emulator_e2e.py`) sont ignores par
 defaut. Ils demandent Chromium et lancent eux-memes l'emulateur CESAR sur un
 port libre : rien a demarrer a la main. La CI les lance avec `CHECKMATE_E2E=1` :

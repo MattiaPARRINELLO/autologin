@@ -1,13 +1,34 @@
 # Tester avec une capture CESAR
 
-Une capture est un parcours CESAR reel fige sur disque : pages HTML, ressources,
-HAR et trace. L'emulateur la sert comme un faux CESAR local, donc le watcher se
-teste contre le vrai DOM, sans creneau et sans risque de signer une presence
-reelle.
+Page de developpement : une capture est un parcours CESAR reel fige sur disque
+(pages HTML, ressources, HAR, trace). L'emulateur la sert comme un faux CESAR
+local, donc le watcher se teste contre le vrai DOM, sans creneau et sans risque
+de signer une presence reelle. Les utilisateurs de CheckMate n'ont pas besoin de
+cette page.
 
-A utiliser quand l'emulateur genere ne suffit pas : selecteurs du vrai site,
-taille et style reels du canvas, structure reelle de la popup. Pour un simple
-cycle de surveillance, `emulator/server.py` sans `--scenario` suffit.
+A utiliser quand les pages generees ne suffisent pas : selecteurs du vrai site,
+taille et style reels du canvas, structure reelle de la popup.
+
+## Boucle rapide
+
+```bash
+./scripts/dev-scenario.sh chemin/vers/capture
+```
+
+Le script demarre l'emulateur sur un port libre, ouvre l'emargement, lance un
+cycle complet du watcher, affiche l'etat final et rend le code de sortie du
+watcher (`0` signe, `2` rien a signer). Il s'arrete ensuite.
+
+Options utiles en developpement :
+
+```bash
+./scripts/dev-scenario.sh capture 8810    # port fixe, utile pour recharger la page a la main
+./scripts/dev-scenario.sh capture --keep  # laisse l'emulateur tourner apres le cycle
+./scripts/dev-scenario.sh                 # sans capture : pages generees
+```
+
+Le reste de cette page detaille la version manuelle, utile pour inspecter la
+page, rejouer un etat precis ou tester sur Windows.
 
 ## 1. Servir la capture
 
