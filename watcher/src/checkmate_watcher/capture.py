@@ -106,6 +106,7 @@ MASK_JS = """
 SENSITIVE_META = re.compile(
     r'<meta\b[^>]*\bname="(?:app-user|user|csrf[^"]*)"[^>]*>', re.IGNORECASE
 )
+SENSITIVE_INPUT = re.compile(r'<input\b[^>]*\bname="_?csrf[^"]*"[^>]*>', re.IGNORECASE)
 
 FORM_ACTION = re.compile(r'(<form\b[^>]*\baction=")([^"]*)(")', re.IGNORECASE)
 CSS_URL = re.compile(r"url\(\s*(['\"]?)([^'\")]+)\1\s*\)")
@@ -234,10 +235,14 @@ def read_metadata(root: Path) -> dict:
 def rewrite_pages(root: Path, mapping: dict[str, str]) -> None:
     for page in sorted((root / PAGES_DIR).glob("*.html")):
         html = rewrite_assets(page.read_text(encoding="utf-8"), mapping)
-        html = strip_sensitive_meta(html)
+        html = strip_sensitive_fields(html)
         if page.stem == STEP_CONNEXION:
             html = normalize_login_action(html)
         page.write_text(html, encoding="utf-8")
+
+
+def strip_sensitive_fields(html: str) -> str:
+    return SENSITIVE_INPUT.sub("", strip_sensitive_meta(html))
 
 
 def strip_sensitive_meta(html: str) -> str:
