@@ -168,7 +168,7 @@ def test_sign_attend_la_disparition_du_bouton(tmp_path):
     with emulator(ATTENDANCE_CLOSE_DELAY_MS="2000") as (executable, base_url):
         config = make_config(tmp_path, executable, base_url)
 
-        async def scenario() -> tuple[str, float, int]:
+        async def scenario() -> tuple[str, float, int, bool]:
             session = CesarSession(config)
             await session.open(headless=True)
             try:
@@ -179,15 +179,19 @@ def test_sign_attend_la_disparition_du_bouton(tmp_path):
                 elapsed = time.monotonic() - started
                 # Au retour de sign(), le bouton doit deja avoir disparu du DOM.
                 remaining = await session.page.locator(".buttonPresent").count()
-                return confirmation, elapsed, remaining
+                guard = await session.page.evaluate(
+                    "() => !!document.getElementById('checkmate-signature-guard')"
+                )
+                return confirmation, elapsed, remaining, guard
             finally:
                 await session.close()
 
-        confirmation, elapsed, remaining = asyncio.run(
+        confirmation, elapsed, remaining, guard = asyncio.run(
             asyncio.wait_for(scenario(), timeout=120)
         )
 
         assert "prise en compte" in confirmation.lower()
         assert remaining == 0
+        assert guard is False
         assert elapsed >= 2.0
         assert wait_for_state(base_url)["signed"] is True
