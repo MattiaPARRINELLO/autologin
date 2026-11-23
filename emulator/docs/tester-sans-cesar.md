@@ -147,9 +147,10 @@ capture.
 
 - Le JavaScript du site : `harness.js` le remplace. Les animations de popup et
   les gestionnaires d'evenements de CESAR ne sont pas rejoues a l'identique.
-- Les ressources non capturees : polices, icones et bundles charges
-  dynamiquement renvoient 404. Sans effet sur la detection et la signature,
-  mais la page n'est pas pixel pour pixel.
+- Les ressources non capturees : les imports internes aux bundles JavaScript et
+  le favicon renvoient 404, les polices Google viennent du reseau. La mise en
+  page et les images capturees s'appliquent, mais la page n'est pas pixel pour
+  pixel.
 - L'anti-rejeu du site : la capture est figee, elle ne prouve pas qu'un
   correctif marchera sur la vraie page.
 
