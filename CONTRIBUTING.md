@@ -261,6 +261,43 @@ une version non testee en beta.
 L'historique de `main` ne doit jamais etre reecrit : pas de force-push, pas de
 rebase d'une branche deja publiee.
 
+## Numerotation des versions
+
+Le watcher suit SemVer (`MAJOR.MINOR.PATCH`). Une release n'incremente qu'un
+seul numero a la fois.
+
+| Changement | Numero | Exemple |
+| --- | --- | --- |
+| Correction de bug, message, documentation, performance, dependance | PATCH | 0.6.5 vers 0.6.6 |
+| Fonctionnalite visible, nouvelle option, nouveau canal | MINOR | 0.6.6 vers 0.7.0 |
+| Rupture de compatibilite | MAJOR | 1.3.0 vers 2.0.0 |
+
+Regles de decision :
+
+- **PATCH** : le comportement observable ne change pas, ou seul un defaut est
+  corrige. Un lot de correctifs reste un PATCH, meme s'il touche plusieurs
+  fichiers. C'est le choix par defaut d'une maintenance.
+- **MINOR** : l'utilisateur gagne quelque chose de nouveau (ecran, option,
+  canal, format de notification) sans avoir a reconfigurer quoi que ce soit. Une
+  nouvelle fonctionnalite part sur `beta` en `X.Y.0-beta.N`.
+- **MAJOR** : une mise a jour casse une installation existante : cle de
+  configuration renommee ou supprimee, format de fichier incompatible, plateforme
+  abandonnee, comportement par defaut inverse. Une MAJOR s'accompagne d'une note
+  de migration dans `watcher/docs/note-mise-a-jour.md`.
+
+Points de vigilance :
+
+- Tant que le projet reste en `0.x`, une MINOR peut encore changer des details
+  internes, mais elle ne doit jamais casser une configuration existante. La
+  version `1.0.0` marque l'engagement de stabilite du format de configuration.
+- Une beta garde la version cible : `0.7.0-beta.1`, `0.7.0-beta.2`, puis
+  `0.7.0`. Les betas successives ne bougent pas le numero.
+- Une correction urgente sur une version stable deja publiee reste un PATCH et
+  ne saute pas de MINOR.
+- Le changement de version se fait dans un commit dedie
+  `chore: passe la version a X.Y.Z`, qui met a jour `__init__.py`,
+  `pyproject.toml` et `uv.lock` ensemble.
+
 ## Format des tags
 
 Un tag de release suit le prefixe `watcher-v` :
