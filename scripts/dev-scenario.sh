@@ -3,6 +3,7 @@
 # s'arrete, et renvoie le code de sortie du watcher.
 #
 #   ./scripts/dev-scenario.sh chemins/vers/capture [port]
+#   ./scripts/dev-scenario.sh capture --visible  affiche le navigateur du watcher
 #   ./scripts/dev-scenario.sh capture --keep     laisse l'emulateur tourner
 #
 # Sans capture, l'emulateur genere ses pages :
@@ -14,10 +15,16 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SCENARIO=""
 PORT="8787"
 KEEP="0"
+HEADLESS="true"
+VISIBLE_ON_SIGN="false"
 
 for arg in "$@"; do
     case "$arg" in
         --keep) KEEP="1" ;;
+        --visible)
+            HEADLESS="false"
+            VISIBLE_ON_SIGN="false"
+            ;;
         [0-9]*) PORT="$arg" ;;
         *) SCENARIO="$arg" ;;
     esac
@@ -98,8 +105,8 @@ enabled = false
 poll_interval = 15
 auto_sign = true
 auto_sign_delay = 0
-headless = true
-visible_on_sign = false
+headless = $HEADLESS
+visible_on_sign = $VISIBLE_ON_SIGN
 profile_dir = "$TMP/profile"
 state_file = "$TMP/state.json"
 
@@ -117,6 +124,9 @@ enabled = false
 EOF
 
 echo "watcher   : $BASE"
+if [ "$HEADLESS" = "false" ]; then
+    echo "navigateur: visible pendant le cycle"
+fi
 echo
 set +e
 (cd "$ROOT/watcher" && uv run checkmate-watcher --config "$TMP/config.toml" run --once -v)
@@ -126,7 +136,7 @@ set -e
 echo
 echo "etat      : $(curl -sf "$BASE/api/state" || echo 'indisponible')"
 if [ "$KEEP" = "1" ]; then
-    echo "emulateur laisse sur $BASE (pid $EMULATOR_PID), Ctrl-C pour l'arreter"
+    echo "emulateur laisse sur $BASE, connexion demo / demo, Ctrl-C pour l'arreter"
     wait "$EMULATOR_PID"
 fi
 exit "$CODE"
