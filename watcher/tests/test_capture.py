@@ -99,18 +99,18 @@ def test_build_pages_associe_les_etats_du_tableau_de_bord():
 
     assert pages["/connexion"] == "pages/connexion.html"
     assert pages["/"] == {
-        "default": "pages/accueil.html",
         "open": "pages/accueil.html",
+        "default": "pages/accueil-signe.html",
         "signed": "pages/accueil-signe.html",
     }
 
 
 def test_build_pages_retombe_sur_la_premiere_page_capturee():
-    pages = capture.build_pages({"accueil-signe": "pages/accueil-signe.html"})
+    pages = capture.build_pages({"accueil": "pages/accueil.html"})
 
     assert pages["/"] == {
-        "signed": "pages/accueil-signe.html",
-        "default": "pages/accueil-signe.html",
+        "open": "pages/accueil.html",
+        "default": "pages/accueil.html",
     }
 
 

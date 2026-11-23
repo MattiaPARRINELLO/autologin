@@ -67,16 +67,16 @@ STEPS = (
     ),
     (
         STEP_SIGNED,
-        "Ferme le message et reviens au tableau de bord, bouton disparu",
+        "Ferme le message et reviens au tableau de bord sans bouton d'emargement",
     ),
 )
 
-# Le vrai parcours n'affiche jamais de tableau de bord sans bouton : l'accueil
-# capture sert donc d'etat par defaut et d'etat "emargement ouvert". Seul
-# l'accueil d'apres signature differe, par l'absence du bouton.
+# Le vrai parcours n'a pas de page « emargement ferme » distincte : le tableau
+# de bord sans bouton est le meme avant le lancement de l'emargement et apres
+# la signature. Il sert donc d'etat par defaut et d'etat signe.
 DASHBOARD_STEPS = {
-    STEP_DASHBOARD: ("default", "open"),
-    STEP_SIGNED: ("signed",),
+    STEP_DASHBOARD: ("open",),
+    STEP_SIGNED: ("default", "signed"),
 }
 
 # Pages conservees comme reference pour ecrire le harness, mais non servies :
