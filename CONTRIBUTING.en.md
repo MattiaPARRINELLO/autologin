@@ -48,6 +48,10 @@ uvx ruff format --check src tests
 uv run pytest -q
 ```
 
+To iterate on a real page without an attendance slot,
+`./scripts/dev-scenario.sh path/to/capture` serves a capture and runs a full
+watcher cycle: see [Tester avec une capture CESAR](emulator/docs/tester-sans-cesar.md).
+
 End-to-end tests (`tests/test_emulator_e2e.py`) are skipped by default. They
 need Chromium and start the CESAR emulator themselves:
 
