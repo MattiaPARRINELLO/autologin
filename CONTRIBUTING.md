@@ -128,6 +128,13 @@ plus des notes de release, et les deux finiraient par diverger. Une contribution
 qui change le comportement doit donc decrire le changement dans la description
 de la pull request pour qu'il se retrouve dans les notes de release.
 
+Les notes sont regroupees par type, dans cet ordre : fonctionnalites,
+corrections, documentation, dependances, maintenance. Le regroupement vient du
+titre de la pull request, pas de son contenu : le job `PR title` valide le titre
+conventionnel et pose le label correspondant, puis `.github/release.yml`
+declare l'ordre des categories. Une pull request sans label de type ou au titre
+hors convention apparait sous « Autres changements ».
+
 La documentation ne code jamais une version de release en dur : le README pointe
 sur `releases/latest` et sur le badge dynamique, et les exemples de fichiers
 utilisent `<version>`. Le job `Docs versions` refuserait un numero fige.
