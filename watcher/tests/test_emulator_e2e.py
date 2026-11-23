@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import http.client
 import json
 import os
 import shutil
@@ -84,11 +85,7 @@ POINTS = [Point(10, 10, "start"), Point(60, 40, "move"), Point(120, 20, "end")]
 
 
 @contextmanager
-def emulator(*arguments: str, **environment: str):
-    executable = chromium_path()
-    if executable is None:
-        pytest.skip("aucun Chromium disponible")
-
+def emulator_server(*arguments: str, **environment: str):
     port = free_port()
     process = subprocess.Popen(
         [sys.executable, str(EMULATOR), "--port", str(port), *arguments],
@@ -99,14 +96,24 @@ def emulator(*arguments: str, **environment: str):
     base_url = f"http://127.0.0.1:{port}"
     try:
         wait_for_state(base_url)
-        post(base_url, "/api/attendance/open")
-        yield executable, base_url
+        yield base_url
     finally:
         process.terminate()
         try:
             process.wait(timeout=10)
         except subprocess.TimeoutExpired:
             process.kill()
+
+
+@contextmanager
+def emulator(*arguments: str, **environment: str):
+    executable = chromium_path()
+    if executable is None:
+        pytest.skip("aucun Chromium disponible")
+
+    with emulator_server(*arguments, **environment) as base_url:
+        post(base_url, "/api/attendance/open")
+        yield executable, base_url
 
 
 def make_config(tmp_path, executable: str, base_url: str, points=None) -> Config:
@@ -375,3 +382,20 @@ def test_une_capture_de_cesar_devient_un_scenario_jouable(tmp_path):
         )
         assert code == 0
         assert wait_for_state(base_url)["signed"] is True
+
+
+def test_la_connexion_accepte_les_champs_du_formulaire_cesar():
+    with emulator_server() as base_url:
+        port = int(base_url.rsplit(":", 1)[1])
+        connection = http.client.HTTPConnection("127.0.0.1", port, timeout=5)
+        connection.request(
+            "POST",
+            "/connexion",
+            body="_username=demo&_password=demo",
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
+        )
+        response = connection.getresponse()
+
+        assert response.status == 303
+        assert "cesar_session=" in (response.getheader("Set-Cookie") or "")
+        connection.close()

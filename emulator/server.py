@@ -596,8 +596,10 @@ class Handler(BaseHTTPRequestHandler):
             length = int(self.headers.get("Content-Length") or 0)
             raw = self.rfile.read(length).decode("utf-8", errors="replace")
             form = parse_qs(raw)
-            username = (form.get("username") or [""])[0]
-            password = (form.get("password") or [""])[0]
+            # Un scenario capture reprend les noms de champs de CESAR
+            # (_username, _password) : on accepte les deux conventions.
+            username = (form.get("username") or form.get("_username") or [""])[0]
+            password = (form.get("password") or form.get("_password") or [""])[0]
             if (
                 username == self.emulator.username
                 and password == self.emulator.password
