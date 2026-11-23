@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CESAR Emineo - tableau de bord</title>
+<link rel="stylesheet" href="/assets/cesar.css">
+</head>
+<body class="page-dashboard" data-scenario="cesar-simplifie">
+<div id="app">
+  <header class="topbar">
+    <span class="brand">CESAR Emineo</span>
+    <nav class="topbar-nav">
+      <a href="/admin">Administration</a>
+      <a href="/connexion?logout=1">Deconnexion</a>
+    </nav>
+  </header>
+  <main class="layout">
+    <section class="calendar-panel card toastui-calendar-day-view">
+      <h2 class="panel-title">Journee</h2>
+      <div class="toastui-calendar-layout">
+        <ul class="slot-list">
+          <li class="slot"><strong>08:30</strong> Culture generale</li>
+          <li class="slot"><strong>10:15</strong> Maths</li>
+          <li class="slot"><strong>14:00</strong> Developpement</li>
+        </ul>
+      </div>
+    </section>
+    <section class="attendance-panel card">
+      <p class="status open">Emargement ouvert</p>
+      <p class="hint">Le formateur attend ta signature.</p>
+      <button type="button" class="buttonPresent btn-success"
+              data-live-action-param="session-1">Signer ma presence</button>
+    </section>
+  </main>
+</div>
+<div id="attendance-modal" class="swal2-container" aria-hidden="true">
+  <div class="swal2-popup" role="dialog" aria-modal="true">
+    <h2 class="swal2-title">Signature de presence</h2>
+    <p class="hint">Trace ta signature puis valide.</p>
+    <div class="signature-frame">
+      <canvas id="signature-pad" data-written-signature-target="canvas"
+              width="320" height="150"></canvas>
+    </div>
+    <button type="button" id="save-signature" class="btn-primary"
+            data-live-action-param="signed">Enregistrer</button>
+    <div class="swal2-html-container"></div>
+  </div>
+</div>
+<script src="/assets/cesar-lib.js"></script>
+</body>
+</html>

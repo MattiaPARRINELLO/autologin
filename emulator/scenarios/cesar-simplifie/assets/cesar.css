@@ -1,0 +1,91 @@
+/* Feuille de style du scenario, servie comme une ressource statique. */
+:root {
+  color-scheme: light;
+  --cesar-ink: #0f172a;
+  --cesar-line: #cbd5e1;
+  --cesar-accent: #1d4ed8;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: "Segoe UI", system-ui, sans-serif;
+  background: #f1f5f9;
+  color: var(--cesar-ink);
+}
+
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 28px;
+  background: #fff;
+  border-bottom: 1px solid var(--cesar-line);
+}
+
+.brand { font-weight: 700; letter-spacing: .3px; }
+.topbar-nav a { margin-left: 18px; color: var(--cesar-accent); text-decoration: none; }
+
+.layout {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 28px 20px 64px;
+  display: grid;
+  gap: 18px;
+}
+
+.card {
+  background: #fff;
+  border: 1px solid var(--cesar-line);
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.panel-title { margin: 0 0 12px; font-size: 17px; }
+.slot-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.slot { padding: 10px 12px; border: 1px solid var(--cesar-line); border-radius: 8px; }
+
+.status { display: inline-block; padding: 5px 12px; border-radius: 999px; font-size: 13px; font-weight: 700; }
+.status.open { background: #dcfce7; color: #14532d; }
+.status.closed { background: #e2e8f0; color: #334155; }
+.hint { color: #64748b; font-size: 14px; }
+
+button { font: inherit; border: 0; border-radius: 8px; padding: 11px 18px; font-weight: 700; cursor: pointer; }
+.btn-primary { background: var(--cesar-accent); color: #fff; }
+.btn-success { background: #15803d; color: #fff; margin-top: 12px; }
+
+#attendance-modal {
+  position: fixed;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15, 23, 42, .55);
+}
+
+#attendance-modal.visible { display: flex; }
+
+.swal2-popup {
+  background: #fff;
+  border-radius: 14px;
+  padding: 22px;
+  width: 380px;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, .35);
+}
+
+.swal2-title { margin: 0 0 6px; font-size: 18px; }
+
+.signature-frame { margin: 14px 0; }
+canvas { display: block; width: 100%; background: #fff; border: 1px solid var(--cesar-line); border-radius: 10px; touch-action: none; cursor: crosshair; }
+
+.swal2-html-container { margin-top: 14px; color: #15803d; font-weight: 600; }
+
+.login-wrapper { min-height: 100vh; display: grid; place-items: center; padding: 24px; }
+.login-card { width: 380px; background: #fff; border: 1px solid var(--cesar-line); border-radius: 14px; padding: 26px; }
+.login-title { margin: 0 0 6px; font-size: 22px; }
+.login-hint { color: #64748b; font-size: 14px; margin-top: 0; }
+.form-group { margin-bottom: 16px; }
+.form-group label { display: block; font-size: 13px; color: #475569; margin-bottom: 6px; }
+.form-group input { width: 100%; padding: 11px; border: 1px solid var(--cesar-line); border-radius: 8px; }
+.login-submit { width: 100%; }

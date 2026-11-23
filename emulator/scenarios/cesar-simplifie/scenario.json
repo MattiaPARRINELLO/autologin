@@ -1,0 +1,13 @@
+{
+  "name": "cesar-simplifie",
+  "pages": {
+    "/connexion": "pages/connexion.html",
+    "/": {
+      "default": "pages/tableau-ferme.html",
+      "open": "pages/tableau-ouvert.html",
+      "signed": "pages/tableau-signe.html"
+    }
+  },
+  "harness": "harness.js",
+  "assets": "assets"
+}
