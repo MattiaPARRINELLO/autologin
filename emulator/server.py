@@ -256,7 +256,40 @@ CANVAS_WIRING = {
     canvas.addEventListener('pointerup', endStroke);
     canvas.addEventListener('pointercancel', endStroke);
 """,
+    "mouse": """
+    canvas.addEventListener('mousedown', (event) => {
+      drawing = true;
+      const p = position(event);
+      points.push({ x: p.x, y: p.y, type: 'start' });
+      ctx.beginPath();
+      ctx.moveTo(p.x, p.y);
+    });
+
+    canvas.addEventListener('mousemove', (event) => {
+      if (!drawing) return;
+      const p = position(event);
+      points.push({ x: p.x, y: p.y, type: 'move' });
+      ctx.lineTo(p.x, p.y);
+      ctx.stroke();
+    });
+
+    function endStroke(event) {
+      if (!drawing) return;
+      drawing = false;
+      const p = position(event);
+      points.push({ x: p.x, y: p.y, type: 'end' });
+      ctx.stroke();
+    }
+    canvas.addEventListener('mouseup', endStroke);
+    canvas.addEventListener('mouseleave', endStroke);
+""",
 }
+
+
+def canvas_wiring(variants: frozenset[str]) -> str:
+    if MOUSE_EVENTS_ONLY in variants:
+        return CANVAS_WIRING["mouse"]
+    return CANVAS_WIRING["pointer"]
 
 
 def render_page(title: str, body: str, *, script: str = "", style: str = "") -> bytes:
@@ -377,7 +410,7 @@ def render_dashboard(
 def dashboard_script(close_delay_ms: int, variants: frozenset[str]) -> str:
     return DASHBOARD_SCRIPT.replace(
         "__ATTENDANCE_CLOSE_DELAY_MS__", str(max(0, close_delay_ms))
-    ).replace("__CANVAS_WIRING__", CANVAS_WIRING["pointer"])
+    ).replace("__CANVAS_WIRING__", canvas_wiring(variants))
 
 
 def modal_style(variants: frozenset[str]) -> str:
@@ -658,7 +691,8 @@ def main() -> int:
         default=[],
         help=(
             "variante de comportement, repetable : slow-animation anime "
-            "lentement la modale de signature"
+            "lentement la modale de signature, mouse-events-only fait ignorer "
+            "les evenements pointer par le canvas"
         ),
     )
     args = parser.parse_args()
