@@ -36,6 +36,12 @@ EMULATOR = REPO_ROOT / "emulator" / "server.py"
 SCENARIO = REPO_ROOT / "emulator" / "scenarios" / "cesar-simplifie"
 E2E_ENABLED = os.environ.get("CHECKMATE_E2E") == "1"
 
+
+@pytest.fixture(autouse=True)
+def diagnostics_isolees(tmp_path, monkeypatch):
+    monkeypatch.setenv("CHECKMATE_DIAGNOSTICS_DIR", str(tmp_path / "diagnostics"))
+
+
 pytestmark = pytest.mark.skipif(
     not E2E_ENABLED,
     reason=(
