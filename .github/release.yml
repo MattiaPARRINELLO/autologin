@@ -1,0 +1,34 @@
+# Regroupement des notes de release generees par GitHub (generate_release_notes).
+# L'ordre des categories est celui de ce fichier ; un label ne peut appartenir
+# qu'a la premiere categorie qui le cite. Le label de type est applique par
+# `.github/workflows/pr-title.yml` a partir du titre conventionnel de la PR.
+changelog:
+  categories:
+    - title: Nouvelles fonctionnalites
+      labels:
+        - feat
+        - enhancement
+    - title: Corrections
+      labels:
+        - fix
+        - bug
+    - title: Documentation
+      labels:
+        - docs
+        - documentation
+    - title: Dependances
+      labels:
+        - dependencies
+    - title: Maintenance
+      labels:
+        - chore
+        - ci
+        - build
+        - test
+        - refactor
+        - style
+        - perf
+        - revert
+    - title: Autres changements
+      labels:
+        - "*"
