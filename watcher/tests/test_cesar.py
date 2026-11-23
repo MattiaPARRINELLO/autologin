@@ -160,9 +160,21 @@ def test_wait_for_hidden_sans_page(selectors):
                 "width": 600,
                 "height": 240,
             },
-            False,
+            True,
+        ),
+        (
+            {
+                "count": 900,
+                "minX": 298,
+                "minY": 20,
+                "maxX": 301,
+                "maxY": 220,
+                "width": 600,
+                "height": 240,
+            },
+            True,
         ),
     ],
 )
-def test_ink_is_dot(ink, attendu):
-    assert CesarSession._ink_is_dot(ink) is attendu
+def test_ink_is_incomplete(ink, attendu):
+    assert CesarSession._ink_is_incomplete(ink) is attendu
