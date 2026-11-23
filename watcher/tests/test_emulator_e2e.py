@@ -253,3 +253,25 @@ def test_le_scenario_respecte_le_delai_de_fermeture(tmp_path):
         assert "prise en compte" in confirmation.lower()
         assert elapsed >= 1.5
         assert wait_for_state(base_url)["signed"] is True
+
+
+def test_le_watcher_signe_avec_une_animation_lente(tmp_path):
+    with emulator("--variant", "slow-animation") as (executable, base_url):
+        config = make_config(tmp_path, executable, base_url)
+
+        async def scenario() -> tuple[str, str]:
+            session = CesarSession(config)
+            await session.open(headless=True)
+            try:
+                await session._goto_dashboard()
+                await session._ensure_logged_in()
+                html = await session.page.content()
+                return html, await session.sign(POINTS)
+            finally:
+                await session.close()
+
+        html, confirmation = asyncio.run(asyncio.wait_for(scenario(), timeout=120))
+
+        assert "modal-in" in html
+        assert "prise en compte" in confirmation.lower()
+        assert wait_for_state(base_url)["signed"] is True
