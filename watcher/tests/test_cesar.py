@@ -4,7 +4,7 @@ import asyncio
 
 import pytest
 
-from checkmate_watcher.cesar import CesarSession, draw_coordinates
+from checkmate_watcher.cesar import CANVAS_HITTABLE_JS, CesarSession, draw_coordinates
 from checkmate_watcher.config import (
     CesarConfig,
     Config,
@@ -185,3 +185,36 @@ def test_draw_coordinates_arrondit_les_points():
     fitted = [FittedPoint(x=1.234, y=5.678), FittedPoint(x=9.0, y=0.5)]
 
     assert draw_coordinates(fitted) == [[1.23, 5.68], [9.0, 0.5]]
+
+
+class FakeHitCanvas:
+    """Canvas dont le hit-test est scripte, pour tester l'attente."""
+
+    def __init__(self, results: list[bool]) -> None:
+        self.results = list(results)
+        self.current = results[-1] if results else True
+
+    async def evaluate(self, script, arg=None):
+        if script is CANVAS_HITTABLE_JS:
+            if self.results:
+                self.current = self.results.pop(0)
+            return self.current
+        return True
+
+
+def test_attend_que_le_canvas_soit_decouvert():
+    page = FakePage(wait_seconds=0)
+    session = make_session(page)
+    canvas = FakeHitCanvas([False, False, True])
+
+    assert asyncio.run(session._wait_until_hittable(canvas, timeout_ms=500)) is True
+    assert len(page.waits) == 2
+
+
+def test_abandonne_si_le_canvas_reste_recouvert():
+    page = FakePage(wait_seconds=0)
+    session = make_session(page)
+    canvas = FakeHitCanvas([False] * 40)
+
+    assert asyncio.run(session._wait_until_hittable(canvas, timeout_ms=150)) is False
+    assert len(page.waits) >= 1

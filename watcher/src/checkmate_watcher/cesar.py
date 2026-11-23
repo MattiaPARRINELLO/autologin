@@ -518,15 +518,17 @@ class CesarSession:
         trace. On retente alors en envoyant les evenements DOM directement.
         """
         await canvas.evaluate(INK_SNAPSHOT_JS)
-        fitted = self._fit_points(points, box)
-        if await self._canvas_is_hittable(canvas):
-            await self._draw(box, fitted)
+        if await self._wait_until_hittable(canvas):
+            box = await self._stable_box(canvas) or box
+            await self._draw(box, self._fit_points(points, box))
         else:
             logger.warning(
-                "canvas de signature recouvert par un autre element, "
+                "canvas de signature toujours recouvert apres attente, "
                 "envoi direct des evenements DOM"
             )
-            await canvas.evaluate(EVENT_DRAW_JS, draw_coordinates(fitted))
+            await canvas.evaluate(
+                EVENT_DRAW_JS, draw_coordinates(self._fit_points(points, box))
+            )
         await self.page.wait_for_timeout(200)
         ink = await canvas.evaluate(INK_DIFF_JS)
         logger.info("encre detectee sur le canvas : %s", ink)
@@ -553,6 +555,26 @@ class CesarSession:
                 "la signature n'a pas ete prise par le canvas CESAR "
                 "(trace reduit a un point ou a une ligne)"
             )
+
+    async def _wait_until_hittable(self, canvas, timeout_ms: int = 3000) -> bool:
+        """Attend que l'animation de la popup decouvre le canvas.
+
+        Pendant l'animation, une couche du site peut recouvrir le canvas : les
+        clics de la souris partent alors sur cette couche et le trace est perdu.
+        """
+        if self.page is None:
+            return await self._canvas_is_hittable(canvas)
+        deadline = asyncio.get_running_loop().time() + timeout_ms / 1000
+        waited = False
+        while asyncio.get_running_loop().time() < deadline:
+            if await self._canvas_is_hittable(canvas):
+                if waited:
+                    logger.info("canvas de signature decouvert apres attente")
+                return True
+            waited = True
+            await self.page.wait_for_timeout(100)
+        logger.warning("canvas de signature encore recouvert apres %sms", timeout_ms)
+        return False
 
     async def _canvas_is_hittable(self, canvas) -> bool:
         """Verifie qu'aucun element ne recouvre le canvas.
