@@ -24,8 +24,9 @@ READY_SELECTORS = (
     "div.toastui-calendar-layout",
 )
 
-# En dessous de ce ratio, le trace couvre une zone trop petite pour etre une
-# signature : c'est un point (clic sans mouvement ou canvas mal mesure).
+# En dessous de ce ratio sur un des deux axes, le trace n'a pas la forme d'une
+# signature : point (clic sans mouvement) ou ligne (canvas mesure pendant une
+# animation, mouvements ignores par la librairie du site).
 MIN_INK_RATIO = 0.05
 
 INK_SNAPSHOT_JS = """
@@ -495,7 +496,7 @@ class CesarSession:
         await self._draw(box, self._fit_points(points, box))
         await self.page.wait_for_timeout(200)
         ink = await canvas.evaluate(INK_DIFF_JS)
-        if not self._ink_is_dot(ink):
+        if not self._ink_is_incomplete(ink):
             return
 
         logger.warning(
@@ -511,10 +512,10 @@ class CesarSession:
         await canvas.evaluate(EVENT_DRAW_JS, coordinates)
         await self.page.wait_for_timeout(200)
         ink = await canvas.evaluate(INK_DIFF_JS)
-        if self._ink_is_dot(ink):
+        if self._ink_is_incomplete(ink):
             raise SignError(
                 "la signature n'a pas ete prise par le canvas CESAR "
-                "(trace reduit a un point)"
+                "(trace reduit a un point ou a une ligne)"
             )
 
     def _fit_points(self, points: list[Point], box: dict) -> list[FittedPoint]:
@@ -526,7 +527,13 @@ class CesarSession:
         )
 
     @staticmethod
-    def _ink_is_dot(ink: dict | None) -> bool:
+    def _ink_is_incomplete(ink: dict | None) -> bool:
+        """Detecte un trace qui n'a pas la forme d'une signature.
+
+        Un point (clic sans mouvement) comme une ligne (un axe ecrase) sont
+        refuses : dans les deux cas le site enregistrerait autre chose que la
+        signature de l'utilisateur.
+        """
         if ink is None:
             return False
         if ink.get("count", 0) < 3:
@@ -535,7 +542,7 @@ class CesarSession:
         height = max(1, ink.get("height", 1))
         extent_x = (ink.get("maxX", -1) - ink.get("minX", 0)) / width
         extent_y = (ink.get("maxY", -1) - ink.get("minY", 0)) / height
-        return max(extent_x, extent_y) < MIN_INK_RATIO
+        return min(extent_x, extent_y) < MIN_INK_RATIO
 
     async def _draw(self, box: dict, points: list[FittedPoint]) -> None:
         if self.page is None:
