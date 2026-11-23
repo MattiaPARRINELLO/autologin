@@ -79,6 +79,24 @@ selecteurs par defaut du watcher (`.toastui-calendar-day-view`,
 `.buttonPresent`, `canvas[data-written-signature-target]`,
 `.swal2-html-container`) dans une structure differente des pages generees.
 
+## Variantes de comportement
+
+`--variant` (repetable) reproduit des conditions du vrai site, pour les bugs
+qui ne sortent qu'en conditions reelles :
+
+| Variante | Effet |
+|----------|-------|
+| `slow-animation` | la modale s'anime pendant 1,2 s : le canvas bouge encore quand le watcher le mesure |
+| `mouse-events-only` | le canvas n'ecoute que `mousedown` / `mousemove` / `mouseup` et ignore les evenements pointer |
+
+```bash
+python3 emulator/server.py --port 8787 --variant slow-animation
+python3 emulator/server.py --port 8787 --variant mouse-events-only
+```
+
+Les variantes ne s'appliquent qu'aux pages generees : un scenario capture
+(`--scenario`) sert ses propres pages et son propre `harness.js`.
+
 ## Brancher le watcher dessus
 
 ```bash
