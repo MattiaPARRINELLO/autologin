@@ -12,6 +12,9 @@ brutes :
 3. ``write_scenario`` ecrit ``scenario.json`` et un ``harness.js`` de depart,
    directement consommables par ``emulator/server.py --scenario``.
 
+Le trace Playwright reste local : il contient le DOM reel et les formulaires
+saisis. Seules les pages et les assets assainis peuvent etre versionnes.
+
 Lancement interactif :
 
     uv run python -m checkmate_watcher.capture --output captures/2026-11-20
@@ -46,22 +49,42 @@ SECRET_HEADERS = frozenset(
 SECRET_CONTENT_KEYS = frozenset({"mimeType", "size", "compression"})
 
 STEP_CONNEXION = "connexion"
-STEP_DASHBOARD_CLOSED = "tableau-ferme"
-STEP_DASHBOARD_OPEN = "tableau-ouvert"
-STEP_DASHBOARD_SIGNED = "tableau-signe"
+STEP_DASHBOARD = "accueil"
+STEP_SIGNATURE = "signature"
+STEP_CONFIRMATION = "confirmation"
+STEP_SIGNED = "accueil-signe"
 
 STEPS = (
     (STEP_CONNEXION, "Arrive sur la page de connexion, sans te connecter"),
-    (STEP_DASHBOARD_CLOSED, "Connecte-toi et attends le tableau de bord"),
-    (STEP_DASHBOARD_OPEN, "Ouvre l'emargement et laisse la page telle quelle"),
-    (STEP_DASHBOARD_SIGNED, "Signe comme d'habitude, puis reviens sur le tableau"),
+    (
+        STEP_DASHBOARD,
+        "Connecte-toi, puis attends le tableau de bord avec le bouton d'emargement",
+    ),
+    (
+        STEP_SIGNATURE,
+        "Clique sur le bouton d'emargement pour ouvrir la signature",
+    ),
+    (
+        STEP_CONFIRMATION,
+        "Signe puis clique sur Enregistrer, sans fermer le message",
+    ),
+    (
+        STEP_SIGNED,
+        "Ferme le message et reviens au tableau de bord sans bouton d'emargement",
+    ),
 )
 
-STATE_STEPS = {
-    STEP_DASHBOARD_CLOSED: "default",
-    STEP_DASHBOARD_OPEN: "open",
-    STEP_DASHBOARD_SIGNED: "signed",
+# Le vrai parcours n'a pas de page « emargement ferme » distincte : le tableau
+# de bord sans bouton est le meme avant le lancement de l'emargement et apres
+# la signature. Il sert donc d'etat par defaut et d'etat signe.
+DASHBOARD_STEPS = {
+    STEP_DASHBOARD: ("open",),
+    STEP_SIGNED: ("default", "signed"),
 }
+
+# Pages conservees comme reference pour ecrire le harness, mais non servies :
+# la signature et le message de confirmation sont des popups, pas des routes.
+REFERENCE_STEPS = (STEP_SIGNATURE, STEP_CONFIRMATION)
 
 MASK_JS = """
 (selectors) => {
@@ -69,12 +92,20 @@ MASK_JS = """
   for (const selector of selectors) {
     for (const node of clone.querySelectorAll(selector)) {
       node.textContent = '[masque]';
-      node.removeAttribute('value');
+      for (const attribute of ['value', 'content', 'title', 'alt']) {
+        node.removeAttribute(attribute);
+      }
     }
   }
   return clone.outerHTML;
 }
 """
+
+# Metadonnees que CESAR injecte dans l'en-tete et qui identifient l'etudiant :
+# identifiant, nom, jeton CSRF. Retirees de toutes les pages assainies.
+SENSITIVE_META = re.compile(
+    r'<meta\b[^>]*\bname="(?:app-user|user|csrf[^"]*)"[^>]*>', re.IGNORECASE
+)
 
 FORM_ACTION = re.compile(r'(<form\b[^>]*\baction=")([^"]*)(")', re.IGNORECASE)
 CSS_URL = re.compile(r"url\(\s*(['\"]?)([^'\")]+)\1\s*\)")
@@ -102,7 +133,7 @@ class CaptureSession:
     _playwright: object | None = None
     _pending: list = field(default_factory=list)
 
-    async def start(self) -> None:
+    async def start(self, headless: bool = False) -> None:
         from playwright.async_api import async_playwright
 
         (self.root / PAGES_DIR).mkdir(parents=True, exist_ok=True)
@@ -110,7 +141,7 @@ class CaptureSession:
         self._playwright = await async_playwright().start()
         options = resolve_launch_options(self._playwright.chromium, None).as_kwargs()
         self._browser = await self._playwright.chromium.launch(
-            headless=False,
+            headless=headless,
             args=["--no-first-run", "--no-default-browser-check"],
             **options,
         )
@@ -203,9 +234,14 @@ def read_metadata(root: Path) -> dict:
 def rewrite_pages(root: Path, mapping: dict[str, str]) -> None:
     for page in sorted((root / PAGES_DIR).glob("*.html")):
         html = rewrite_assets(page.read_text(encoding="utf-8"), mapping)
+        html = strip_sensitive_meta(html)
         if page.stem == STEP_CONNEXION:
             html = normalize_login_action(html)
         page.write_text(html, encoding="utf-8")
+
+
+def strip_sensitive_meta(html: str) -> str:
+    return SENSITIVE_META.sub("", html)
 
 
 def rewrite_assets(html: str, mapping: dict[str, str]) -> str:
@@ -257,6 +293,9 @@ def scrub_message(message: dict) -> None:
     ]
     message.pop("cookies", None)
     message.pop("queryString", None)
+    # Le corps d'une requete contient le formulaire de connexion :
+    # identifiant, mot de passe en clair et jeton CSRF.
+    message.pop("postData", None)
     message["url"] = message.get("url", "").split("?", 1)[0]
     if "content" in message:
         message["content"] = {
@@ -289,18 +328,26 @@ def page_files(root: Path) -> dict[str, str]:
 
 
 def build_pages(files: dict[str, str]) -> dict:
-    dashboard = {
-        state: files[step] for step, state in STATE_STEPS.items() if step in files
-    }
     pages: dict = {}
     if STEP_CONNEXION in files:
         pages["/connexion"] = files[STEP_CONNEXION]
+    dashboard = build_dashboard_states(files)
     if dashboard:
-        dashboard.setdefault("default", next(iter(dashboard.values())))
         pages["/"] = dashboard
     if not pages:
         raise ValueError("aucune page capturee : capture d'abord un parcours")
     return pages
+
+
+def build_dashboard_states(files: dict[str, str]) -> dict[str, str]:
+    states: dict[str, str] = {}
+    for step, step_states in DASHBOARD_STEPS.items():
+        for state in step_states:
+            if step in files:
+                states[state] = files[step]
+    if states:
+        states.setdefault("default", next(iter(states.values())))
+    return states
 
 
 async def run_capture(args: argparse.Namespace) -> None:
@@ -317,6 +364,9 @@ async def run_capture(args: argparse.Namespace) -> None:
     sanitize(args.output)
     write_scenario(args.output, args.name or args.output.name)
     print(f"\nScenario ecrit dans {args.output}")
+    references = [step for step in REFERENCE_STEPS if step in session.steps]
+    if references:
+        print(f"  captures de reference (non servies) : {', '.join(references)}")
     print(f"  python emulator/server.py --scenario {args.output}")
 
 
