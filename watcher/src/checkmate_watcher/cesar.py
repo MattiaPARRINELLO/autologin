@@ -92,8 +92,46 @@ INK_DIFF_JS = """
 }
 """
 
-EVENT_DRAW_JS = """
-async (canvas, coordinates) => {
+SIGNATURE_GUARD_JS = """
+() => {
+  if (document.getElementById('checkmate-signature-guard')) return true;
+  const guard = document.createElement('div');
+  guard.id = 'checkmate-signature-guard';
+  Object.assign(guard.style, {
+    position: 'fixed',
+    inset: '0',
+    zIndex: '2147483647',
+    background: 'transparent',
+    pointerEvents: 'auto',
+    touchAction: 'none',
+    cursor: 'progress',
+  });
+  const swallow = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+  };
+  for (const type of [
+    'pointerdown', 'pointerup', 'pointermove', 'pointercancel',
+    'mousedown', 'mouseup', 'mousemove',
+    'touchstart', 'touchend', 'touchmove',
+    'click', 'dblclick', 'contextmenu', 'wheel',
+  ]) {
+    guard.addEventListener(type, swallow, { passive: false });
+  }
+  document.documentElement.appendChild(guard);
+  return true;
+}
+"""
+
+SIGNATURE_GUARD_REMOVE_JS = """
+() => {
+  const guard = document.getElementById('checkmate-signature-guard');
+  if (guard) guard.remove();
+  return true;
+}
+"""
+
+EVENT_DRAW_JS = """async (canvas, coordinates) => {
   const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   const rect = canvas.getBoundingClientRect();
   const withOffsets = (event, x, y) => {
@@ -487,35 +525,56 @@ class CesarSession:
     ) -> None:
         """Rejoue la signature puis verifie qu'elle est vraiment dessinee.
 
-        Un canvas mesure pendant une animation, ou un enchainement d'evenements
-        ignore par la librairie du site, produit un simple point au lieu du
-        trace. On retente alors en envoyant les evenements DOM directement.
+        Un clic humain pendant le rejeu, un canvas mesure pendant une animation
+        ou des evenements ignores par la librairie du site produisent un simple
+        point au lieu du trace. On bloque donc les clics avec une garde
+        transparente et on envoie les evenements DOM directement sur le canvas,
+        puis on verifie les pixels. En dernier recours, on repasse par le vrai
+        curseur.
         """
         await canvas.evaluate(INK_SNAPSHOT_JS)
-        await self._draw(box, self._fit_points(points, box))
-        await self.page.wait_for_timeout(200)
-        ink = await canvas.evaluate(INK_DIFF_JS)
-        if not self._ink_is_dot(ink):
-            return
+        await self._signature_guard(canvas, True)
+        try:
+            for attempt in (1, 2):
+                coordinates = [
+                    [round(point.x, 2), round(point.y, 2)]
+                    for point in self._fit_points(points, box)
+                ]
+                await canvas.evaluate(EVENT_DRAW_JS, coordinates)
+                await self.page.wait_for_timeout(200)
+                ink = await canvas.evaluate(INK_DIFF_JS)
+                if not self._ink_is_dot(ink):
+                    return
+                logger.warning(
+                    "trace incomplet sur le canvas CESAR (tentative %s/2, %s)",
+                    attempt,
+                    ink,
+                )
 
-        logger.warning(
-            "trace incomplet sur le canvas CESAR (%s), nouvelle tentative", ink
-        )
-        retry_box = await self._stable_box(canvas)
-        if retry_box is None or retry_box["width"] <= 0 or retry_box["height"] <= 0:
-            raise SignError("canvas de signature sans dimensions")
-        coordinates = [
-            [round(point.x, 2), round(point.y, 2)]
-            for point in self._fit_points(points, retry_box)
-        ]
-        await canvas.evaluate(EVENT_DRAW_JS, coordinates)
-        await self.page.wait_for_timeout(200)
-        ink = await canvas.evaluate(INK_DIFF_JS)
-        if self._ink_is_dot(ink):
-            raise SignError(
-                "la signature n'a pas ete prise par le canvas CESAR "
-                "(trace reduit a un point)"
-            )
+            # Dernier recours : vrai curseur. La garde est retiree pour que
+            # Playwright puisse atteindre le canvas.
+            await self._signature_guard(canvas, False)
+            retry_box = await self._stable_box(canvas)
+            if retry_box is None or retry_box["width"] <= 0 or retry_box["height"] <= 0:
+                raise SignError("canvas de signature sans dimensions")
+            await self._draw(retry_box, self._fit_points(points, retry_box))
+            await self.page.wait_for_timeout(200)
+            ink = await canvas.evaluate(INK_DIFF_JS)
+            if self._ink_is_dot(ink):
+                raise SignError(
+                    "la signature n'a pas ete prise par le canvas CESAR "
+                    "(trace reduit a un point)"
+                )
+        finally:
+            await self._signature_guard(canvas, False)
+
+    async def _signature_guard(self, canvas, active: bool) -> None:
+        """Pose ou retire un calque transparent qui avale les clics humains."""
+        script = SIGNATURE_GUARD_JS if active else SIGNATURE_GUARD_REMOVE_JS
+        try:
+            await canvas.evaluate(script)
+        except Exception:
+            logger.debug("garde de signature indisponible", exc_info=True)
 
     def _fit_points(self, points: list[Point], box: dict) -> list[FittedPoint]:
         return fit_points(
