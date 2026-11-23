@@ -142,6 +142,39 @@ def test_snapshot_erreur_sans_cause(tmp_path):
     assert snapshot["last_error_message"] is None
 
 
+def test_snapshot_erreur_resolue(tmp_path):
+    config = make_config(tmp_path)
+    state = StateStore(tmp_path / "state.json")
+    state.set_meta("last_error_at", "2026-11-16T09:50:00")
+    state.set_meta("last_error_message", "CESAR est injoignable pour le moment.")
+    state.set_meta("last_ok_at", "2026-11-16T09:52:00")
+    snapshot = build_snapshot(
+        config,
+        state,
+        datetime(2026, 11, 16, 9, 0),
+        tmp_path / "config.toml",
+        now=datetime(2026, 11, 16, 10, 0),
+    )
+    assert snapshot["mode"] == "active"
+    assert snapshot["label"] == "Surveillance active"
+    assert snapshot["last_error_message"] == "CESAR est injoignable pour le moment."
+
+
+def test_snapshot_erreur_posterieure_au_succes(tmp_path):
+    config = make_config(tmp_path)
+    state = StateStore(tmp_path / "state.json")
+    state.set_meta("last_ok_at", "2026-11-16T09:50:00")
+    state.set_meta("last_error_at", "2026-11-16T09:58:00")
+    snapshot = build_snapshot(
+        config,
+        state,
+        datetime(2026, 11, 16, 9, 0),
+        tmp_path / "config.toml",
+        now=datetime(2026, 11, 16, 10, 0),
+    )
+    assert snapshot["mode"] == "error"
+
+
 def test_snapshot_uptime(tmp_path):
     config = make_config(tmp_path)
     state = StateStore(tmp_path / "state.json")

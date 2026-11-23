@@ -26,6 +26,13 @@ def _recent(value: str | None, now: datetime, seconds: int = 600) -> bool:
     return (now - stamp).total_seconds() < seconds
 
 
+def _resolved(state: StateStore) -> bool:
+    """Vrai si une surveillance a reussi depuis la derniere erreur."""
+    error_at = state.get_meta("last_error_at")
+    ok_at = state.get_meta("last_ok_at")
+    return bool(error_at and ok_at and ok_at >= error_at)
+
+
 def build_snapshot(
     config: Config,
     state: StateStore,
@@ -47,7 +54,7 @@ def build_snapshot(
     mode = "active" if situation.reason == "disabled" else situation.reason
     label = labels[situation.reason]
 
-    if _recent(state.get_meta("last_error_at"), moment):
+    if _recent(state.get_meta("last_error_at"), moment) and not _resolved(state):
         mode, label = "error", "Erreur récente"
 
     next_start = schedule.next_start(moment)
