@@ -108,3 +108,17 @@ def test_wait_for_hidden_sans_page(selectors):
     session.page = None
 
     assert asyncio.run(session._wait_for_hidden(selectors, 1000)) is False
+
+
+@pytest.mark.parametrize(
+    ("ink", "attendu"),
+    [
+        (None, False),
+        ({"count": 0, "minX": 0, "minY": 0, "maxX": -1, "maxY": -1, "width": 600, "height": 240}, True),
+        ({"count": 12, "minX": 300, "minY": 120, "maxX": 302, "maxY": 122, "width": 600, "height": 240}, True),
+        ({"count": 4000, "minX": 30, "minY": 20, "maxX": 560, "maxY": 220, "width": 600, "height": 240}, False),
+        ({"count": 900, "minX": 40, "minY": 118, "maxX": 540, "maxY": 121, "width": 600, "height": 240}, False),
+    ],
+)
+def test_ink_is_dot(ink, attendu):
+    assert CesarSession._ink_is_dot(ink) is attendu
