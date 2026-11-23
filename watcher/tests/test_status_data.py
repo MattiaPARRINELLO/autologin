@@ -112,6 +112,8 @@ def test_snapshot_erreur_recente(tmp_path):
     config = make_config(tmp_path)
     state = StateStore(tmp_path / "state.json")
     state.set_meta("last_error_at", "2026-11-16T09:58:00")
+    state.set_meta("last_error_kind", "reseau")
+    state.set_meta("last_error_message", "CESAR est injoignable pour le moment.")
     snapshot = build_snapshot(
         config,
         state,
@@ -121,6 +123,23 @@ def test_snapshot_erreur_recente(tmp_path):
     )
     assert snapshot["mode"] == "error"
     assert snapshot["label"] == "Erreur récente"
+    assert snapshot["last_error_kind"] == "reseau"
+    assert snapshot["last_error_message"] == "CESAR est injoignable pour le moment."
+
+
+def test_snapshot_erreur_sans_cause(tmp_path):
+    config = make_config(tmp_path)
+    state = StateStore(tmp_path / "state.json")
+    state.set_meta("last_error_at", "2026-11-16T09:58:00")
+    snapshot = build_snapshot(
+        config,
+        state,
+        datetime(2026, 11, 16, 9, 0),
+        tmp_path / "config.toml",
+        now=datetime(2026, 11, 16, 10, 0),
+    )
+    assert snapshot["last_error_kind"] is None
+    assert snapshot["last_error_message"] is None
 
 
 def test_snapshot_uptime(tmp_path):

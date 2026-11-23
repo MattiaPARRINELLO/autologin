@@ -88,6 +88,8 @@ def build_snapshot(
         "last_signed_at": state.get_meta("last_signed_at"),
         "last_detection_at": state.get_meta("last_detection_at"),
         "last_error_at": state.get_meta("last_error_at"),
+        "last_error_kind": state.get_meta("last_error_kind"),
+        "last_error_message": state.get_meta("last_error_message"),
         "restart_required": restart_required,
         "log_file": str(default_log_file()),
     }
