@@ -90,27 +90,27 @@ def test_strip_har_secrets_ignore_un_har_absent(tmp_path):
 def test_build_pages_associe_les_etats_du_tableau_de_bord():
     files = {
         "connexion": "pages/connexion.html",
-        "tableau-ferme": "pages/tableau-ferme.html",
-        "tableau-ouvert": "pages/tableau-ouvert.html",
-        "tableau-signe": "pages/tableau-signe.html",
+        "accueil": "pages/accueil.html",
+        "accueil-signe": "pages/accueil-signe.html",
+        "signature": "pages/signature.html",
     }
 
     pages = capture.build_pages(files)
 
     assert pages["/connexion"] == "pages/connexion.html"
     assert pages["/"] == {
-        "default": "pages/tableau-ferme.html",
-        "open": "pages/tableau-ouvert.html",
-        "signed": "pages/tableau-signe.html",
+        "default": "pages/accueil.html",
+        "open": "pages/accueil.html",
+        "signed": "pages/accueil-signe.html",
     }
 
 
 def test_build_pages_retombe_sur_la_premiere_page_capturee():
-    pages = capture.build_pages({"tableau-ouvert": "pages/tableau-ouvert.html"})
+    pages = capture.build_pages({"accueil-signe": "pages/accueil-signe.html"})
 
     assert pages["/"] == {
-        "open": "pages/tableau-ouvert.html",
-        "default": "pages/tableau-ouvert.html",
+        "signed": "pages/accueil-signe.html",
+        "default": "pages/accueil-signe.html",
     }
 
 

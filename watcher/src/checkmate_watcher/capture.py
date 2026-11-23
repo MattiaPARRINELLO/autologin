@@ -46,22 +46,42 @@ SECRET_HEADERS = frozenset(
 SECRET_CONTENT_KEYS = frozenset({"mimeType", "size", "compression"})
 
 STEP_CONNEXION = "connexion"
-STEP_DASHBOARD_CLOSED = "tableau-ferme"
-STEP_DASHBOARD_OPEN = "tableau-ouvert"
-STEP_DASHBOARD_SIGNED = "tableau-signe"
+STEP_DASHBOARD = "accueil"
+STEP_SIGNATURE = "signature"
+STEP_CONFIRMATION = "confirmation"
+STEP_SIGNED = "accueil-signe"
 
 STEPS = (
     (STEP_CONNEXION, "Arrive sur la page de connexion, sans te connecter"),
-    (STEP_DASHBOARD_CLOSED, "Connecte-toi et attends le tableau de bord"),
-    (STEP_DASHBOARD_OPEN, "Ouvre l'emargement et laisse la page telle quelle"),
-    (STEP_DASHBOARD_SIGNED, "Signe comme d'habitude, puis reviens sur le tableau"),
+    (
+        STEP_DASHBOARD,
+        "Connecte-toi, puis attends le tableau de bord avec le bouton d'emargement",
+    ),
+    (
+        STEP_SIGNATURE,
+        "Clique sur le bouton d'emargement pour ouvrir la signature",
+    ),
+    (
+        STEP_CONFIRMATION,
+        "Signe puis clique sur Enregistrer, sans fermer le message",
+    ),
+    (
+        STEP_SIGNED,
+        "Ferme le message et reviens au tableau de bord, bouton disparu",
+    ),
 )
 
-STATE_STEPS = {
-    STEP_DASHBOARD_CLOSED: "default",
-    STEP_DASHBOARD_OPEN: "open",
-    STEP_DASHBOARD_SIGNED: "signed",
+# Le vrai parcours n'affiche jamais de tableau de bord sans bouton : l'accueil
+# capture sert donc d'etat par defaut et d'etat "emargement ouvert". Seul
+# l'accueil d'apres signature differe, par l'absence du bouton.
+DASHBOARD_STEPS = {
+    STEP_DASHBOARD: ("default", "open"),
+    STEP_SIGNED: ("signed",),
 }
+
+# Pages conservees comme reference pour ecrire le harness, mais non servies :
+# la signature et le message de confirmation sont des popups, pas des routes.
+REFERENCE_STEPS = (STEP_SIGNATURE, STEP_CONFIRMATION)
 
 MASK_JS = """
 (selectors) => {
@@ -289,18 +309,26 @@ def page_files(root: Path) -> dict[str, str]:
 
 
 def build_pages(files: dict[str, str]) -> dict:
-    dashboard = {
-        state: files[step] for step, state in STATE_STEPS.items() if step in files
-    }
     pages: dict = {}
     if STEP_CONNEXION in files:
         pages["/connexion"] = files[STEP_CONNEXION]
+    dashboard = build_dashboard_states(files)
     if dashboard:
-        dashboard.setdefault("default", next(iter(dashboard.values())))
         pages["/"] = dashboard
     if not pages:
         raise ValueError("aucune page capturee : capture d'abord un parcours")
     return pages
+
+
+def build_dashboard_states(files: dict[str, str]) -> dict[str, str]:
+    states: dict[str, str] = {}
+    for step, step_states in DASHBOARD_STEPS.items():
+        for state in step_states:
+            if step in files:
+                states[state] = files[step]
+    if states:
+        states.setdefault("default", next(iter(states.values())))
+    return states
 
 
 async def run_capture(args: argparse.Namespace) -> None:
@@ -317,6 +345,9 @@ async def run_capture(args: argparse.Namespace) -> None:
     sanitize(args.output)
     write_scenario(args.output, args.name or args.output.name)
     print(f"\nScenario ecrit dans {args.output}")
+    references = [step for step in REFERENCE_STEPS if step in session.steps]
+    if references:
+        print(f"  captures de reference (non servies) : {', '.join(references)}")
     print(f"  python emulator/server.py --scenario {args.output}")
 
 
