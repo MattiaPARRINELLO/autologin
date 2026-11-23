@@ -24,6 +24,146 @@ READY_SELECTORS = (
     "div.toastui-calendar-layout",
 )
 
+# En dessous de ce ratio, le trace couvre une zone trop petite pour etre une
+# signature : c'est un point (clic sans mouvement ou canvas mal mesure).
+MIN_INK_RATIO = 0.05
+
+INK_SNAPSHOT_JS = """
+(canvas) => {
+  const context = canvas.getContext('2d');
+  if (!context) return false;
+  const width = canvas.width;
+  const height = canvas.height;
+  if (!width || !height) return false;
+  try {
+    const data = context.getImageData(0, 0, width, height).data;
+    window.__checkmateInk = { data: new Uint8ClampedArray(data), width, height };
+    return true;
+  } catch (error) {
+    return false;
+  }
+}
+"""
+
+INK_DIFF_JS = """
+(canvas) => {
+  const snapshot = window.__checkmateInk;
+  const context = canvas.getContext('2d');
+  if (!snapshot || !context) return null;
+  if (canvas.width !== snapshot.width || canvas.height !== snapshot.height) return null;
+  let data;
+  try {
+    data = context.getImageData(0, 0, snapshot.width, snapshot.height).data;
+  } catch (error) {
+    return null;
+  }
+  let minX = snapshot.width;
+  let minY = snapshot.height;
+  let maxX = -1;
+  let maxY = -1;
+  let count = 0;
+  const step = 2;
+  for (let y = 0; y < snapshot.height; y += step) {
+    for (let x = 0; x < snapshot.width; x += step) {
+      const index = (y * snapshot.width + x) * 4;
+      if (
+        data[index] !== snapshot.data[index] ||
+        data[index + 1] !== snapshot.data[index + 1] ||
+        data[index + 2] !== snapshot.data[index + 2] ||
+        data[index + 3] !== snapshot.data[index + 3]
+      ) {
+        count += 1;
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+      }
+    }
+  }
+  return {
+    count,
+    minX,
+    minY,
+    maxX,
+    maxY,
+    width: snapshot.width,
+    height: snapshot.height,
+  };
+}
+"""
+
+EVENT_DRAW_JS = """
+async (canvas, coordinates) => {
+  const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+  const rect = canvas.getBoundingClientRect();
+  const withOffsets = (event, x, y) => {
+    const values = {
+      offsetX: x,
+      offsetY: y,
+      layerX: x,
+      layerY: y,
+      pageX: window.scrollX + rect.left + x,
+      pageY: window.scrollY + rect.top + y,
+      x: rect.left + x,
+      y: rect.top + y,
+    };
+    for (const [key, value] of Object.entries(values)) {
+      try {
+        Object.defineProperty(event, key, { configurable: true, get: () => value });
+      } catch (error) {
+        // Certaines implementations verrouillent deja ces proprietes.
+      }
+    }
+    return event;
+  };
+  const fire = (kind, x, y, buttons) => {
+    const clientX = rect.left + x;
+    const clientY = rect.top + y;
+    const options = {
+      bubbles: true,
+      cancelable: true,
+      composed: true,
+      clientX,
+      clientY,
+      screenX: window.screenX + clientX,
+      screenY: window.screenY + clientY,
+      button: 0,
+      buttons,
+    };
+    const names = { down: 'mousedown', move: 'mousemove', up: 'mouseup' };
+    canvas.dispatchEvent(withOffsets(new MouseEvent(names[kind], options), x, y));
+    try {
+      canvas.dispatchEvent(
+        withOffsets(
+          new PointerEvent('pointer' + kind, {
+            ...options,
+            pointerId: 1,
+            pointerType: 'mouse',
+            isPrimary: true,
+            pressure: buttons ? 0.5 : 0,
+          }),
+          x,
+          y
+        )
+      );
+    } catch (error) {
+      // PointerEvent non supporte.
+    }
+  };
+
+  const first = coordinates[0];
+  fire('down', first[0], first[1], 1);
+  for (let index = 1; index < coordinates.length; index += 1) {
+    await delay(8);
+    fire('move', coordinates[index][0], coordinates[index][1], 1);
+  }
+  await delay(8);
+  const last = coordinates[coordinates.length - 1];
+  fire('up', last[0], last[1], 0);
+  return true;
+}
+"""
+
 
 class CesarError(Exception):
     """Erreur generale de pilotage du site."""
@@ -276,19 +416,18 @@ class CesarSession:
 
         await button.click()
         canvas = await self._wait_for_selector(self.selectors.signature_canvas, 20000)
-        await self.page.wait_for_timeout(800)
 
-        box = await canvas.bounding_box()
+        box = await self._stable_box(canvas)
         if box is None or box["width"] <= 0 or box["height"] <= 0:
             raise SignError("canvas de signature sans dimensions")
 
-        fitted = fit_points(
-            points,
-            box["width"],
-            box["height"],
-            self.config.signature.padding_ratio,
+        logger.info(
+            "signature rejouee : %s points, canvas %sx%s",
+            len(points),
+            round(box["width"]),
+            round(box["height"]),
         )
-        await self._draw(box, fitted)
+        await self._draw_checked(canvas, box, points)
         await self.page.wait_for_timeout(500)
 
         previous = await self._confirmation_text()
@@ -315,6 +454,88 @@ class CesarSession:
             confirmation,
         )
         return confirmation
+
+    async def _stable_box(self, canvas, timeout_ms: int = 2000) -> dict | None:
+        """Attend que le canvas cesse de bouger (animation de la popup)."""
+        if self.page is None:
+            return None
+        deadline = asyncio.get_running_loop().time() + timeout_ms / 1000
+        previous = await canvas.bounding_box()
+        stable = 0
+        while asyncio.get_running_loop().time() < deadline:
+            await self.page.wait_for_timeout(80)
+            current = await canvas.bounding_box()
+            if current is None:
+                continue
+            if previous is not None and all(
+                abs(current[key] - previous[key]) < 0.5
+                for key in ("x", "y", "width", "height")
+            ):
+                stable += 1
+                if stable >= 3:
+                    return current
+            else:
+                stable = 0
+            previous = current
+        return previous
+
+    async def _draw_checked(
+        self,
+        canvas,
+        box: dict,
+        points: list[Point],
+    ) -> None:
+        """Rejoue la signature puis verifie qu'elle est vraiment dessinee.
+
+        Un canvas mesure pendant une animation, ou un enchainement d'evenements
+        ignore par la librairie du site, produit un simple point au lieu du
+        trace. On retente alors en envoyant les evenements DOM directement.
+        """
+        await canvas.evaluate(INK_SNAPSHOT_JS)
+        await self._draw(box, self._fit_points(points, box))
+        await self.page.wait_for_timeout(200)
+        ink = await canvas.evaluate(INK_DIFF_JS)
+        if not self._ink_is_dot(ink):
+            return
+
+        logger.warning(
+            "trace incomplet sur le canvas CESAR (%s), nouvelle tentative", ink
+        )
+        retry_box = await self._stable_box(canvas)
+        if retry_box is None or retry_box["width"] <= 0 or retry_box["height"] <= 0:
+            raise SignError("canvas de signature sans dimensions")
+        coordinates = [
+            [round(point.x, 2), round(point.y, 2)]
+            for point in self._fit_points(points, retry_box)
+        ]
+        await canvas.evaluate(EVENT_DRAW_JS, coordinates)
+        await self.page.wait_for_timeout(200)
+        ink = await canvas.evaluate(INK_DIFF_JS)
+        if self._ink_is_dot(ink):
+            raise SignError(
+                "la signature n'a pas ete prise par le canvas CESAR "
+                "(trace reduit a un point)"
+            )
+
+    def _fit_points(self, points: list[Point], box: dict) -> list[FittedPoint]:
+        return fit_points(
+            points,
+            box["width"],
+            box["height"],
+            self.config.signature.padding_ratio,
+        )
+
+    @staticmethod
+    def _ink_is_dot(ink: dict | None) -> bool:
+        if ink is None:
+            return False
+        if ink.get("count", 0) < 3:
+            return True
+        width = max(1, ink.get("width", 1))
+        height = max(1, ink.get("height", 1))
+        extent_x = (ink.get("maxX", -1) - ink.get("minX", 0)) / width
+        extent_y = (ink.get("maxY", -1) - ink.get("minY", 0)) / height
+        return max(extent_x, extent_y) < MIN_INK_RATIO
 
     async def _draw(self, box: dict, points: list[FittedPoint]) -> None:
         if self.page is None:

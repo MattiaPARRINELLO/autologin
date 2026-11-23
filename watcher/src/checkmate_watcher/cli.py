@@ -74,6 +74,7 @@ CAPTURE_HTML = """
     <h1>Dessine ta signature</h1>
     <p>Trace la signature a la souris, puis clique sur Enregistrer.</p>
     <canvas id="pad" width="640" height="320"></canvas>
+    <p id="message" role="status"></p>
     <div class="actions">
       <button id="clear" type="button">Effacer</button>
       <button id="save" type="button">Enregistrer</button>
@@ -126,13 +127,33 @@ CAPTURE_HTML = """
   canvas.addEventListener('pointerup', endStroke);
   canvas.addEventListener('pointercancel', endStroke);
 
+  function pointsExtent(points) {
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    for (const point of points) {
+      if (point.x < minX) minX = point.x;
+      if (point.y < minY) minY = point.y;
+      if (point.x > maxX) maxX = point.x;
+      if (point.y > maxY) maxY = point.y;
+    }
+    if (!Number.isFinite(minX) || !Number.isFinite(minY)) return 0;
+    return Math.max(maxX - minX, maxY - minY);
+  }
+
   document.getElementById('clear').addEventListener('click', () => {
     state.points.length = 0;
+    document.getElementById('message').textContent = '';
     ctx.clearRect(0, 0, canvas.width, canvas.height);
   });
 
   document.getElementById('save').addEventListener('click', () => {
-    if (state.points.length < 2) return;
+    if (state.points.length < 2 || pointsExtent(state.points) < 2) {
+      document.getElementById('message').textContent =
+        'Dessine une vraie signature : un clic ne suffit pas.';
+      return;
+    }
     state.done = true;
   });
 </script>

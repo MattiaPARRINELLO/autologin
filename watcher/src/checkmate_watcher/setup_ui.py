@@ -725,9 +725,24 @@ function clearPad() {
   setStatus("signatureStatus", "");
 }
 
+function pointsExtent(list) {
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  for (const point of list) {
+    if (point.x < minX) minX = point.x;
+    if (point.y < minY) minY = point.y;
+    if (point.x > maxX) maxX = point.x;
+    if (point.y > maxY) maxY = point.y;
+  }
+  if (!Number.isFinite(minX) || !Number.isFinite(minY)) return 0;
+  return Math.max(maxX - minX, maxY - minY);
+}
+
 async function saveSignature() {
-  if (points.length < 2) {
-    setStatus("signatureStatus", "Dessine d'abord une signature.", "err");
+  if (points.length < 2 || pointsExtent(points) < 2) {
+    setStatus("signatureStatus", "Dessine d'abord une vraie signature.", "err");
     return;
   }
   try {

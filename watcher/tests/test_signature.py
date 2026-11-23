@@ -36,6 +36,16 @@ def test_parse_points_refuse_des_coordonnees_invalides():
         parse_points([{"x": "a", "y": 1}, {"x": 2, "y": 3}])
 
 
+def test_parse_points_refuse_une_signature_reduite_a_un_point():
+    with pytest.raises(SignatureError):
+        parse_points(
+            [
+                {"x": 42, "y": 17, "type": "start"},
+                {"x": 42, "y": 17, "type": "end"},
+            ]
+        )
+
+
 def test_fit_points_centre_et_respecte_les_dimensions():
     points = [
         Point(0, 0, "start"),
