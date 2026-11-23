@@ -14,6 +14,7 @@ from datetime import date
 from .browser import resolve_launch_options
 from .config import Config
 from .signature import FittedPoint, Point, fit_points
+from .signature_diagnostics import SignatureDiagnostics, diagnostics_directory
 
 logger = logging.getLogger(__name__)
 
@@ -448,7 +449,10 @@ class CesarSession:
             round(box["width"]),
             round(box["height"]),
         )
-        await self._draw_checked(canvas, box, points)
+        diagnostics = SignatureDiagnostics(diagnostics_directory(), self.page)
+        await diagnostics.begin(canvas)
+        await self._draw_checked(canvas, box, points, diagnostics)
+        await diagnostics.save(canvas)
         await self.page.wait_for_timeout(500)
 
         previous = await self._confirmation_text()
@@ -505,6 +509,7 @@ class CesarSession:
         canvas,
         box: dict,
         points: list[Point],
+        diagnostics: SignatureDiagnostics,
     ) -> None:
         """Rejoue la signature puis verifie qu'elle est vraiment dessinee.
 
@@ -525,6 +530,7 @@ class CesarSession:
         await self.page.wait_for_timeout(200)
         ink = await canvas.evaluate(INK_DIFF_JS)
         logger.info("encre detectee sur le canvas : %s", ink)
+        await diagnostics.add_step("premier essai", canvas, ink)
         if not self._ink_is_incomplete(ink):
             return
 
@@ -540,7 +546,9 @@ class CesarSession:
         await self.page.wait_for_timeout(200)
         ink = await canvas.evaluate(INK_DIFF_JS)
         logger.info("encre detectee apres rejeu : %s", ink)
+        await diagnostics.add_step("rejeu", canvas, ink)
         if self._ink_is_incomplete(ink):
+            await diagnostics.save(canvas)
             raise SignError(
                 "la signature n'a pas ete prise par le canvas CESAR "
                 "(trace reduit a un point ou a une ligne)"

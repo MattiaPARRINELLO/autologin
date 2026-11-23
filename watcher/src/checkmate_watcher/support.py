@@ -17,6 +17,7 @@ from .credentials import keyring_available
 from .signature import SignatureError, load_signature
 
 MAX_LOG_LINES = 400
+MAX_DIAGNOSTIC_BYTES = 5_000_000
 
 
 def _redact(text: str) -> str:
@@ -59,14 +60,31 @@ def diagnostics(config: Config, config_path: Path) -> str:
             f"demarrage auto: {autostart_enabled()}",
             f"profil: {config.watcher.profile_dir}",
             f"logs: {paths.default_log_file()}",
+            f"diagnostics: {paths.data_dir() / 'diagnostics'}",
         ]
     )
+
+
+def _add_diagnostics(archive: zipfile.ZipFile, directory: Path) -> None:
+    """Ajoute les dernieres traces de signature, dans la limite de taille."""
+    if not directory.is_dir():
+        return
+    total = 0
+    for path in sorted(directory.rglob("*")):
+        if not path.is_file():
+            continue
+        size = path.stat().st_size
+        if total + size > MAX_DIAGNOSTIC_BYTES:
+            break
+        archive.write(path, f"diagnostics/{path.relative_to(directory)}")
+        total += size
 
 
 def build_support_bundle(
     config: Config,
     config_path: Path,
     output: Path | None = None,
+    diagnostics_dir: Path | None = None,
 ) -> Path:
     """Cree une archive de diagnostic sans mot de passe ni signature."""
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
@@ -82,5 +100,9 @@ def build_support_bundle(
         archive.writestr("diagnostic.txt", summary + "\n")
         archive.writestr("config-sans-secrets.toml", config_text)
         archive.writestr("logs.txt", log_text + "\n")
+        _add_diagnostics(
+            archive,
+            diagnostics_dir or (paths.data_dir() / "diagnostics"),
+        )
 
     return target
