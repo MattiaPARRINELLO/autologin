@@ -277,6 +277,27 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   /**
+   * Boite englobante du trace : un clic sans mouvement ne produit qu'un point.
+   */
+  function signatureExtent(data) {
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+
+    for (const point of data) {
+      if (typeof point.x !== 'number' || typeof point.y !== 'number') continue;
+      if (point.x < minX) minX = point.x;
+      if (point.y < minY) minY = point.y;
+      if (point.x > maxX) maxX = point.x;
+      if (point.y > maxY) maxY = point.y;
+    }
+
+    if (!Number.isFinite(minX) || !Number.isFinite(minY)) return 0;
+    return Math.max(maxX - minX, maxY - minY);
+  }
+
+  /**
    * Redessine une signature à partir d'un tableau de coordonnées
    * Utilisé lors du chargement de données sauvegardées
    */
@@ -511,6 +532,11 @@ document.addEventListener('DOMContentLoaded', () => {
       appendExecutionLog('Configuration', 'Signature manquante', 'error');
       return;
     }
+    if (signatureExtent(signatureData) < 2) {
+      updateStatusBar('Signature invalide : dessine un vrai trace');
+      appendExecutionLog('Configuration', 'Signature reduite a un point', 'error');
+      return;
+    }
 
     const lastAction = `Configuration sauvegardée — ${formatDateHeure()}`;
 
@@ -547,6 +573,11 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!result.signatureData || result.signatureData.length === 0) {
         updateStatusBar('Sauvegardez votre signature d\'abord');
         appendExecutionLog('Pointage', 'Tentative de lancement sans signature', 'error');
+        return;
+      }
+      if (signatureExtent(result.signatureData) < 2) {
+        updateStatusBar('Signature invalide : redessine-la');
+        appendExecutionLog('Pointage', 'Signature reduite a un point', 'error');
         return;
       }
 
