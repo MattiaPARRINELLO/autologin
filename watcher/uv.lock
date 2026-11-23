@@ -115,7 +115,7 @@ wheels = [
 
 [[package]]
 name = "checkmate-watcher"
-version = "0.6.3"
+version = "0.6.4"
 source = { editable = "." }
 dependencies = [
     { name = "dbus-next", marker = "sys_platform == 'linux'" },
