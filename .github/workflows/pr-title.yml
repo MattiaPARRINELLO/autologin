@@ -6,6 +6,7 @@ on:
 
 permissions:
   contents: read
+  pull-requests: write
 
 jobs:
   title:
@@ -24,3 +25,25 @@ jobs:
             exit 1
           fi
           echo "Titre valide : $TITLE"
+
+      - name: Etiqueter la pull request avec son type
+        # Un jeton de `pull_request` est en lecture seule sur une PR de fork :
+        # le labelling est reserve aux branches du depot.
+        if: github.event.pull_request.head.repo.full_name == github.repository
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          types="feat fix docs style refactor perf test build ci chore revert"
+          type="$(sed -E "s/^(${types// /|})(\([a-z0-9._/-]+\))?!?: .*/\1/" <<< "$TITLE")"
+          # Le label existe peut-etre deja : la commande est idempotente.
+          gh label create "$type" --force > /dev/null
+          for autre in $types; do
+            if [ "$autre" != "$type" ]; then
+              gh pr edit "$PR" --remove-label "$autre" > /dev/null 2>&1 || true
+            fi
+          done
+          gh pr edit "$PR" --add-label "$type" > /dev/null
+          echo "Label de type applique : $type"
