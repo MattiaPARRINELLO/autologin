@@ -178,6 +178,18 @@ def test_strip_sensitive_meta_retire_l_identite_et_le_jeton():
     assert 'name="viewport"' in result
 
 
+def test_strip_sensitive_fields_retire_le_jeton_du_formulaire():
+    html = (
+        '<input id="username" name="_username" value="">'
+        '<input type="hidden" name="_csrf_token" value="secret">'
+    )
+
+    result = capture.strip_sensitive_fields(html)
+
+    assert "_csrf_token" not in result
+    assert 'name="_username"' in result
+
+
 def test_sanitize_refuse_une_capture_sans_metadonnees(tmp_path):
     with pytest.raises(FileNotFoundError, match="capture introuvable"):
         capture.sanitize(tmp_path)
