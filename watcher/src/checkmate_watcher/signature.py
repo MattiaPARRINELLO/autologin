@@ -10,6 +10,8 @@ from pathlib import Path
 VALID_KINDS = ("start", "move", "end")
 MIN_PADDING_RATIO = 0.1
 MAX_PADDING_RATIO = 1.0
+# En dessous de cette etendue, le trace n'est qu'un point (clic sans mouvement).
+MIN_EXTENT = 2.0
 
 
 class SignatureError(Exception):
@@ -45,6 +47,13 @@ def _coerce_point(raw: object) -> Point:
     return Point(x=x, y=y, kind=kind)
 
 
+def points_extent(points: list[Point]) -> tuple[float, float]:
+    """Largeur et hauteur de la boite englobante du trace."""
+    xs = [p.x for p in points]
+    ys = [p.y for p in points]
+    return max(xs) - min(xs), max(ys) - min(ys)
+
+
 def parse_points(data: object) -> list[Point]:
     """Accepte la liste brute ou l'objet exporte par l'extension."""
     if isinstance(data, dict):
@@ -54,6 +63,11 @@ def parse_points(data: object) -> list[Point]:
     points = [_coerce_point(item) for item in data]
     if len(points) < 2:
         raise SignatureError("la signature doit contenir au moins deux points")
+    width, height = points_extent(points)
+    if max(width, height) < MIN_EXTENT:
+        raise SignatureError(
+            "la signature est un point : redessine-la en deplacant la souris"
+        )
     return points
 
 
