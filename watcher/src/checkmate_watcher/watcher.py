@@ -17,6 +17,7 @@ from .cesar import (
     is_success_confirmation,
 )
 from .config import Config
+from .errors import describe_error
 from .notifications import Notifier
 from .paths import default_config_path
 from .signature import load_signature
@@ -39,6 +40,14 @@ class StopRequested(Exception):
 
 def _now_iso() -> str:
     return datetime.now().isoformat(timespec="seconds")
+
+
+def _record_error(state: StateStore, exc: BaseException) -> None:
+    """Garde la cause de l'erreur pour l'afficher dans le tableau de bord."""
+    kind, message = describe_error(exc)
+    state.set_meta("last_error_at", _now_iso())
+    state.set_meta("last_error_kind", kind)
+    state.set_meta("last_error_message", message)
 
 
 SIGN = "sign"
@@ -379,7 +388,7 @@ async def run_loop(
                             except CesarError as exc:
                                 logger.error("echec de la signature : %s", exc)
                                 state.increment("stats.errors")
-                                state.set_meta("last_error_at", _now_iso())
+                                _record_error(state, exc)
                                 prompt_cooldowns[signal.key] = (
                                     asyncio.get_running_loop().time()
                                     + config.watcher.prompt_retry
@@ -421,7 +430,7 @@ async def run_loop(
                 except Exception as exc:  # noqa: BLE001
                     consecutive_errors += 1
                     state.increment("stats.errors")
-                    state.set_meta("last_error_at", _now_iso())
+                    _record_error(state, exc)
                     logger.error("erreur pendant la surveillance : %s", exc)
                     if consecutive_errors >= MAX_CONSECUTIVE_ERRORS:
                         logger.warning(
