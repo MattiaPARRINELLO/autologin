@@ -53,6 +53,19 @@ def status_level(mode: str) -> str:
     return "NeedsAttention" if mode == "error" else "Active"
 
 
+def menu_handler(action):
+    """Adapte une action sans argument au callback attendu par pystray.
+
+    pystray inspecte le nombre d'arguments du callback : zero, un ou deux.
+    Trois arguments, meme avec une valeur par defaut, levent une ValueError.
+    """
+
+    def handler(icon, item):
+        action()
+
+    return handler
+
+
 class TrayController:
     def __init__(self, session: StatusSession) -> None:
         self.session = session
@@ -112,7 +125,7 @@ class TrayController:
                 items.append(
                     pystray.MenuItem(
                         label,
-                        lambda icon, item, action=action: action(),
+                        menu_handler(action),
                         default=label == "Ouvrir le statut",
                     )
                 )
