@@ -27,6 +27,7 @@ def test_script_linux_echappe_les_chemins(tmp_path):
 
     monkeypatch = pytest.MonkeyPatch()
     monkeypatch.setattr(subprocess, "Popen", fake_popen)
+    monkeypatch.setattr(self_update.shutil, "which", lambda _name: None)
     try:
         self_update._install_linux(archive, archive.parent)
     finally:
@@ -37,7 +38,62 @@ def test_script_linux_echappe_les_chemins(tmp_path):
     assert "'" + str(archive) + "'" in script
     assert "tar -xzf" in script
     assert "systemctl --user stop checkmate-watcher.service" in script
+    assert "CHECKMATE_UPDATE_DETACHED" in script
+    assert "systemctl --user start checkmate-watcher.service" in script
     assert captured["kwargs"]["start_new_session"] is True
+
+
+def test_installation_linux_passe_par_une_unite_systemd(tmp_path):
+    archive = tmp_path / "CheckMate-linux-0.4.2.tar.gz"
+    archive.write_bytes(b"x")
+    calls: list = []
+
+    def fake_popen(argv, **kwargs):
+        calls.append((argv, kwargs))
+        return object()
+
+    monkeypatch = pytest.MonkeyPatch()
+    monkeypatch.setattr(subprocess, "Popen", fake_popen)
+    monkeypatch.setattr(
+        self_update.shutil, "which", lambda _name: "/usr/bin/systemd-run"
+    )
+    monkeypatch.setattr(self_update, "_transient_unit_active", lambda _unit: True)
+    try:
+        self_update._install_linux(archive, archive.parent)
+    finally:
+        monkeypatch.undo()
+
+    assert len(calls) == 1
+    argv = calls[0][0]
+    assert argv[0] == "/usr/bin/systemd-run"
+    assert any(arg.startswith("--unit=") for arg in argv)
+    assert "--setenv=CHECKMATE_UPDATE_DETACHED=1" in argv
+    assert argv[-2:] == ["/bin/bash", argv[-1]]
+
+
+def test_installation_linux_replie_si_unite_inactive(tmp_path):
+    archive = tmp_path / "CheckMate-linux-0.4.2.tar.gz"
+    archive.write_bytes(b"x")
+    calls: list = []
+
+    def fake_popen(argv, **kwargs):
+        calls.append((argv, kwargs))
+        return object()
+
+    monkeypatch = pytest.MonkeyPatch()
+    monkeypatch.setattr(subprocess, "Popen", fake_popen)
+    monkeypatch.setattr(
+        self_update.shutil, "which", lambda _name: "/usr/bin/systemd-run"
+    )
+    monkeypatch.setattr(self_update, "_transient_unit_active", lambda _unit: False)
+    try:
+        self_update._install_linux(archive, archive.parent)
+    finally:
+        monkeypatch.undo()
+
+    assert len(calls) == 2
+    assert calls[1][0][0] == "/bin/bash"
+    assert calls[1][1]["start_new_session"] is True
 
 
 def test_install_windows_utilise_les_options_silencieuses(tmp_path):
