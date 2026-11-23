@@ -47,19 +47,50 @@ Filename: "{sys}\schtasks.exe"; Parameters: "/Delete /F /TN CheckMate"; Flags: r
 Filename: "{sys}\reg.exe"; Parameters: "delete ""HKCU\Software\Microsoft\Windows\CurrentVersion\Run"" /v CheckMate /f"; Flags: runhidden; RunOnceId: "DeleteRunKey"
 
 [Code]
-procedure CurStepChanged(CurStep: TSetupStep);
+const
+  RunKey = 'Software\Microsoft\Windows\CurrentVersion\Run';
+  RunValue = 'CheckMate';
+
+procedure KillRunningApp;
 var
   ResultCode: Integer;
 begin
+  Exec(
+    ExpandConstant('{sys}\taskkill.exe'),
+    '/F /IM CheckMate.exe',
+    '',
+    SW_HIDE,
+    ewWaitUntilTerminated,
+    ResultCode
+  );
+end;
+
+procedure RelaunchApp;
+var
+  Command: String;
+  ResultCode: Integer;
+begin
+  { La cle Run contient la commande exacte du demarrage automatique, donc un
+    eventuel --config personnalise est respecte. Absente, l'autostart est
+    desactive : on ne relance rien. }
+  if not RegQueryStringValue(HKCU, RunKey, RunValue, Command) then
+    Exit;
+  Exec(
+    ExpandConstant('{cmd}'),
+    '/C start "" ' + Command,
+    ExpandConstant('{app}'),
+    SW_HIDE,
+    ewNoWait,
+    ResultCode
+  );
+end;
+
+procedure CurStepChanged(CurStep: TSetupStep);
+begin
   if CurStep = ssInstall then
-  begin
-    Exec(
-      ExpandConstant('{sys}\taskkill.exe'),
-      '/F /IM CheckMate.exe',
-      '',
-      SW_HIDE,
-      ewWaitUntilTerminated,
-      ResultCode
-    );
-  end;
+    KillRunningApp;
+  { Mise a jour silencieuse uniquement : une installation interactive ouvre
+    deja l'assistant de configuration. }
+  if (CurStep = ssPostInstall) and WizardSilent then
+    RelaunchApp;
 end;

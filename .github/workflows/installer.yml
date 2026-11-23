@@ -1,0 +1,35 @@
+name: Installeur Windows
+
+on:
+  pull_request:
+    paths:
+      - "watcher/packaging/checkmate.iss"
+      - ".github/workflows/installer.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compile:
+    name: Compiler le script Inno Setup
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Inno Setup
+        run: choco install innosetup -y --no-progress
+
+      - name: Fichiers factices
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force watcher\dist\CheckMate | Out-Null
+          Set-Content watcher\dist\CheckMate\CheckMate.exe "stub"
+
+      - name: Compiler
+        shell: pwsh
+        working-directory: watcher
+        run: |
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "/DMyAppVersion=0.0.0" "packaging\checkmate.iss"
+          if ($LASTEXITCODE -ne 0) { throw "compilation de l'installeur echouee" }
