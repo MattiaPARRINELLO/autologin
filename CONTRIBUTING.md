@@ -119,11 +119,18 @@ uv run python -m checkmate_watcher.capture \
   --mask ".student-name" --mask "#login-display"
 ```
 
-Quatre etapes sont demandees, chacune validee par Entree : page de connexion
-sans se connecter, tableau de bord avec emargement ferme, emargement ouvert,
-tableau de bord apres signature. Le script enregistre le HTML des pages, les
-ressources statiques dans `assets/`, un HAR `network.har` et une trace
-Playwright `trace.zip`.
+Cinq etapes sont demandees, chacune validee par Entree : page de connexion
+sans se connecter, tableau de bord avec le bouton d'emargement, popup de
+signature ouverte, message de confirmation affiche, puis tableau de bord apres
+fermeture du message. Le script enregistre le HTML des pages, les ressources
+statiques dans `assets/`, un HAR `network.har` et une trace Playwright
+`trace.zip`.
+
+Le vrai parcours n'affiche jamais de tableau de bord sans bouton : l'accueil
+capture sert donc d'etat par defaut et d'etat « emargement ouvert ». Seul
+l'accueil d'apres signature differe, par l'absence du bouton.
+`pages/signature.html` et `pages/confirmation.html` sont conservees comme
+reference pour ecrire le `harness.js`, mais ne sont pas servies comme routes.
 
 Regles de stockage et de versionnement :
 

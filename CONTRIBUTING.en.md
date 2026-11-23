@@ -74,10 +74,16 @@ uv run python -m checkmate_watcher.capture \
   --mask ".student-name"
 ```
 
-Four steps are captured, each confirmed with Enter: login page, dashboard with
-attendance closed, attendance opened, dashboard after signing. The script stores
-the page HTML, static resources in `assets/`, a `network.har` file and a
-Playwright `trace.zip`.
+Five steps are captured, each confirmed with Enter: login page, dashboard with
+the attendance button, signature popup opened, confirmation message shown, then
+the dashboard after closing the message. The script stores the page HTML, static
+resources in `assets/`, a `network.har` file and a Playwright `trace.zip`.
+
+The real flow never shows a dashboard without the button: the captured dashboard
+is used both as the default and as the "attendance open" state. Only the
+post-signature dashboard differs, by the absence of the button.
+`pages/signature.html` and `pages/confirmation.html` are kept as reference for
+writing the `harness.js`, but they are not served as routes.
 
 Storage rules:
 
