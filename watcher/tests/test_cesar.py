@@ -4,7 +4,7 @@ import asyncio
 
 import pytest
 
-from checkmate_watcher.cesar import CesarSession
+from checkmate_watcher.cesar import CesarSession, draw_coordinates
 from checkmate_watcher.config import (
     CesarConfig,
     Config,
@@ -14,6 +14,7 @@ from checkmate_watcher.config import (
     UpdatesConfig,
     WatcherConfig,
 )
+from checkmate_watcher.signature import FittedPoint
 
 
 class FakePage:
@@ -178,3 +179,9 @@ def test_wait_for_hidden_sans_page(selectors):
 )
 def test_ink_is_incomplete(ink, attendu):
     assert CesarSession._ink_is_incomplete(ink) is attendu
+
+
+def test_draw_coordinates_arrondit_les_points():
+    fitted = [FittedPoint(x=1.234, y=5.678), FittedPoint(x=9.0, y=0.5)]
+
+    assert draw_coordinates(fitted) == [[1.23, 5.68], [9.0, 0.5]]
