@@ -126,9 +126,9 @@ fermeture du message. Le script enregistre le HTML des pages, les ressources
 statiques dans `assets/`, un HAR `network.har` et une trace Playwright
 `trace.zip`.
 
-Le vrai parcours n'affiche jamais de tableau de bord sans bouton : l'accueil
-capture sert donc d'etat par defaut et d'etat « emargement ouvert ». Seul
-l'accueil d'apres signature differe, par l'absence du bouton.
+Dans le vrai parcours, la page sans bouton est la meme avant le lancement de
+l'emargement et apres la signature. Elle sert donc d'etat par defaut (emargement
+ferme) et d'etat signe ; la page avec bouton sert d'etat « emargement ouvert ».
 `pages/signature.html` et `pages/confirmation.html` sont conservees comme
 reference pour ecrire le `harness.js`, mais ne sont pas servies comme routes.
 

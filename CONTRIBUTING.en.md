@@ -79,9 +79,9 @@ the attendance button, signature popup opened, confirmation message shown, then
 the dashboard after closing the message. The script stores the page HTML, static
 resources in `assets/`, a `network.har` file and a Playwright `trace.zip`.
 
-The real flow never shows a dashboard without the button: the captured dashboard
-is used both as the default and as the "attendance open" state. Only the
-post-signature dashboard differs, by the absence of the button.
+In the real flow, the page without the button is the same before attendance is
+launched and after signing. It is therefore used as the default (closed) state
+and as the signed state; the page with the button is the "attendance open" state.
 `pages/signature.html` and `pages/confirmation.html` are kept as reference for
 writing the `harness.js`, but they are not served as routes.
 
