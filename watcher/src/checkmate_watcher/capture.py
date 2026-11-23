@@ -251,8 +251,21 @@ def strip_sensitive_meta(html: str) -> str:
 
 def rewrite_assets(html: str, mapping: dict[str, str]) -> str:
     for url, relative in mapping.items():
-        html = html.replace(url, "/" + relative)
+        for reference in asset_references(url):
+            html = html.replace(reference, "/" + relative)
     return html
+
+
+def asset_references(url: str) -> tuple[str, ...]:
+    """Formes sous lesquelles une ressource peut apparaitre dans le HTML.
+
+    CESAR ecrit surtout des chemins relatifs (`/build/assets/x.css`), alors que
+    le HAR et la capture connaissent l'URL absolue.
+    """
+    parsed = urlparse(url)
+    if not parsed.query:
+        return (url, parsed.path)
+    return (url, f"{parsed.path}?{parsed.query}", parsed.path)
 
 
 def normalize_login_action(html: str) -> str:
