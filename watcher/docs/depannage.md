@@ -152,12 +152,21 @@ Crée une archive propre avec :
 checkmate-watcher support-bundle
 ```
 
-Envoie :
+Le bundle contient la sortie de diagnostic, la configuration sans mot de passe
+et les dernières lignes de logs.
 
-- la sortie de `self-test --notify` ;
-- les 50 dernières lignes de logs ;
-- la configuration **sans le mot de passe** (`check-config` masque déjà le
-  secret).
+Depuis la prochaine version, il embarque aussi `diagnostics/`, les cinq
+dernières tentatives de signature :
+
+- `diagnostic.json` : taille du canvas et de la page, densité de pixels,
+  élément qui recouvre le canvas, nombre d'événements reçus (dont ceux de
+  confiance), encre mesurée, longueur de la valeur enregistrée par le site ;
+- `canvas.png` : ce qui a été réellement tracé dans le canvas ;
+- `page.png` : la page au moment du tracé.
+
+C'est ce qu'il faut pour reproduire un cas où la signature part de travers.
+
+Envoie aussi la sortie de `self-test`.
 
 Ne partage jamais `~/.config/checkmate-watcher/env`, `%LOCALAPPDATA%\checkmate-watcher\config.toml`
 s'il contient `password`, ni le dossier du profil Chromium.

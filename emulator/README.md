@@ -79,6 +79,9 @@ selecteurs par defaut du watcher (`.toastui-calendar-day-view`,
 `.buttonPresent`, `canvas[data-written-signature-target]`,
 `.swal2-html-container`) dans une structure differente des pages generees.
 
+Pour servir une capture reelle et faire tourner le watcher dessus, y compris
+sur Windows, voir [Tester avec une capture CESAR](docs/tester-sans-cesar.md).
+
 ## Variantes de comportement
 
 `--variant` (repetable) reproduit des conditions du vrai site, pour les bugs

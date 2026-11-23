@@ -14,6 +14,7 @@ from datetime import date
 from .browser import resolve_launch_options
 from .config import Config
 from .signature import FittedPoint, Point, fit_points
+from .signature_diagnostics import SignatureDiagnostics, diagnostics_directory
 
 logger = logging.getLogger(__name__)
 
@@ -24,9 +25,15 @@ READY_SELECTORS = (
     "div.toastui-calendar-layout",
 )
 
-# En dessous de ce ratio, le trace couvre une zone trop petite pour etre une
-# signature : c'est un point (clic sans mouvement ou canvas mal mesure).
+# En dessous de ce ratio sur un des deux axes, le trace n'a pas la forme d'une
+# signature : point (clic sans mouvement) ou ligne (canvas mesure pendant une
+# animation, mouvements ignores par la librairie du site).
 MIN_INK_RATIO = 0.05
+
+
+def draw_coordinates(fitted: list[FittedPoint]) -> list[list[float]]:
+    return [[round(point.x, 2), round(point.y, 2)] for point in fitted]
+
 
 INK_SNAPSHOT_JS = """
 (canvas) => {
@@ -89,6 +96,17 @@ INK_DIFF_JS = """
     width: snapshot.width,
     height: snapshot.height,
   };
+}
+"""
+
+CANVAS_HITTABLE_JS = """
+(canvas) => {
+  const rect = canvas.getBoundingClientRect();
+  const hit = document.elementFromPoint(
+    rect.left + rect.width / 2,
+    rect.top + rect.height / 2
+  );
+  return hit !== null && (hit === canvas || canvas.contains(hit));
 }
 """
 
@@ -416,6 +434,10 @@ class CesarSession:
 
         await button.click()
         canvas = await self._wait_for_selector(self.selectors.signature_canvas, 20000)
+        try:
+            await canvas.scroll_into_view_if_needed(timeout=2000)
+        except Exception:
+            logger.debug("canvas de signature deja visible", exc_info=True)
 
         box = await self._stable_box(canvas)
         if box is None or box["width"] <= 0 or box["height"] <= 0:
@@ -427,7 +449,10 @@ class CesarSession:
             round(box["width"]),
             round(box["height"]),
         )
-        await self._draw_checked(canvas, box, points)
+        diagnostics = SignatureDiagnostics(diagnostics_directory(), self.page)
+        await diagnostics.begin(canvas)
+        await self._draw_checked(canvas, box, points, diagnostics)
+        await diagnostics.save(canvas)
         await self.page.wait_for_timeout(500)
 
         previous = await self._confirmation_text()
@@ -484,6 +509,7 @@ class CesarSession:
         canvas,
         box: dict,
         points: list[Point],
+        diagnostics: SignatureDiagnostics,
     ) -> None:
         """Rejoue la signature puis verifie qu'elle est vraiment dessinee.
 
@@ -492,10 +518,22 @@ class CesarSession:
         trace. On retente alors en envoyant les evenements DOM directement.
         """
         await canvas.evaluate(INK_SNAPSHOT_JS)
-        await self._draw(box, self._fit_points(points, box))
+        if await self._wait_until_hittable(canvas):
+            box = await self._stable_box(canvas) or box
+            await self._draw(box, self._fit_points(points, box))
+        else:
+            logger.warning(
+                "canvas de signature toujours recouvert apres attente, "
+                "envoi direct des evenements DOM"
+            )
+            await canvas.evaluate(
+                EVENT_DRAW_JS, draw_coordinates(self._fit_points(points, box))
+            )
         await self.page.wait_for_timeout(200)
         ink = await canvas.evaluate(INK_DIFF_JS)
-        if not self._ink_is_dot(ink):
+        logger.info("encre detectee sur le canvas : %s", ink)
+        await diagnostics.add_step("premier essai", canvas, ink)
+        if not self._ink_is_incomplete(ink):
             return
 
         logger.warning(
@@ -504,18 +542,50 @@ class CesarSession:
         retry_box = await self._stable_box(canvas)
         if retry_box is None or retry_box["width"] <= 0 or retry_box["height"] <= 0:
             raise SignError("canvas de signature sans dimensions")
-        coordinates = [
-            [round(point.x, 2), round(point.y, 2)]
-            for point in self._fit_points(points, retry_box)
-        ]
-        await canvas.evaluate(EVENT_DRAW_JS, coordinates)
+        await canvas.evaluate(
+            EVENT_DRAW_JS, draw_coordinates(self._fit_points(points, retry_box))
+        )
         await self.page.wait_for_timeout(200)
         ink = await canvas.evaluate(INK_DIFF_JS)
-        if self._ink_is_dot(ink):
+        logger.info("encre detectee apres rejeu : %s", ink)
+        await diagnostics.add_step("rejeu", canvas, ink)
+        if self._ink_is_incomplete(ink):
+            await diagnostics.save(canvas)
             raise SignError(
                 "la signature n'a pas ete prise par le canvas CESAR "
-                "(trace reduit a un point)"
+                "(trace reduit a un point ou a une ligne)"
             )
+
+    async def _wait_until_hittable(self, canvas, timeout_ms: int = 3000) -> bool:
+        """Attend que l'animation de la popup decouvre le canvas.
+
+        Pendant l'animation, une couche du site peut recouvrir le canvas : les
+        clics de la souris partent alors sur cette couche et le trace est perdu.
+        """
+        if self.page is None:
+            return await self._canvas_is_hittable(canvas)
+        deadline = asyncio.get_running_loop().time() + timeout_ms / 1000
+        waited = False
+        while asyncio.get_running_loop().time() < deadline:
+            if await self._canvas_is_hittable(canvas):
+                if waited:
+                    logger.info("canvas de signature decouvert apres attente")
+                return True
+            waited = True
+            await self.page.wait_for_timeout(100)
+        logger.warning("canvas de signature encore recouvert apres %sms", timeout_ms)
+        return False
+
+    async def _canvas_is_hittable(self, canvas) -> bool:
+        """Verifie qu'aucun element ne recouvre le canvas.
+
+        Si c'est le cas, la souris clique sur l'overlay : les evenements sont
+        alors envoyes directement au canvas.
+        """
+        try:
+            return bool(await canvas.evaluate(CANVAS_HITTABLE_JS))
+        except Exception:  # noqa: BLE001
+            return True
 
     def _fit_points(self, points: list[Point], box: dict) -> list[FittedPoint]:
         return fit_points(
@@ -526,7 +596,13 @@ class CesarSession:
         )
 
     @staticmethod
-    def _ink_is_dot(ink: dict | None) -> bool:
+    def _ink_is_incomplete(ink: dict | None) -> bool:
+        """Detecte un trace qui n'a pas la forme d'une signature.
+
+        Un point (clic sans mouvement) comme une ligne (un axe ecrase) sont
+        refuses : dans les deux cas le site enregistrerait autre chose que la
+        signature de l'utilisateur.
+        """
         if ink is None:
             return False
         if ink.get("count", 0) < 3:
@@ -535,7 +611,7 @@ class CesarSession:
         height = max(1, ink.get("height", 1))
         extent_x = (ink.get("maxX", -1) - ink.get("minX", 0)) / width
         extent_y = (ink.get("maxY", -1) - ink.get("minY", 0)) / height
-        return max(extent_x, extent_y) < MIN_INK_RATIO
+        return min(extent_x, extent_y) < MIN_INK_RATIO
 
     async def _draw(self, box: dict, points: list[FittedPoint]) -> None:
         if self.page is None:

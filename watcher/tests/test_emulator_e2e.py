@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import http.client
 import json
 import os
 import shutil
@@ -34,6 +35,12 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 EMULATOR = REPO_ROOT / "emulator" / "server.py"
 SCENARIO = REPO_ROOT / "emulator" / "scenarios" / "cesar-simplifie"
 E2E_ENABLED = os.environ.get("CHECKMATE_E2E") == "1"
+
+
+@pytest.fixture(autouse=True)
+def diagnostics_isolees(tmp_path, monkeypatch):
+    monkeypatch.setenv("CHECKMATE_DIAGNOSTICS_DIR", str(tmp_path / "diagnostics"))
+
 
 pytestmark = pytest.mark.skipif(
     not E2E_ENABLED,
@@ -84,11 +91,7 @@ POINTS = [Point(10, 10, "start"), Point(60, 40, "move"), Point(120, 20, "end")]
 
 
 @contextmanager
-def emulator(*arguments: str, **environment: str):
-    executable = chromium_path()
-    if executable is None:
-        pytest.skip("aucun Chromium disponible")
-
+def emulator_server(*arguments: str, **environment: str):
     port = free_port()
     process = subprocess.Popen(
         [sys.executable, str(EMULATOR), "--port", str(port), *arguments],
@@ -99,14 +102,24 @@ def emulator(*arguments: str, **environment: str):
     base_url = f"http://127.0.0.1:{port}"
     try:
         wait_for_state(base_url)
-        post(base_url, "/api/attendance/open")
-        yield executable, base_url
+        yield base_url
     finally:
         process.terminate()
         try:
             process.wait(timeout=10)
         except subprocess.TimeoutExpired:
             process.kill()
+
+
+@contextmanager
+def emulator(*arguments: str, **environment: str):
+    executable = chromium_path()
+    if executable is None:
+        pytest.skip("aucun Chromium disponible")
+
+    with emulator_server(*arguments, **environment) as base_url:
+        post(base_url, "/api/attendance/open")
+        yield executable, base_url
 
 
 def make_config(tmp_path, executable: str, base_url: str, points=None) -> Config:
@@ -301,9 +314,21 @@ def test_le_watcher_signe_quand_le_canvas_ignore_les_evenements_pointer(tmp_path
         assert wait_for_state(base_url)["signed"] is True
 
 
+async def draw_signature(page) -> None:
+    canvas = page.locator("canvas[data-written-signature-target]")
+    box = await canvas.bounding_box()
+    x = box["x"] + 24
+    y = box["y"] + 30
+    await page.mouse.move(x, y)
+    await page.mouse.down()
+    for step in range(1, 6):
+        await page.mouse.move(x + step * 28, y + step * 9)
+    await page.mouse.up()
+
+
 async def capture_scenario_pages(base_url: str, output: Path) -> None:
     session = CaptureSession(output, base_url)
-    await session.start()
+    await session.start(headless=True)
     try:
         await session.goto("/connexion")
         await session.save_step("connexion")
@@ -311,21 +336,24 @@ async def capture_scenario_pages(base_url: str, output: Path) -> None:
         await session.page.fill("input#username", "demo")
         await session.page.fill("input#password", "demo")
         await session.page.click("button[type='submit'].btn-primary")
-        await session.save_step("tableau-ferme")
+        await session.save_step("accueil")
 
-        post(base_url, "/api/attendance/open")
-        await session.page.reload(wait_until="networkidle")
-        await session.save_step("tableau-ouvert")
-
-        await session.page.evaluate(
-            """() => fetch('/api/signature', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ points: [{ x: 5, y: 5, type: 'start' }] })
-            })"""
+        await session.page.click("button.buttonPresent")
+        await session.page.wait_for_selector(
+            "canvas[data-written-signature-target]", state="visible"
         )
+        await session.save_step("signature")
+
+        await draw_signature(session.page)
+        await session.page.click("button[data-live-action-param='signed']")
+        await session.page.wait_for_function(
+            "() => document.querySelector('.swal2-html-container')"
+            ".textContent.includes('prise en compte')"
+        )
+        await session.save_step("confirmation")
+
         await session.page.reload(wait_until="networkidle")
-        await session.save_step("tableau-signe")
+        await session.save_step("accueil-signe")
     finally:
         await session.close()
 
@@ -333,7 +361,6 @@ async def capture_scenario_pages(base_url: str, output: Path) -> None:
 def test_une_capture_de_cesar_devient_un_scenario_jouable(tmp_path):
     output = tmp_path / "capture"
     with emulator("--scenario", str(SCENARIO)) as (_, source_url):
-        post(source_url, "/api/attendance/reset")
         asyncio.run(
             asyncio.wait_for(capture_scenario_pages(source_url, output), timeout=120)
         )
@@ -341,9 +368,15 @@ def test_une_capture_de_cesar_devient_un_scenario_jouable(tmp_path):
     sanitize(output)
     write_scenario(output, "capture-emulateur")
 
-    pages = list((output / "pages").glob("*.html"))
-    assert len(pages) == 4
-    for page in pages:
+    pages = sorted(page.stem for page in (output / "pages").glob("*.html"))
+    assert pages == [
+        "accueil",
+        "accueil-signe",
+        "confirmation",
+        "connexion",
+        "signature",
+    ]
+    for page in (output / "pages").glob("*.html"):
         assert source_url not in page.read_text(encoding="utf-8")
 
     with emulator("--scenario", str(output)) as (executable, base_url):
@@ -355,3 +388,20 @@ def test_une_capture_de_cesar_devient_un_scenario_jouable(tmp_path):
         )
         assert code == 0
         assert wait_for_state(base_url)["signed"] is True
+
+
+def test_la_connexion_accepte_les_champs_du_formulaire_cesar():
+    with emulator_server() as base_url:
+        port = int(base_url.rsplit(":", 1)[1])
+        connection = http.client.HTTPConnection("127.0.0.1", port, timeout=5)
+        connection.request(
+            "POST",
+            "/connexion",
+            body="_username=demo&_password=demo",
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
+        )
+        response = connection.getresponse()
+
+        assert response.status == 303
+        assert "cesar_session=" in (response.getheader("Set-Cookie") or "")
+        connection.close()
