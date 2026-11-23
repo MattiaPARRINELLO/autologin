@@ -394,8 +394,17 @@ class Handler(BaseHTTPRequestHandler):
     def send_html(
         self, payload: bytes, status: int = 200, headers: dict | None = None
     ) -> None:
+        self.send_bytes(payload, "text/html; charset=utf-8", status, headers)
+
+    def send_bytes(
+        self,
+        payload: bytes,
+        content_type: str,
+        status: int = 200,
+        headers: dict | None = None,
+    ) -> None:
         self.send_response(status)
-        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(payload)))
         for key, value in (headers or {}).items():
             self.send_header(key, value)
