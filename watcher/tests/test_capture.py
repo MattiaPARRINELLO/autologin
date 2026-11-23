@@ -58,6 +58,10 @@ def test_strip_har_secrets_retire_cookies_et_corps(tmp_path):
                         ],
                         "cookies": [{"name": "session", "value": "secret"}],
                         "queryString": [{"name": "token", "value": "abc"}],
+                        "postData": {
+                            "mimeType": "application/x-www-form-urlencoded",
+                            "text": "_username=etudiant&_password=motdepasse",
+                        },
                     },
                     "response": {
                         "url": "https://cesar.fr/api/page",
@@ -79,6 +83,7 @@ def test_strip_har_secrets_retire_cookies_et_corps(tmp_path):
     assert entry["request"]["headers"] == [{"name": "Accept", "value": "*/*"}]
     assert "cookies" not in entry["request"]
     assert "queryString" not in entry["request"]
+    assert "postData" not in entry["request"]
     assert entry["response"]["content"] == {"size": 12}
     assert entry["response"]["headers"] == []
 
@@ -129,6 +134,7 @@ def test_sanitize_reecrit_pages_css_et_har(tmp_path):
     (tmp_path / "pages").mkdir()
     (tmp_path / "assets").mkdir()
     (tmp_path / "pages" / "connexion.html").write_text(
+        '<meta name="app-user" content=\'{"username":"etudiant"}\'>'
         '<form action="https://cesar.fr/login"></form>'
         '<link rel="stylesheet" href="https://cesar.fr/app.css">',
         encoding="utf-8",
@@ -154,7 +160,22 @@ def test_sanitize_reecrit_pages_css_et_har(tmp_path):
     css = (tmp_path / "assets" / "000-app.css").read_text(encoding="utf-8")
     assert 'href="/assets/000-app.css"' in html
     assert 'action="/connexion"' in html
+    assert "app-user" not in html
     assert 'url("/assets/001-fond.png")' in css
+
+
+def test_strip_sensitive_meta_retire_l_identite_et_le_jeton():
+    html = (
+        '<meta name="app-user" content=\'{"username":"etudiant"}\'>'
+        '<meta name="csrf-token" content="secret">'
+        '<meta name="viewport" content="width=device-width">'
+    )
+
+    result = capture.strip_sensitive_meta(html)
+
+    assert "app-user" not in result
+    assert "csrf-token" not in result
+    assert 'name="viewport"' in result
 
 
 def test_sanitize_refuse_une_capture_sans_metadonnees(tmp_path):

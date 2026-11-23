@@ -12,6 +12,9 @@ brutes :
 3. ``write_scenario`` ecrit ``scenario.json`` et un ``harness.js`` de depart,
    directement consommables par ``emulator/server.py --scenario``.
 
+Le trace Playwright reste local : il contient le DOM reel et les formulaires
+saisis. Seules les pages et les assets assainis peuvent etre versionnes.
+
 Lancement interactif :
 
     uv run python -m checkmate_watcher.capture --output captures/2026-11-20
@@ -89,12 +92,20 @@ MASK_JS = """
   for (const selector of selectors) {
     for (const node of clone.querySelectorAll(selector)) {
       node.textContent = '[masque]';
-      node.removeAttribute('value');
+      for (const attribute of ['value', 'content', 'title', 'alt']) {
+        node.removeAttribute(attribute);
+      }
     }
   }
   return clone.outerHTML;
 }
 """
+
+# Metadonnees que CESAR injecte dans l'en-tete et qui identifient l'etudiant :
+# identifiant, nom, jeton CSRF. Retirees de toutes les pages assainies.
+SENSITIVE_META = re.compile(
+    r'<meta\b[^>]*\bname="(?:app-user|user|csrf[^"]*)"[^>]*>', re.IGNORECASE
+)
 
 FORM_ACTION = re.compile(r'(<form\b[^>]*\baction=")([^"]*)(")', re.IGNORECASE)
 CSS_URL = re.compile(r"url\(\s*(['\"]?)([^'\")]+)\1\s*\)")
@@ -223,9 +234,14 @@ def read_metadata(root: Path) -> dict:
 def rewrite_pages(root: Path, mapping: dict[str, str]) -> None:
     for page in sorted((root / PAGES_DIR).glob("*.html")):
         html = rewrite_assets(page.read_text(encoding="utf-8"), mapping)
+        html = strip_sensitive_meta(html)
         if page.stem == STEP_CONNEXION:
             html = normalize_login_action(html)
         page.write_text(html, encoding="utf-8")
+
+
+def strip_sensitive_meta(html: str) -> str:
+    return SENSITIVE_META.sub("", html)
 
 
 def rewrite_assets(html: str, mapping: dict[str, str]) -> str:
@@ -277,6 +293,9 @@ def scrub_message(message: dict) -> None:
     ]
     message.pop("cookies", None)
     message.pop("queryString", None)
+    # Le corps d'une requete contient le formulaire de connexion :
+    # identifiant, mot de passe en clair et jeton CSRF.
+    message.pop("postData", None)
     message["url"] = message.get("url", "").split("?", 1)[0]
     if "content" in message:
         message["content"] = {
