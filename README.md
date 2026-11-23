@@ -374,6 +374,25 @@ Les sélecteurs sont configurables, mais une grosse mise à jour de CESAR peut
 nécessiter une mise à jour de CheckMate. Les logs indiquent alors qu'aucun
 bouton n'a été trouvé.
 
+### Pourquoi un autre navigateur s'ouvre-t-il au moment de signer ?
+
+C'est normal. Pour signer, CheckMate a besoin de piloter lui-même un
+navigateur : il remplit le formulaire CESAR, reproduit la signature puis ferme
+la fenêtre. Cela passe par Chromium, le seul moteur que l'automatisation
+utilise ici, avec un profil dédié à CheckMate. Ton navigateur par défaut et ton
+profil personnel ne sont donc ni ouverts ni modifiés.
+
+Si plusieurs Chromium sont installés, tu peux imposer celui qui s'ouvre :
+
+```toml
+[watcher]
+executable_path = "/usr/bin/chromium"
+```
+
+Le tableau de bord et l'assistant ne sont pas concernés : ils s'affichent dans
+une fenêtre CheckMate native. `CHECKMATE_BROWSER=1` force leur ouverture dans
+le navigateur par défaut.
+
 ### Est-ce que je peux utiliser plusieurs comptes CESAR ?
 
 Une installation correspond à un compte. Pour un autre compte, il faut une
