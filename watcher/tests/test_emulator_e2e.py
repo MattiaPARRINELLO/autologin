@@ -101,9 +101,9 @@ def emulator(**environment: str):
             process.kill()
 
 
-def make_config(tmp_path, executable: str, base_url: str) -> Config:
+def make_config(tmp_path, executable: str, base_url: str, points=None) -> Config:
     signature_file = tmp_path / "signature.json"
-    save_signature(signature_file, POINTS)
+    save_signature(signature_file, POINTS if points is None else points)
     return Config(
         cesar=CesarConfig(
             base_url=base_url,
@@ -143,6 +143,25 @@ def test_le_watcher_detecte_et_signe_sur_l_emulateur(tmp_path):
         state = wait_for_state(base_url)
         assert state["signed"] is True
         assert state["signature_points"] >= 2
+
+
+def test_une_signature_reduite_a_un_point_ne_signe_pas(tmp_path):
+    with emulator() as (executable, base_url):
+        config = make_config(
+            tmp_path,
+            executable,
+            base_url,
+            points=[Point(20, 20, "start"), Point(20, 20, "end")],
+        )
+        code = asyncio.run(
+            asyncio.wait_for(
+                run_loop(config, once=True, auto_override=True), timeout=60
+            )
+        )
+        assert code == 2
+
+        state = wait_for_state(base_url)
+        assert state["signed"] is False
 
 
 def test_sign_attend_la_disparition_du_bouton(tmp_path):
