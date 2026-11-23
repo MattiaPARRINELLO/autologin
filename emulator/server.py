@@ -188,6 +188,34 @@ DASHBOARD_SCRIPT = """
     ctx.lineCap = 'round';
     ctx.strokeStyle = '#0f172a';
 
+    __CANVAS_WIRING__
+  }
+
+  const trigger = document.querySelector('.buttonPresent');
+  if (trigger) {
+    trigger.addEventListener('click', () => modal.classList.add('visible'));
+  }
+
+  if (save) {
+    save.addEventListener('click', async () => {
+      const response = await fetch('/api/signature', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ points })
+      });
+      const data = await response.json();
+      swal.textContent = data.message;
+      save.disabled = true;
+      window.setTimeout(() => {
+        if (trigger) trigger.remove();
+        if (canvas) canvas.remove();
+      }, __ATTENDANCE_CLOSE_DELAY_MS__);
+    });
+  }
+"""
+
+CANVAS_WIRING = {
+    "pointer": """
     canvas.addEventListener('pointerdown', (event) => {
       drawing = true;
       canvas.setPointerCapture(event.pointerId);
@@ -214,30 +242,8 @@ DASHBOARD_SCRIPT = """
     }
     canvas.addEventListener('pointerup', endStroke);
     canvas.addEventListener('pointercancel', endStroke);
-  }
-
-  const trigger = document.querySelector('.buttonPresent');
-  if (trigger) {
-    trigger.addEventListener('click', () => modal.classList.add('visible'));
-  }
-
-  if (save) {
-    save.addEventListener('click', async () => {
-      const response = await fetch('/api/signature', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ points })
-      });
-      const data = await response.json();
-      swal.textContent = data.message;
-      save.disabled = true;
-      window.setTimeout(() => {
-        if (trigger) trigger.remove();
-        if (canvas) canvas.remove();
-      }, __ATTENDANCE_CLOSE_DELAY_MS__);
-    });
-  }
-"""
+""",
+}
 
 
 def render_page(title: str, body: str, *, script: str = "") -> bytes:
@@ -351,7 +357,7 @@ def render_dashboard(
 def dashboard_script(close_delay_ms: int) -> str:
     return DASHBOARD_SCRIPT.replace(
         "__ATTENDANCE_CLOSE_DELAY_MS__", str(max(0, close_delay_ms))
-    )
+    ).replace("__CANVAS_WIRING__", CANVAS_WIRING["pointer"])
 
 
 def render_admin(state: AttendanceState) -> bytes:
