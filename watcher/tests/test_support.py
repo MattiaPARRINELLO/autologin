@@ -41,3 +41,23 @@ def test_archive_sans_secret(tmp_path, monkeypatch):
     assert "secret-du-compte" not in content
     assert "ligne masquee" in content
     assert "version:" in content
+
+
+def test_archive_contient_les_diagnostics(tmp_path):
+    config = default_config()
+    diagnostics = tmp_path / "diagnostics" / "signature-20260101-000000"
+    diagnostics.mkdir(parents=True)
+    (diagnostics / "diagnostic.json").write_text("{}", encoding="utf-8")
+    (diagnostics / "canvas.png").write_bytes(b"png")
+
+    bundle = build_support_bundle(
+        config,
+        tmp_path / "config.toml",
+        tmp_path / "bundle.zip",
+        diagnostics_dir=tmp_path / "diagnostics",
+    )
+
+    with zipfile.ZipFile(bundle) as archive:
+        names = archive.namelist()
+    assert "diagnostics/signature-20260101-000000/diagnostic.json" in names
+    assert "diagnostics/signature-20260101-000000/canvas.png" in names
