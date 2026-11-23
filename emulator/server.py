@@ -33,6 +33,9 @@ from urllib.parse import parse_qs, urlparse
 from scenario import Scenario, ScenarioError, load_scenario
 
 COOKIE_NAME = "cesar_session"
+SLOW_ANIMATION = "slow-animation"
+MOUSE_EVENTS_ONLY = "mouse-events-only"
+VARIANT_CHOICES = (SLOW_ANIMATION, MOUSE_EVENTS_ONLY)
 
 
 @dataclass
@@ -53,12 +56,14 @@ class Emulator:
         token: str,
         run_id: str,
         attendance_close_delay_ms: int = 0,
+        variants: frozenset[str] = frozenset(),
     ) -> None:
         self.username = username
         self.password = password
         self.token = token
         self.run_id = run_id
         self.attendance_close_delay_ms = max(0, attendance_close_delay_ms)
+        self.variants = frozenset(variants)
         self.lock = threading.Lock()
         self.state = AttendanceState()
 
@@ -166,6 +171,14 @@ PAGE_STYLE = """
   .swal2-html-container { margin-top: 16px; color: #86efac; font-weight: 600; }
 """
 
+MODAL_ANIMATION_STYLE = """
+  @keyframes modal-in {
+    from { opacity: 0; transform: translateY(-32px) scale(.92); }
+    to { opacity: 1; transform: none; }
+  }
+  #modal.visible .dialog { animation: modal-in 1.2s ease-out; }
+"""
+
 DASHBOARD_SCRIPT = """
   const modal = document.getElementById('modal');
   const canvas = document.getElementById('pad');
@@ -246,7 +259,8 @@ CANVAS_WIRING = {
 }
 
 
-def render_page(title: str, body: str, *, script: str = "") -> bytes:
+def render_page(title: str, body: str, *, script: str = "", style: str = "") -> bytes:
+    extra_style = f"<style>{style}</style>" if style else ""
     html = f"""<!doctype html>
 <html lang="fr">
 <head>
@@ -254,6 +268,7 @@ def render_page(title: str, body: str, *, script: str = "") -> bytes:
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{title}</title>
 <style>{PAGE_STYLE}</style>
+{extra_style}
 </head>
 <body>
 {body}
@@ -292,7 +307,10 @@ def render_login(error: bool = False) -> bytes:
 
 
 def render_dashboard(
-    state: AttendanceState, run_id: str, close_delay_ms: int = 0
+    state: AttendanceState,
+    run_id: str,
+    close_delay_ms: int = 0,
+    variants: frozenset[str] = frozenset(),
 ) -> bytes:
     if state.signed:
         attendance = (
@@ -350,14 +368,22 @@ def render_dashboard(
 </main>
 {modal}
 """
-    script = dashboard_script(close_delay_ms)
-    return render_page("CESAR - tableau de bord", body, script=script)
+    script = dashboard_script(close_delay_ms, variants)
+    return render_page(
+        "CESAR - tableau de bord", body, script=script, style=modal_style(variants)
+    )
 
 
-def dashboard_script(close_delay_ms: int) -> str:
+def dashboard_script(close_delay_ms: int, variants: frozenset[str]) -> str:
     return DASHBOARD_SCRIPT.replace(
         "__ATTENDANCE_CLOSE_DELAY_MS__", str(max(0, close_delay_ms))
     ).replace("__CANVAS_WIRING__", CANVAS_WIRING["pointer"])
+
+
+def modal_style(variants: frozenset[str]) -> str:
+    if SLOW_ANIMATION not in variants:
+        return ""
+    return MODAL_ANIMATION_STYLE
 
 
 def render_admin(state: AttendanceState) -> bytes:
@@ -517,6 +543,7 @@ class Handler(BaseHTTPRequestHandler):
                     self.emulator.state,
                     self.emulator.run_id,
                     self.emulator.attendance_close_delay_ms,
+                    self.emulator.variants,
                 )
             self.send_html(page)
             return
@@ -624,6 +651,16 @@ def main() -> int:
             "a la place des pages generees (voir emulator/scenario.py)"
         ),
     )
+    parser.add_argument(
+        "--variant",
+        action="append",
+        choices=VARIANT_CHOICES,
+        default=[],
+        help=(
+            "variante de comportement, repetable : slow-animation anime "
+            "lentement la modale de signature"
+        ),
+    )
     args = parser.parse_args()
 
     if args.scenario is not None:
@@ -639,6 +676,7 @@ def main() -> int:
         secrets.token_urlsafe(24),
         secrets.token_hex(3),
         attendance_close_delay_ms=args.attendance_close_delay_ms,
+        variants=frozenset(args.variant),
     )
     if args.open:
         EMULATOR.open_attendance()
