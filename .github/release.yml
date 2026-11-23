@@ -16,6 +16,9 @@ changelog:
       labels:
         - docs
         - documentation
+    - title: Dependances
+      labels:
+        - dependencies
     - title: Maintenance
       labels:
         - chore
@@ -26,9 +29,6 @@ changelog:
         - style
         - perf
         - revert
-    - title: Dependances
-      labels:
-        - dependencies
     - title: Autres changements
       labels:
         - "*"
