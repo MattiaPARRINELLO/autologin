@@ -8,6 +8,9 @@ confirmation et etat persistant en memoire.
 Lancer :
     python3 emulator/server.py --port 8765
 
+Ou servir un scenario capture a la place des pages generees :
+    python3 emulator/server.py --port 8765 --scenario emulator/scenarios/demo
+
 Puis configurer le watcher avec base_url = "http://127.0.0.1:8765".
 """
 
@@ -24,9 +27,15 @@ import time
 from dataclasses import dataclass
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
+from scenario import Scenario, ScenarioError, load_scenario
+
 COOKIE_NAME = "cesar_session"
+SLOW_ANIMATION = "slow-animation"
+MOUSE_EVENTS_ONLY = "mouse-events-only"
+VARIANT_CHOICES = (SLOW_ANIMATION, MOUSE_EVENTS_ONLY)
 
 
 @dataclass
@@ -47,12 +56,14 @@ class Emulator:
         token: str,
         run_id: str,
         attendance_close_delay_ms: int = 0,
+        variants: frozenset[str] = frozenset(),
     ) -> None:
         self.username = username
         self.password = password
         self.token = token
         self.run_id = run_id
         self.attendance_close_delay_ms = max(0, attendance_close_delay_ms)
+        self.variants = frozenset(variants)
         self.lock = threading.Lock()
         self.state = AttendanceState()
 
@@ -103,6 +114,28 @@ class Emulator:
 
 
 EMULATOR: Emulator | None = None
+SCENARIO: Scenario | None = None
+
+
+def scenario_state() -> str:
+    assert EMULATOR is not None
+    if EMULATOR.state.signed:
+        return "signed"
+    if EMULATOR.state.open:
+        return "open"
+    return "default"
+
+
+def scenario_page(path: str) -> bytes | None:
+    if SCENARIO is None:
+        return None
+    return SCENARIO.page_html(path, scenario_state())
+
+
+def scenario_asset(path: str) -> tuple[bytes, str] | None:
+    if SCENARIO is None:
+        return None
+    return SCENARIO.asset(path)
 
 
 PAGE_STYLE = """
@@ -138,6 +171,14 @@ PAGE_STYLE = """
   .swal2-html-container { margin-top: 16px; color: #86efac; font-weight: 600; }
 """
 
+MODAL_ANIMATION_STYLE = """
+  @keyframes modal-in {
+    from { opacity: 0; transform: translateY(-32px) scale(.92); }
+    to { opacity: 1; transform: none; }
+  }
+  #modal.visible .dialog { animation: modal-in 1.2s ease-out; }
+"""
+
 DASHBOARD_SCRIPT = """
   const modal = document.getElementById('modal');
   const canvas = document.getElementById('pad');
@@ -160,6 +201,34 @@ DASHBOARD_SCRIPT = """
     ctx.lineCap = 'round';
     ctx.strokeStyle = '#0f172a';
 
+    __CANVAS_WIRING__
+  }
+
+  const trigger = document.querySelector('.buttonPresent');
+  if (trigger) {
+    trigger.addEventListener('click', () => modal.classList.add('visible'));
+  }
+
+  if (save) {
+    save.addEventListener('click', async () => {
+      const response = await fetch('/api/signature', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ points })
+      });
+      const data = await response.json();
+      swal.textContent = data.message;
+      save.disabled = true;
+      window.setTimeout(() => {
+        if (trigger) trigger.remove();
+        if (canvas) canvas.remove();
+      }, __ATTENDANCE_CLOSE_DELAY_MS__);
+    });
+  }
+"""
+
+CANVAS_WIRING = {
+    "pointer": """
     canvas.addEventListener('pointerdown', (event) => {
       drawing = true;
       canvas.setPointerCapture(event.pointerId);
@@ -186,33 +255,45 @@ DASHBOARD_SCRIPT = """
     }
     canvas.addEventListener('pointerup', endStroke);
     canvas.addEventListener('pointercancel', endStroke);
-  }
-
-  const trigger = document.querySelector('.buttonPresent');
-  if (trigger) {
-    trigger.addEventListener('click', () => modal.classList.add('visible'));
-  }
-
-  if (save) {
-    save.addEventListener('click', async () => {
-      const response = await fetch('/api/signature', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ points })
-      });
-      const data = await response.json();
-      swal.textContent = data.message;
-      save.disabled = true;
-      window.setTimeout(() => {
-        if (trigger) trigger.remove();
-        if (canvas) canvas.remove();
-      }, __ATTENDANCE_CLOSE_DELAY_MS__);
+""",
+    "mouse": """
+    canvas.addEventListener('mousedown', (event) => {
+      drawing = true;
+      const p = position(event);
+      points.push({ x: p.x, y: p.y, type: 'start' });
+      ctx.beginPath();
+      ctx.moveTo(p.x, p.y);
     });
-  }
-"""
+
+    canvas.addEventListener('mousemove', (event) => {
+      if (!drawing) return;
+      const p = position(event);
+      points.push({ x: p.x, y: p.y, type: 'move' });
+      ctx.lineTo(p.x, p.y);
+      ctx.stroke();
+    });
+
+    function endStroke(event) {
+      if (!drawing) return;
+      drawing = false;
+      const p = position(event);
+      points.push({ x: p.x, y: p.y, type: 'end' });
+      ctx.stroke();
+    }
+    canvas.addEventListener('mouseup', endStroke);
+    canvas.addEventListener('mouseleave', endStroke);
+""",
+}
 
 
-def render_page(title: str, body: str, *, script: str = "") -> bytes:
+def canvas_wiring(variants: frozenset[str]) -> str:
+    if MOUSE_EVENTS_ONLY in variants:
+        return CANVAS_WIRING["mouse"]
+    return CANVAS_WIRING["pointer"]
+
+
+def render_page(title: str, body: str, *, script: str = "", style: str = "") -> bytes:
+    extra_style = f"<style>{style}</style>" if style else ""
     html = f"""<!doctype html>
 <html lang="fr">
 <head>
@@ -220,6 +301,7 @@ def render_page(title: str, body: str, *, script: str = "") -> bytes:
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{title}</title>
 <style>{PAGE_STYLE}</style>
+{extra_style}
 </head>
 <body>
 {body}
@@ -258,7 +340,10 @@ def render_login(error: bool = False) -> bytes:
 
 
 def render_dashboard(
-    state: AttendanceState, run_id: str, close_delay_ms: int = 0
+    state: AttendanceState,
+    run_id: str,
+    close_delay_ms: int = 0,
+    variants: frozenset[str] = frozenset(),
 ) -> bytes:
     if state.signed:
         attendance = (
@@ -316,14 +401,22 @@ def render_dashboard(
 </main>
 {modal}
 """
-    script = dashboard_script(close_delay_ms)
-    return render_page("CESAR - tableau de bord", body, script=script)
+    script = dashboard_script(close_delay_ms, variants)
+    return render_page(
+        "CESAR - tableau de bord", body, script=script, style=modal_style(variants)
+    )
 
 
-def dashboard_script(close_delay_ms: int) -> str:
+def dashboard_script(close_delay_ms: int, variants: frozenset[str]) -> str:
     return DASHBOARD_SCRIPT.replace(
         "__ATTENDANCE_CLOSE_DELAY_MS__", str(max(0, close_delay_ms))
-    )
+    ).replace("__CANVAS_WIRING__", canvas_wiring(variants))
+
+
+def modal_style(variants: frozenset[str]) -> str:
+    if SLOW_ANIMATION not in variants:
+        return ""
+    return MODAL_ANIMATION_STYLE
 
 
 def render_admin(state: AttendanceState) -> bytes:
@@ -394,8 +487,17 @@ class Handler(BaseHTTPRequestHandler):
     def send_html(
         self, payload: bytes, status: int = 200, headers: dict | None = None
     ) -> None:
+        self.send_bytes(payload, "text/html; charset=utf-8", status, headers)
+
+    def send_bytes(
+        self,
+        payload: bytes,
+        content_type: str,
+        status: int = 200,
+        headers: dict | None = None,
+    ) -> None:
         self.send_response(status)
-        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(payload)))
         for key, value in (headers or {}).items():
             self.send_header(key, value)
@@ -454,7 +556,10 @@ class Handler(BaseHTTPRequestHandler):
             if self.is_authenticated():
                 self.redirect("/")
                 return
-            self.send_html(render_login(error="error" in query))
+            page = scenario_page(path)
+            if page is None:
+                page = render_login(error="error" in query)
+            self.send_html(page)
             return
 
         if path == "/admin":
@@ -465,13 +570,20 @@ class Handler(BaseHTTPRequestHandler):
             if not self.is_authenticated():
                 self.redirect("/connexion")
                 return
-            self.send_html(
-                render_dashboard(
+            page = scenario_page(path)
+            if page is None:
+                page = render_dashboard(
                     self.emulator.state,
                     self.emulator.run_id,
                     self.emulator.attendance_close_delay_ms,
+                    self.emulator.variants,
                 )
-            )
+            self.send_html(page)
+            return
+
+        asset = scenario_asset(path)
+        if asset is not None:
+            self.send_bytes(*asset)
             return
 
         self.send_html(b"<h1>404</h1>", status=404)
@@ -537,7 +649,7 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def main() -> int:
-    global EMULATOR
+    global EMULATOR, SCENARIO
 
     parser = argparse.ArgumentParser(description="Emulateur local de CESAR Emineo")
     parser.add_argument("--host", default="127.0.0.1")
@@ -563,7 +675,34 @@ def main() -> int:
             "apres une signature (defaut : ATTENDANCE_CLOSE_DELAY_MS ou 0)"
         ),
     )
+    parser.add_argument(
+        "--scenario",
+        type=Path,
+        default=None,
+        help=(
+            "dossier de scenario capture a servir pour /connexion et / "
+            "a la place des pages generees (voir emulator/scenario.py)"
+        ),
+    )
+    parser.add_argument(
+        "--variant",
+        action="append",
+        choices=VARIANT_CHOICES,
+        default=[],
+        help=(
+            "variante de comportement, repetable : slow-animation anime "
+            "lentement la modale de signature, mouse-events-only fait ignorer "
+            "les evenements pointer par le canvas"
+        ),
+    )
     args = parser.parse_args()
+
+    if args.scenario is not None:
+        try:
+            SCENARIO = load_scenario(args.scenario, args.attendance_close_delay_ms)
+        except ScenarioError as exc:
+            print(f"Scenario invalide : {exc}", file=sys.stderr)
+            return 2
 
     EMULATOR = Emulator(
         args.username,
@@ -571,6 +710,7 @@ def main() -> int:
         secrets.token_urlsafe(24),
         secrets.token_hex(3),
         attendance_close_delay_ms=args.attendance_close_delay_ms,
+        variants=frozenset(args.variant),
     )
     if args.open:
         EMULATOR.open_attendance()
@@ -593,6 +733,8 @@ def main() -> int:
 
     base = f"http://{args.host}:{server.server_address[1]}"
     print(f"Emulateur CESAR demarre sur {base}", flush=True)
+    if SCENARIO is not None:
+        print(f"  scenario  : {SCENARIO.name} ({SCENARIO.root})", flush=True)
     print(
         f"  connexion : {base}/connexion ({args.username} / {args.password})",
         flush=True,

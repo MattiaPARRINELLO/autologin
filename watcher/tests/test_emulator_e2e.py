@@ -15,6 +15,7 @@ from pathlib import Path
 import pytest
 
 from checkmate_watcher.browser import bundled_chromium_path
+from checkmate_watcher.capture import CaptureSession, sanitize, write_scenario
 from checkmate_watcher.cesar import CesarSession
 from checkmate_watcher.config import (
     AnalyticsConfig,
@@ -31,6 +32,7 @@ from checkmate_watcher.watcher import run_loop
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 EMULATOR = REPO_ROOT / "emulator" / "server.py"
+SCENARIO = REPO_ROOT / "emulator" / "scenarios" / "cesar-simplifie"
 E2E_ENABLED = os.environ.get("CHECKMATE_E2E") == "1"
 
 pytestmark = pytest.mark.skipif(
@@ -66,6 +68,12 @@ def wait_for_state(base_url: str, attempts: int = 60) -> dict:
     raise AssertionError("l'emulateur n'a pas demarre")
 
 
+def fetch(base_url: str, path: str) -> tuple[str, str]:
+    with urllib.request.urlopen(f"{base_url}{path}", timeout=5) as response:
+        content_type = response.headers.get("Content-Type", "")
+        return content_type, response.read().decode("utf-8")
+
+
 def post(base_url: str, path: str) -> dict:
     request = urllib.request.Request(f"{base_url}{path}", method="POST")
     with urllib.request.urlopen(request, timeout=5) as response:
@@ -76,14 +84,14 @@ POINTS = [Point(10, 10, "start"), Point(60, 40, "move"), Point(120, 20, "end")]
 
 
 @contextmanager
-def emulator(**environment: str):
+def emulator(*arguments: str, **environment: str):
     executable = chromium_path()
     if executable is None:
         pytest.skip("aucun Chromium disponible")
 
     port = free_port()
     process = subprocess.Popen(
-        [sys.executable, str(EMULATOR), "--port", str(port)],
+        [sys.executable, str(EMULATOR), "--port", str(port), *arguments],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
         env={**os.environ, **environment},
@@ -190,4 +198,160 @@ def test_sign_attend_la_disparition_du_bouton(tmp_path):
         assert "prise en compte" in confirmation.lower()
         assert remaining == 0
         assert elapsed >= 2.0
+        assert wait_for_state(base_url)["signed"] is True
+
+
+def test_le_mode_scenario_sert_les_pages_capturees():
+    with emulator("--scenario", str(SCENARIO)) as (_, base_url):
+        content_type, html = fetch(base_url, "/connexion")
+        assert content_type.startswith("text/html")
+        assert 'data-scenario="cesar-simplifie"' in html
+        assert "/assets/cesar-lib.js" in html
+
+        css_type, css = fetch(base_url, "/assets/cesar.css")
+        assert css_type == "text/css"
+        assert "--cesar-accent" in css
+
+
+def test_le_watcher_detecte_et_signe_sur_un_scenario_capture(tmp_path):
+    with emulator("--scenario", str(SCENARIO)) as (executable, base_url):
+        config = make_config(tmp_path, executable, base_url)
+        code = asyncio.run(
+            asyncio.wait_for(
+                run_loop(config, once=True, auto_override=True), timeout=120
+            )
+        )
+        assert code == 0
+
+        state = wait_for_state(base_url)
+        assert state["signed"] is True
+        assert state["signature_points"] >= 2
+
+
+def test_le_scenario_respecte_le_delai_de_fermeture(tmp_path):
+    with emulator(
+        "--scenario",
+        str(SCENARIO),
+        "--attendance-close-delay-ms",
+        "1500",
+    ) as (executable, base_url):
+        config = make_config(tmp_path, executable, base_url)
+
+        async def scenario() -> tuple[str, float]:
+            session = CesarSession(config)
+            await session.open(headless=True)
+            try:
+                await session._goto_dashboard()
+                await session._ensure_logged_in()
+                started = time.monotonic()
+                confirmation = await session.sign(POINTS)
+                return confirmation, time.monotonic() - started
+            finally:
+                await session.close()
+
+        confirmation, elapsed = asyncio.run(asyncio.wait_for(scenario(), timeout=120))
+
+        assert "prise en compte" in confirmation.lower()
+        assert elapsed >= 1.5
+        assert wait_for_state(base_url)["signed"] is True
+
+
+def test_le_watcher_signe_avec_une_animation_lente(tmp_path):
+    with emulator("--variant", "slow-animation") as (executable, base_url):
+        config = make_config(tmp_path, executable, base_url)
+
+        async def scenario() -> tuple[str, str]:
+            session = CesarSession(config)
+            await session.open(headless=True)
+            try:
+                await session._goto_dashboard()
+                await session._ensure_logged_in()
+                html = await session.page.content()
+                return html, await session.sign(POINTS)
+            finally:
+                await session.close()
+
+        html, confirmation = asyncio.run(asyncio.wait_for(scenario(), timeout=120))
+
+        assert "modal-in" in html
+        assert "prise en compte" in confirmation.lower()
+        assert wait_for_state(base_url)["signed"] is True
+
+
+def test_le_watcher_signe_quand_le_canvas_ignore_les_evenements_pointer(tmp_path):
+    with emulator("--variant", "mouse-events-only") as (executable, base_url):
+        config = make_config(tmp_path, executable, base_url)
+
+        async def scenario() -> tuple[str, str]:
+            session = CesarSession(config)
+            await session.open(headless=True)
+            try:
+                await session._goto_dashboard()
+                await session._ensure_logged_in()
+                html = await session.page.content()
+                return html, await session.sign(POINTS)
+            finally:
+                await session.close()
+
+        html, confirmation = asyncio.run(asyncio.wait_for(scenario(), timeout=120))
+
+        assert "mousemove" in html
+        assert "pointerdown" not in html
+        assert "prise en compte" in confirmation.lower()
+        assert wait_for_state(base_url)["signed"] is True
+
+
+async def capture_scenario_pages(base_url: str, output: Path) -> None:
+    session = CaptureSession(output, base_url)
+    await session.start()
+    try:
+        await session.goto("/connexion")
+        await session.save_step("connexion")
+
+        await session.page.fill("input#username", "demo")
+        await session.page.fill("input#password", "demo")
+        await session.page.click("button[type='submit'].btn-primary")
+        await session.save_step("tableau-ferme")
+
+        post(base_url, "/api/attendance/open")
+        await session.page.reload(wait_until="networkidle")
+        await session.save_step("tableau-ouvert")
+
+        await session.page.evaluate(
+            """() => fetch('/api/signature', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ points: [{ x: 5, y: 5, type: 'start' }] })
+            })"""
+        )
+        await session.page.reload(wait_until="networkidle")
+        await session.save_step("tableau-signe")
+    finally:
+        await session.close()
+
+
+def test_une_capture_de_cesar_devient_un_scenario_jouable(tmp_path):
+    output = tmp_path / "capture"
+    with emulator("--scenario", str(SCENARIO)) as (_, source_url):
+        post(source_url, "/api/attendance/reset")
+        asyncio.run(
+            asyncio.wait_for(capture_scenario_pages(source_url, output), timeout=120)
+        )
+
+    sanitize(output)
+    write_scenario(output, "capture-emulateur")
+
+    pages = list((output / "pages").glob("*.html"))
+    assert len(pages) == 4
+    for page in pages:
+        assert source_url not in page.read_text(encoding="utf-8")
+
+    with emulator("--scenario", str(output)) as (executable, base_url):
+        config = make_config(tmp_path, executable, base_url)
+        code = asyncio.run(
+            asyncio.wait_for(
+                run_loop(config, once=True, auto_override=True), timeout=120
+            )
+        )
+        assert code == 0
         assert wait_for_state(base_url)["signed"] is True
