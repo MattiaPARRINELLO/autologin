@@ -133,6 +133,11 @@ Relance `checkmate-watcher setup`, refais le tracé, puis vérifie la confirmati
 affichée par CESAR. Si le site répond autre chose que "présence prise en
 compte", la signature n'a pas été validée.
 
+Si le message parle d'un tracé "réduit à un point", la signature enregistrée ou
+rejouée ne contient qu'un clic : redessine-la dans l'assistant (le tracé doit
+couvrir la zone) puis relance. CheckMate préfère échouer plutôt que de valider
+un émargement avec un point.
+
 ## La fenêtre visible ne s'ouvre pas
 
 - vérifie que la session graphique est active ;
