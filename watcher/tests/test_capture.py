@@ -17,6 +17,19 @@ def test_rewrite_assets_ne_touche_que_les_urls_connues():
     assert "https://autre.fr/b.png" in result
 
 
+def test_rewrite_assets_resout_les_chemins_relatifs():
+    html = '<link href="/build/assets/app.css"><script src="/build/assets/app.js?v=2"></script>'
+    mapping = {
+        "https://cesar.fr/build/assets/app.css": "assets/000-app.css",
+        "https://cesar.fr/build/assets/app.js?v=2": "assets/001-app.js",
+    }
+
+    result = capture.rewrite_assets(html, mapping)
+
+    assert 'href="/assets/000-app.css"' in result
+    assert 'src="/assets/001-app.js"' in result
+
+
 def test_normalize_login_action_ramene_le_formulaire_sur_connexion():
     html = '<form id="f" action="https://cesar.fr/login/do" method="post"></form>'
 
@@ -136,7 +149,8 @@ def test_sanitize_reecrit_pages_css_et_har(tmp_path):
     (tmp_path / "pages" / "connexion.html").write_text(
         '<meta name="app-user" content=\'{"username":"etudiant"}\'>'
         '<form action="https://cesar.fr/login"></form>'
-        '<link rel="stylesheet" href="https://cesar.fr/app.css">',
+        '<link rel="stylesheet" href="https://cesar.fr/app.css">'
+        '<script src="/build/assets/app.js"></script>',
         encoding="utf-8",
     )
     (tmp_path / "assets" / "000-app.css").write_text(
@@ -148,6 +162,7 @@ def test_sanitize_reecrit_pages_css_et_har(tmp_path):
                 "assets": {
                     "https://cesar.fr/app.css": "assets/000-app.css",
                     "https://cesar.fr/fond.png": "assets/001-fond.png",
+                    "https://cesar.fr/build/assets/app.js": "assets/002-app.js",
                 }
             }
         ),
@@ -161,6 +176,7 @@ def test_sanitize_reecrit_pages_css_et_har(tmp_path):
     assert 'href="/assets/000-app.css"' in html
     assert 'action="/connexion"' in html
     assert "app-user" not in html
+    assert 'src="/assets/002-app.js"' in html
     assert 'url("/assets/001-fond.png")' in css
 
 
