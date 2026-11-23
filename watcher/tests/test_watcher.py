@@ -4,7 +4,7 @@ from datetime import datetime
 
 from checkmate_watcher.schedule import Schedule, parse_windows
 from checkmate_watcher.state import StateStore
-from checkmate_watcher.watcher import _pause_reason
+from checkmate_watcher.watcher import _pause_reason, _record_success
 
 SCHEDULE = Schedule(
     enabled=True,
@@ -44,3 +44,24 @@ def test_pause_sur_creneau_deja_signe(tmp_path):
 
 def test_surveillance_active_sur_creneau_libre(tmp_path):
     assert _pause_reason(SCHEDULE, StateStore(tmp_path / "s.json"), LUNDI_10H) is None
+
+
+def test_succes_note_le_retour_a_la_normale(tmp_path):
+    state = StateStore(tmp_path / "s.json")
+    state.set_meta("last_error_at", "2026-11-16T09:00:00")
+    _record_success(state)
+    assert state.get_meta("last_ok_at") is not None
+
+
+def test_succes_sans_erreur_n_ecrit_rien(tmp_path):
+    state = StateStore(tmp_path / "s.json")
+    _record_success(state)
+    assert state.get_meta("last_ok_at") is None
+
+
+def test_succes_repete_ne_reecrit_pas_l_heure(tmp_path):
+    state = StateStore(tmp_path / "s.json")
+    state.set_meta("last_error_at", "2026-11-16T09:00:00")
+    state.set_meta("last_ok_at", "2026-11-16T09:05:00")
+    _record_success(state)
+    assert state.get_meta("last_ok_at") == "2026-11-16T09:05:00"

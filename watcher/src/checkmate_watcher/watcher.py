@@ -50,6 +50,18 @@ def _record_error(state: StateStore, exc: BaseException) -> None:
     state.set_meta("last_error_message", message)
 
 
+def _record_success(state: StateStore) -> None:
+    """Note le retour a la normale pour retirer l'alerte au plus vite."""
+    error_at = state.get_meta("last_error_at")
+    if not error_at:
+        return
+    ok_at = state.get_meta("last_ok_at")
+    if ok_at is not None and ok_at >= error_at:
+        return
+    state.set_meta("last_ok_at", _now_iso())
+    logger.info("erreur precedente resolue")
+
+
 SIGN = "sign"
 ABSENT = "absent"
 NO_ANSWER = "no_answer"
@@ -347,6 +359,7 @@ async def run_loop(
                 try:
                     signal = await session.check()
                     consecutive_errors = 0
+                    _record_success(state)
 
                     if signal is None:
                         logger.debug("rien a signer")
