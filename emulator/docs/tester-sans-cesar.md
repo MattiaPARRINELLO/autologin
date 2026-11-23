@@ -22,9 +22,24 @@ watcher (`0` signe, `2` rien a signer). Il s'arrete ensuite.
 Options utiles en developpement :
 
 ```bash
-./scripts/dev-scenario.sh capture 8810    # port fixe, utile pour recharger la page a la main
-./scripts/dev-scenario.sh capture --keep  # laisse l'emulateur tourner apres le cycle
-./scripts/dev-scenario.sh                 # sans capture : pages generees
+./scripts/dev-scenario.sh capture --visible  # navigateur visible pendant tout le cycle
+./scripts/dev-scenario.sh capture 8810       # port fixe, pour recharger la page a la main
+./scripts/dev-scenario.sh capture --keep     # laisse l'emulateur tourner apres le cycle
+./scripts/dev-scenario.sh                    # sans capture : pages generees
+```
+
+Par defaut tout est invisible (`headless = true`) : c'est rapide, mais on ne voit
+rien. `--visible` ouvre Chromium et le garde ouvert du login a la confirmation.
+`--keep` laisse l'emulateur en place et affiche l'URL a ouvrir toi-meme, avec le
+compte `demo` / `demo`.
+
+Si le bouton d'emargement est recouvert par une carte du site, le clic echoue en
+mode visible. La capture n'a pas toutes les feuilles de style du site : remonte
+le bouton au chargement du harness :
+
+```js
+trigger.style.position = 'relative';
+trigger.style.zIndex = '50';
 ```
 
 Le reste de cette page detaille la version manuelle, utile pour inspecter la
