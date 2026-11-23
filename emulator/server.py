@@ -8,6 +8,9 @@ confirmation et etat persistant en memoire.
 Lancer :
     python3 emulator/server.py --port 8765
 
+Ou servir un scenario capture a la place des pages generees :
+    python3 emulator/server.py --port 8765 --scenario emulator/scenarios/demo
+
 Puis configurer le watcher avec base_url = "http://127.0.0.1:8765".
 """
 
@@ -24,7 +27,10 @@ import time
 from dataclasses import dataclass
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 from urllib.parse import parse_qs, urlparse
+
+from scenario import Scenario, ScenarioError, load_scenario
 
 COOKIE_NAME = "cesar_session"
 
@@ -103,6 +109,28 @@ class Emulator:
 
 
 EMULATOR: Emulator | None = None
+SCENARIO: Scenario | None = None
+
+
+def scenario_state() -> str:
+    assert EMULATOR is not None
+    if EMULATOR.state.signed:
+        return "signed"
+    if EMULATOR.state.open:
+        return "open"
+    return "default"
+
+
+def scenario_page(path: str) -> bytes | None:
+    if SCENARIO is None:
+        return None
+    return SCENARIO.page_html(path, scenario_state())
+
+
+def scenario_asset(path: str) -> tuple[bytes, str] | None:
+    if SCENARIO is None:
+        return None
+    return SCENARIO.asset(path)
 
 
 PAGE_STYLE = """
@@ -463,7 +491,10 @@ class Handler(BaseHTTPRequestHandler):
             if self.is_authenticated():
                 self.redirect("/")
                 return
-            self.send_html(render_login(error="error" in query))
+            page = scenario_page(path)
+            if page is None:
+                page = render_login(error="error" in query)
+            self.send_html(page)
             return
 
         if path == "/admin":
@@ -474,13 +505,19 @@ class Handler(BaseHTTPRequestHandler):
             if not self.is_authenticated():
                 self.redirect("/connexion")
                 return
-            self.send_html(
-                render_dashboard(
+            page = scenario_page(path)
+            if page is None:
+                page = render_dashboard(
                     self.emulator.state,
                     self.emulator.run_id,
                     self.emulator.attendance_close_delay_ms,
                 )
-            )
+            self.send_html(page)
+            return
+
+        asset = scenario_asset(path)
+        if asset is not None:
+            self.send_bytes(*asset)
             return
 
         self.send_html(b"<h1>404</h1>", status=404)
@@ -546,7 +583,7 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def main() -> int:
-    global EMULATOR
+    global EMULATOR, SCENARIO
 
     parser = argparse.ArgumentParser(description="Emulateur local de CESAR Emineo")
     parser.add_argument("--host", default="127.0.0.1")
@@ -572,7 +609,23 @@ def main() -> int:
             "apres une signature (defaut : ATTENDANCE_CLOSE_DELAY_MS ou 0)"
         ),
     )
+    parser.add_argument(
+        "--scenario",
+        type=Path,
+        default=None,
+        help=(
+            "dossier de scenario capture a servir pour /connexion et / "
+            "a la place des pages generees (voir emulator/scenario.py)"
+        ),
+    )
     args = parser.parse_args()
+
+    if args.scenario is not None:
+        try:
+            SCENARIO = load_scenario(args.scenario, args.attendance_close_delay_ms)
+        except ScenarioError as exc:
+            print(f"Scenario invalide : {exc}", file=sys.stderr)
+            return 2
 
     EMULATOR = Emulator(
         args.username,
@@ -602,6 +655,8 @@ def main() -> int:
 
     base = f"http://{args.host}:{server.server_address[1]}"
     print(f"Emulateur CESAR demarre sur {base}", flush=True)
+    if SCENARIO is not None:
+        print(f"  scenario  : {SCENARIO.name} ({SCENARIO.root})", flush=True)
     print(
         f"  connexion : {base}/connexion ({args.username} / {args.password})",
         flush=True,
