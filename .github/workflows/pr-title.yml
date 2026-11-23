@@ -38,8 +38,10 @@ jobs:
         run: |
           types="feat fix docs style refactor perf test build ci chore revert"
           type="$(sed -E "s/^(${types// /|})(\([a-z0-9._/-]+\))?!?: .*/\1/" <<< "$TITLE")"
-          # Le label existe peut-etre deja : la commande est idempotente.
-          gh label create "$type" --force > /dev/null
+          # `gh label create` ecraserait couleur et description d'un label existant.
+          if ! gh label list --limit 100 --json name --jq '.[].name' | grep -qx "$type"; then
+            gh label create "$type" > /dev/null
+          fi
           for autre in $types; do
             if [ "$autre" != "$type" ]; then
               gh pr edit "$PR" --remove-label "$autre" > /dev/null 2>&1 || true
