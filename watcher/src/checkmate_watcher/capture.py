@@ -102,7 +102,7 @@ class CaptureSession:
     _playwright: object | None = None
     _pending: list = field(default_factory=list)
 
-    async def start(self) -> None:
+    async def start(self, headless: bool = False) -> None:
         from playwright.async_api import async_playwright
 
         (self.root / PAGES_DIR).mkdir(parents=True, exist_ok=True)
@@ -110,7 +110,7 @@ class CaptureSession:
         self._playwright = await async_playwright().start()
         options = resolve_launch_options(self._playwright.chromium, None).as_kwargs()
         self._browser = await self._playwright.chromium.launch(
-            headless=False,
+            headless=headless,
             args=["--no-first-run", "--no-default-browser-check"],
             **options,
         )

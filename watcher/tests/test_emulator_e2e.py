@@ -303,7 +303,7 @@ def test_le_watcher_signe_quand_le_canvas_ignore_les_evenements_pointer(tmp_path
 
 async def capture_scenario_pages(base_url: str, output: Path) -> None:
     session = CaptureSession(output, base_url)
-    await session.start()
+    await session.start(headless=True)
     try:
         await session.goto("/connexion")
         await session.save_step("connexion")
