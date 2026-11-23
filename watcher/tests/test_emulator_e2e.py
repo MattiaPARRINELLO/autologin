@@ -15,6 +15,7 @@ from pathlib import Path
 import pytest
 
 from checkmate_watcher.browser import bundled_chromium_path
+from checkmate_watcher.capture import CaptureSession, sanitize, write_scenario
 from checkmate_watcher.cesar import CesarSession
 from checkmate_watcher.config import (
     AnalyticsConfig,
@@ -297,4 +298,60 @@ def test_le_watcher_signe_quand_le_canvas_ignore_les_evenements_pointer(tmp_path
         assert "mousemove" in html
         assert "pointerdown" not in html
         assert "prise en compte" in confirmation.lower()
+        assert wait_for_state(base_url)["signed"] is True
+
+
+async def capture_scenario_pages(base_url: str, output: Path) -> None:
+    session = CaptureSession(output, base_url)
+    await session.start()
+    try:
+        await session.goto("/connexion")
+        await session.save_step("connexion")
+
+        await session.page.fill("input#username", "demo")
+        await session.page.fill("input#password", "demo")
+        await session.page.click("button[type='submit'].btn-primary")
+        await session.save_step("tableau-ferme")
+
+        post(base_url, "/api/attendance/open")
+        await session.page.reload(wait_until="networkidle")
+        await session.save_step("tableau-ouvert")
+
+        await session.page.evaluate(
+            """() => fetch('/api/signature', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ points: [{ x: 5, y: 5, type: 'start' }] })
+            })"""
+        )
+        await session.page.reload(wait_until="networkidle")
+        await session.save_step("tableau-signe")
+    finally:
+        await session.close()
+
+
+def test_une_capture_de_cesar_devient_un_scenario_jouable(tmp_path):
+    output = tmp_path / "capture"
+    with emulator("--scenario", str(SCENARIO)) as (_, source_url):
+        post(source_url, "/api/attendance/reset")
+        asyncio.run(
+            asyncio.wait_for(capture_scenario_pages(source_url, output), timeout=120)
+        )
+
+    sanitize(output)
+    write_scenario(output, "capture-emulateur")
+
+    pages = list((output / "pages").glob("*.html"))
+    assert len(pages) == 4
+    for page in pages:
+        assert source_url not in page.read_text(encoding="utf-8")
+
+    with emulator("--scenario", str(output)) as (executable, base_url):
+        config = make_config(tmp_path, executable, base_url)
+        code = asyncio.run(
+            asyncio.wait_for(
+                run_loop(config, once=True, auto_override=True), timeout=120
+            )
+        )
+        assert code == 0
         assert wait_for_state(base_url)["signed"] is True
