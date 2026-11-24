@@ -122,19 +122,23 @@ def _try_systemd_run(script, unit):
     # fmt: on
 
 
-def _spawn_linux_installer(script: str) -> None:
-    """Detache l'installation du service pour qu'elle lui survive."""
-    unit = f"checkmate-update-{os.getpid()}"
-    if _try_systemd_run(script, unit):
-        return
+def _spawn_detached(argv: list[str]) -> None:
     subprocess.Popen(
-        ["/bin/bash", script],
+        argv,
         close_fds=True,
         start_new_session=True,
         stdin=subprocess.DEVNULL,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
     )
+
+
+def _spawn_linux_installer(script: str) -> None:
+    """Detache l'installation du service pour qu'elle lui survive."""
+    unit = f"checkmate-update-{os.getpid()}"
+    if _try_systemd_run(script, unit):
+        return
+    _spawn_detached(["/bin/bash", script])
 
 
 def _quote(value: str) -> str:
