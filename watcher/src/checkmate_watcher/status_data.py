@@ -30,6 +30,7 @@ class _Context:
     moment: datetime
     schedule: Schedule
     situation: Situation
+    blocked: dict | None
 
 
 def _iso(moment: datetime) -> str:
@@ -62,6 +63,8 @@ def _days(schedule: Schedule) -> list[str]:
 
 
 def _status(ctx: _Context) -> tuple[str, str]:
+    if ctx.blocked is not None:
+        return "blocked", "Mise a jour obligatoire"
     reason = ctx.situation.reason
     mode = "active" if reason == "disabled" else reason
     failed = _recent(ctx.state.get_meta("last_error_at"), ctx.moment)
@@ -124,12 +127,12 @@ def _restart_required(config_path: Path, started_at: datetime) -> bool:
         return False
 
 
-def _build_context(config, state, started_at, config_path, now) -> _Context:
+def _build_context(config, state, started_at, config_path, now, blocked) -> _Context:
     moment = now or datetime.now()
     schedule = config.schedule
     args = (config, state, started_at, config_path, moment, schedule)
     situation = schedule.situation(moment, state.window_done)
-    return _Context(*args, situation)
+    return _Context(*args, situation, blocked)
 
 
 def _render(ctx: _Context) -> dict:
@@ -138,6 +141,7 @@ def _render(ctx: _Context) -> dict:
         **_activity(ctx),
         **_state(ctx),
         "restart_required": _restart_required(ctx.config_path, ctx.started_at),
+        "blocked": ctx.blocked,
         "log_file": str(default_log_file()),
     }
 
@@ -148,5 +152,7 @@ def build_snapshot(
     started_at: datetime,
     config_path: Path,
     now: datetime | None = None,
+    blocked: dict | None = None,
 ) -> dict:
-    return _render(_build_context(config, state, started_at, config_path, now))
+    context = _build_context(config, state, started_at, config_path, now, blocked)
+    return _render(context)
