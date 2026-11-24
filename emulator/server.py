@@ -49,21 +49,17 @@ class AttendanceState:
 
 
 class Emulator:
-    def __init__(
-        self,
-        username: str,
-        password: str,
-        token: str,
-        run_id: str,
-        attendance_close_delay_ms: int = 0,
-        variants: frozenset[str] = frozenset(),
-    ) -> None:
+    def __init__(self, username, password, token, run_id, **options) -> None:
         self.username = username
         self.password = password
         self.token = token
         self.run_id = run_id
-        self.attendance_close_delay_ms = max(0, attendance_close_delay_ms)
-        self.variants = frozenset(variants)
+        delay = options.get("attendance_close_delay_ms", 0)
+        self.attendance_close_delay_ms = max(0, delay)
+        self.variants = frozenset(options.get("variants", frozenset()))
+        self._init_state()
+
+    def _init_state(self) -> None:
         self.lock = threading.Lock()
         self.state = AttendanceState()
 
@@ -90,16 +86,25 @@ class Emulator:
 
     def sign(self, points: list) -> tuple[bool, str]:
         with self.lock:
-            if not points:
-                return False, "Signature vide."
-            if not self.state.open:
-                return False, "Aucun emargement n'est ouvert."
-            if self.state.signed:
-                return False, "Votre presence est deja enregistree."
-            self.state.signed = True
-            self.state.signature_points = len(points)
-            self.state.signed_at = datetime.now().isoformat(timespec="seconds")
+            error = self._sign_error(points)
+            if error is not None:
+                return False, error
+            self._apply_signature(points)
             return True, "Votre presence a bien ete prise en compte."
+
+    def _sign_error(self, points: list) -> str | None:
+        if not points:
+            return "Signature vide."
+        if not self.state.open:
+            return "Aucun emargement n'est ouvert."
+        if self.state.signed:
+            return "Votre presence est deja enregistree."
+        return None
+
+    def _apply_signature(self, points: list) -> None:
+        self.state.signed = True
+        self.state.signature_points = len(points)
+        self.state.signed_at = datetime.now().isoformat(timespec="seconds")
 
     def as_dict(self) -> dict:
         with self.lock:
@@ -292,15 +297,13 @@ def canvas_wiring(variants: frozenset[str]) -> str:
     return CANVAS_WIRING["pointer"]
 
 
-def render_page(title: str, body: str, *, script: str = "", style: str = "") -> bytes:
-    extra_style = f"<style>{style}</style>" if style else ""
-    html = f"""<!doctype html>
+PAGE_TEMPLATE = """<!doctype html>
 <html lang="fr">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{title}</title>
-<style>{PAGE_STYLE}</style>
+<style>{page_style}</style>
 {extra_style}
 </head>
 <body>
@@ -309,16 +312,8 @@ def render_page(title: str, body: str, *, script: str = "", style: str = "") -> 
 </body>
 </html>
 """
-    return html.encode("utf-8")
 
-
-def render_login(error: bool = False) -> bytes:
-    error_block = (
-        '<p style="color:#fca5a5;font-weight:700">Identifiants incorrects.</p>'
-        if error
-        else ""
-    )
-    body = f"""
+LOGIN_TEMPLATE = """
 <main style="max-width:420px;margin-top:12vh">
   <div class="card">
     <h1 style="margin-top:0">CESAR Emineo</h1>
@@ -336,32 +331,31 @@ def render_login(error: bool = False) -> bytes:
   </div>
 </main>
 """
+
+
+def render_page(title: str, body: str, *, script: str = "", style: str = "") -> bytes:
+    extra_style = f"<style>{style}</style>" if style else ""
+    html = PAGE_TEMPLATE.format(
+        title=title,
+        page_style=PAGE_STYLE,
+        extra_style=extra_style,
+        body=body,
+        script=script,
+    )
+    return html.encode("utf-8")
+
+
+def render_login(error: bool = False) -> bytes:
+    error_block = (
+        '<p style="color:#fca5a5;font-weight:700">Identifiants incorrects.</p>'
+        if error
+        else ""
+    )
+    body = LOGIN_TEMPLATE.format(error_block=error_block)
     return render_page("CESAR - connexion", body)
 
 
-def render_dashboard(
-    state: AttendanceState,
-    run_id: str,
-    close_delay_ms: int = 0,
-    variants: frozenset[str] = frozenset(),
-) -> bytes:
-    if state.signed:
-        attendance = (
-            '<div class="card"><p class="status open">Presence signee</p>'
-            f'<p class="muted">Emargement enregistre a {state.signed_at} '
-            f"({state.signature_points} points de signature).</p></div>"
-        )
-        modal = ""
-    elif state.open:
-        attendance = f"""
-<div class="card">
-  <p class="status open">Emargement ouvert</p>
-  <p class="muted">Session {state.session_id}. Le formateur attend ta signature.</p>
-  <button class="buttonPresent success" data-live-action-param="session-{state.session_id}-{run_id}"
-          style="margin-top:12px">Signer ma presence</button>
-</div>
-"""
-        modal = """
+OPEN_MODAL = """
 <div id="modal">
   <div class="dialog">
     <h2 style="margin-top:0">Signature de presence</h2>
@@ -372,14 +366,13 @@ def render_dashboard(
   </div>
 </div>
 """
-    else:
-        attendance = (
-            '<div class="card"><p class="status closed">Aucun emargement en cours</p>'
-            '<p class="muted">Ouvre un emargement depuis /admin pour tester.</p></div>'
-        )
-        modal = ""
 
-    body = f"""
+CLOSED_ATTENDANCE = (
+    '<div class="card"><p class="status closed">Aucun emargement en cours</p>'
+    '<p class="muted">Ouvre un emargement depuis /admin pour tester.</p></div>'
+)
+
+DASHBOARD_BODY = """
 <header>
   <h1>CESAR Emineo</h1>
   <nav><a href="/admin">Administration</a><a href="/connexion?logout=1">Deconnexion</a></nav>
@@ -401,6 +394,47 @@ def render_dashboard(
 </main>
 {modal}
 """
+
+
+def _signed_attendance(state: AttendanceState) -> str:
+    return (
+        '<div class="card"><p class="status open">Presence signee</p>'
+        f'<p class="muted">Emargement enregistre a {state.signed_at} '
+        f"({state.signature_points} points de signature).</p></div>"
+    )
+
+
+def _open_attendance(state: AttendanceState, run_id: str) -> str:
+    return f"""
+<div class="card">
+  <p class="status open">Emargement ouvert</p>
+  <p class="muted">Session {state.session_id}. Le formateur attend ta signature.</p>
+  <button class="buttonPresent success" data-live-action-param="session-{state.session_id}-{run_id}"
+          style="margin-top:12px">Signer ma presence</button>
+</div>
+"""
+
+
+def _dashboard_parts(state: AttendanceState, run_id: str) -> tuple[str, str]:
+    if state.signed:
+        return _signed_attendance(state), ""
+    if state.open:
+        return _open_attendance(state, run_id), OPEN_MODAL
+    return CLOSED_ATTENDANCE, ""
+
+
+def render_dashboard(
+    state: AttendanceState,
+    run_id: str,
+    close_delay_ms: int = 0,
+    variants: frozenset[str] = frozenset(),
+) -> bytes:
+    return _dashboard_page(state, run_id, close_delay_ms, variants)
+
+
+def _dashboard_page(state, run_id, close_delay_ms, variants) -> bytes:
+    attendance, modal = _dashboard_parts(state, run_id)
+    body = DASHBOARD_BODY.format(attendance=attendance, modal=modal)
     script = dashboard_script(close_delay_ms, variants)
     return render_page(
         "CESAR - tableau de bord", body, script=script, style=modal_style(variants)
@@ -419,18 +453,7 @@ def modal_style(variants: frozenset[str]) -> str:
     return MODAL_ANIMATION_STYLE
 
 
-def render_admin(state: AttendanceState) -> bytes:
-    badge = (
-        '<span class="status open">ouvert</span>'
-        if state.open
-        else '<span class="status closed">ferme</span>'
-    )
-    signed = (
-        f'<span class="status open">signe a {state.signed_at}</span>'
-        if state.signed
-        else '<span class="status closed">non signe</span>'
-    )
-    body = f"""
+ADMIN_BODY = """
 <header>
   <h1>Administration de l'emulateur</h1>
   <nav><a href="/">Tableau de bord</a></nav>
@@ -438,7 +461,7 @@ def render_admin(state: AttendanceState) -> bytes:
 <main>
   <div class="card">
     <p>Etat de l'emargement : {badge}</p>
-    <p>Signature : {signed} ({state.signature_points} points, session {state.session_id})</p>
+    <p>Signature : {signed} ({points} points, session {session})</p>
     <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:18px">
       <button class="success" onclick="action('open')">Ouvrir l'emargement</button>
       <button class="ghost" onclick="action('close')">Fermer</button>
@@ -457,6 +480,27 @@ def render_admin(state: AttendanceState) -> bytes:
   }}
 </script>
 """
+
+
+def _badge(state: AttendanceState) -> str:
+    if state.open:
+        return '<span class="status open">ouvert</span>'
+    return '<span class="status closed">ferme</span>'
+
+
+def _signed_badge(state: AttendanceState) -> str:
+    if state.signed:
+        return f'<span class="status open">signe a {state.signed_at}</span>'
+    return '<span class="status closed">non signe</span>'
+
+
+def render_admin(state: AttendanceState) -> bytes:
+    body = ADMIN_BODY.format(
+        badge=_badge(state),
+        signed=_signed_badge(state),
+        points=state.signature_points,
+        session=state.session_id,
+    )
     return render_page("CESAR - administration", body)
 
 
@@ -489,13 +533,7 @@ class Handler(BaseHTTPRequestHandler):
     ) -> None:
         self.send_bytes(payload, "text/html; charset=utf-8", status, headers)
 
-    def send_bytes(
-        self,
-        payload: bytes,
-        content_type: str,
-        status: int = 200,
-        headers: dict | None = None,
-    ) -> None:
+    def send_bytes(self, payload, content_type, status=200, headers=None) -> None:
         self.send_response(status)
         self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(payload)))
@@ -537,117 +575,139 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:
         parsed = urlparse(self.path)
-        path = parsed.path
+        self._route_get(parsed.path, parse_qs(parsed.query))
 
+    def _route_get(self, path: str, query: dict) -> None:
+        if self._route_public(path):
+            return
+        if self._route_page(path, query):
+            return
+        self._serve_asset(path)
+
+    def _route_page(self, path: str, query: dict) -> bool:
+        if path == "/connexion":
+            self._serve_login(query)
+            return True
+        if path == "/admin":
+            self.send_html(render_admin(self.emulator.state))
+            return True
+        if path == "/":
+            self._serve_dashboard()
+            return True
+        return False
+
+    def _route_public(self, path: str) -> bool:
         if path == "/api/state":
             self.send_json(self.emulator.as_dict())
-            return
-
+            return True
         if path == "/favicon.ico":
             self.send_response(204)
             self.end_headers()
-            return
+            return True
+        return False
 
-        if path == "/connexion":
-            query = parse_qs(parsed.query)
-            if "logout" in query:
-                self.redirect("/connexion", clear_cookie=True)
-                return
-            if self.is_authenticated():
-                self.redirect("/")
-                return
-            page = scenario_page(path)
-            if page is None:
-                page = render_login(error="error" in query)
-            self.send_html(page)
+    def _serve_login(self, query: dict) -> None:
+        if "logout" in query:
+            self.redirect("/connexion", clear_cookie=True)
             return
-
-        if path == "/admin":
-            self.send_html(render_admin(self.emulator.state))
+        if self.is_authenticated():
+            self.redirect("/")
             return
+        page = scenario_page("/connexion")
+        if page is None:
+            page = render_login(error="error" in query)
+        self.send_html(page)
 
-        if path == "/":
-            if not self.is_authenticated():
-                self.redirect("/connexion")
-                return
-            page = scenario_page(path)
-            if page is None:
-                page = render_dashboard(
-                    self.emulator.state,
-                    self.emulator.run_id,
-                    self.emulator.attendance_close_delay_ms,
-                    self.emulator.variants,
-                )
-            self.send_html(page)
+    def _serve_dashboard(self) -> None:
+        if not self.is_authenticated():
+            self.redirect("/connexion")
             return
+        page = scenario_page("/")
+        if page is None:
+            page = self._dashboard_page()
+        self.send_html(page)
 
+    def _dashboard_page(self) -> bytes:
+        return render_dashboard(
+            self.emulator.state,
+            self.emulator.run_id,
+            self.emulator.attendance_close_delay_ms,
+            self.emulator.variants,
+        )
+
+    def _serve_asset(self, path: str) -> None:
         asset = scenario_asset(path)
         if asset is not None:
             self.send_bytes(*asset)
             return
-
         self.send_html(b"<h1>404</h1>", status=404)
 
     def do_POST(self) -> None:
-        parsed = urlparse(self.path)
-        path = parsed.path
-
+        path = urlparse(self.path).path
         if path == "/connexion":
-            length = int(self.headers.get("Content-Length") or 0)
-            raw = self.rfile.read(length).decode("utf-8", errors="replace")
-            form = parse_qs(raw)
-            # Un scenario capture reprend les noms de champs de CESAR
-            # (_username, _password) : on accepte les deux conventions.
-            username = (form.get("username") or form.get("_username") or [""])[0]
-            password = (form.get("password") or form.get("_password") or [""])[0]
-            if (
-                username == self.emulator.username
-                and password == self.emulator.password
-            ):
-                self.send_response(303)
-                self.send_header("Location", "/")
-                self.send_header(
-                    "Set-Cookie",
-                    f"{COOKIE_NAME}={self.emulator.token}; Path=/; HttpOnly; SameSite=Lax",
-                )
-                self.end_headers()
-            else:
-                self.redirect("/connexion?error=1")
-            return
-
+            return self._post_login()
         if path == "/api/signature":
-            if not self.is_authenticated():
-                self.send_json({"message": "Session expiree."}, status=401)
-                return
-            payload = self.read_json()
-            if payload is None:
-                self.send_json({"message": "Corps JSON invalide."}, status=400)
-                return
-            points = payload.get("points")
-            if not isinstance(points, list) or not points:
-                self.send_json({"message": "Signature vide."}, status=400)
-                return
-            ok, message = self.emulator.sign(points)
-            self.send_json(
-                {"success": ok, "message": message}, status=200 if ok else 409
-            )
-            return
-
+            return self._post_signature()
         if path.startswith("/api/attendance/"):
-            action_name = path.rsplit("/", 1)[-1]
-            if action_name == "open":
-                self.emulator.open_attendance()
-            elif action_name == "close":
-                self.emulator.close_attendance()
-            elif action_name == "reset":
-                self.emulator.reset()
-            else:
-                self.send_json({"error": "action inconnue"}, status=404)
-                return
-            self.send_json({"ok": True, **self.emulator.as_dict()})
-            return
-
+            return self._post_attendance(path)
         self.send_json({"error": "route inconnue"}, status=404)
+
+    def _post_login(self) -> None:
+        username, password = self._login_fields()
+        if username != self.emulator.username or password != self.emulator.password:
+            self.redirect("/connexion?error=1")
+            return
+        self._send_login_cookie()
+
+    def _login_fields(self) -> tuple[str, str]:
+        length = int(self.headers.get("Content-Length") or 0)
+        raw = self.rfile.read(length).decode("utf-8", errors="replace")
+        form = parse_qs(raw)
+        # Un scenario capture reprend les noms de champs de CESAR.
+        username = (form.get("username") or form.get("_username") or [""])[0]
+        password = (form.get("password") or form.get("_password") or [""])[0]
+        return username, password
+
+    def _send_login_cookie(self) -> None:
+        cookie = f"{COOKIE_NAME}={self.emulator.token}; Path=/; HttpOnly; SameSite=Lax"
+        self.send_response(303)
+        self.send_header("Location", "/")
+        self.send_header("Set-Cookie", cookie)
+        self.end_headers()
+
+    def _post_signature(self) -> None:
+        if not self.is_authenticated():
+            return self._reject(401, "Session expiree.")
+        payload = self.read_json()
+        if payload is None:
+            return self._reject(400, "Corps JSON invalide.")
+        points = payload.get("points")
+        if not isinstance(points, list) or not points:
+            return self._reject(400, "Signature vide.")
+        ok, message = self.emulator.sign(points)
+        self.send_json({"success": ok, "message": message}, status=200 if ok else 409)
+
+    def _reject(self, status: int, message: str) -> None:
+        self.send_json({"message": message}, status=status)
+
+    def _post_attendance(self, path: str) -> None:
+        action = path.rsplit("/", 1)[-1]
+        if not self._attendance_action(action):
+            self.send_json({"error": "action inconnue"}, status=404)
+            return
+        self.send_json({"ok": True, **self.emulator.as_dict()})
+
+    def _attendance_action(self, action: str) -> bool:
+        actions = {
+            "open": self.emulator.open_attendance,
+            "close": self.emulator.close_attendance,
+            "reset": self.emulator.reset,
+        }
+        handler = actions.get(action)
+        if handler is None:
+            return False
+        handler()
+        return True
 
 
 def _afficher_erreur_scenario(exc: ScenarioError) -> None:
@@ -681,10 +741,7 @@ def _afficher_arret(started: float) -> None:
     print(f"\nArret apres {int(time.time() - started)}s")
 
 
-def main() -> int:
-    global EMULATOR, SCENARIO
-
-    parser = argparse.ArgumentParser(description="Emulateur local de CESAR Emineo")
+def _add_network_args(parser) -> None:
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument(
         "--port",
@@ -692,6 +749,9 @@ def main() -> int:
         default=8787,
         help="port d'ecoute (0 = port libre choisi automatiquement)",
     )
+
+
+def _add_session_args(parser) -> None:
     parser.add_argument("--username", default="demo")
     parser.add_argument("--password", default="demo")
     parser.add_argument(
@@ -699,6 +759,9 @@ def main() -> int:
         action="store_true",
         help="ouvre un emargement au demarrage",
     )
+
+
+def _add_delay_arg(parser) -> None:
     parser.add_argument(
         "--attendance-close-delay-ms",
         type=int,
@@ -708,6 +771,9 @@ def main() -> int:
             "apres une signature (defaut : ATTENDANCE_CLOSE_DELAY_MS ou 0)"
         ),
     )
+
+
+def _add_scenario_arg(parser) -> None:
     parser.add_argument(
         "--scenario",
         type=Path,
@@ -717,27 +783,49 @@ def main() -> int:
             "a la place des pages generees (voir emulator/scenario.py)"
         ),
     )
+
+
+VARIANT_HELP = (
+    "variante de comportement, repetable : slow-animation anime "
+    "lentement la modale de signature, mouse-events-only fait ignorer "
+    "les evenements pointer par le canvas"
+)
+
+
+def _add_variant_arg(parser) -> None:
     parser.add_argument(
         "--variant",
         action="append",
         choices=VARIANT_CHOICES,
         default=[],
-        help=(
-            "variante de comportement, repetable : slow-animation anime "
-            "lentement la modale de signature, mouse-events-only fait ignorer "
-            "les evenements pointer par le canvas"
-        ),
+        help=VARIANT_HELP,
     )
-    args = parser.parse_args()
 
-    if args.scenario is not None:
-        try:
-            SCENARIO = load_scenario(args.scenario, args.attendance_close_delay_ms)
-        except ScenarioError as exc:
-            _afficher_erreur_scenario(exc)
-            return 2
 
-    EMULATOR = Emulator(
+def _build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="Emulateur local de CESAR Emineo")
+    _add_network_args(parser)
+    _add_session_args(parser)
+    _add_delay_arg(parser)
+    _add_scenario_arg(parser)
+    _add_variant_arg(parser)
+    return parser
+
+
+def _load_scenario_arg(args) -> int | None:
+    global SCENARIO
+    if args.scenario is None:
+        return None
+    try:
+        SCENARIO = load_scenario(args.scenario, args.attendance_close_delay_ms)
+    except ScenarioError as exc:
+        _afficher_erreur_scenario(exc)
+        return 2
+    return None
+
+
+def _new_emulator(args) -> Emulator:
+    return Emulator(
         args.username,
         args.password,
         secrets.token_urlsafe(24),
@@ -745,27 +833,53 @@ def main() -> int:
         attendance_close_delay_ms=args.attendance_close_delay_ms,
         variants=frozenset(args.variant),
     )
+
+
+def _create_emulator(args) -> None:
+    global EMULATOR
+    EMULATOR = _new_emulator(args)
     if args.open:
         EMULATOR.open_attendance()
 
+
+def _start_server(args):
     try:
-        server = ThreadingHTTPServer((args.host, args.port), Handler)
+        return ThreadingHTTPServer((args.host, args.port), Handler)
     except OSError as exc:
         if exc.errno == errno.EADDRINUSE:
             _afficher_port_occupe(args)
-            return 1
+            return None
         raise
 
-    base = f"http://{args.host}:{server.server_address[1]}"
-    _afficher_demarrage(base, SCENARIO, args)
-    started = time.time()
+
+def _serve_forever(server, started: float) -> None:
     try:
         server.serve_forever()
     except KeyboardInterrupt:
         _afficher_arret(started)
+
+
+def _serve(server, args) -> int:
+    base = f"http://{args.host}:{server.server_address[1]}"
+    _afficher_demarrage(base, SCENARIO, args)
+    started = time.time()
+    try:
+        _serve_forever(server, started)
     finally:
         server.server_close()
     return 0
+
+
+def main() -> int:
+    args = _build_parser().parse_args()
+    error = _load_scenario_arg(args)
+    if error is not None:
+        return error
+    _create_emulator(args)
+    server = _start_server(args)
+    if server is None:
+        return 1
+    return _serve(server, args)
 
 
 if __name__ == "__main__":
