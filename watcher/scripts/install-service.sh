@@ -89,7 +89,7 @@ if [ ! -f "$CONFIG_DIR/env" ]; then
     cat > "$CONFIG_DIR/env" <<'EOF'
 # Variables d'environnement du service CheckMate.
 # Renseigne le mot de passe si ta config utilise password_env.
-# CHECKMATE_PASSWORD=motdepasse
+# Exemple de valeur : CHECKMATE_PASSWORD=motdepasse
 EOF
     chmod 600 "$CONFIG_DIR/env"
     echo "Fichier cree : $CONFIG_DIR/env (renseigne CHECKMATE_PASSWORD)"
