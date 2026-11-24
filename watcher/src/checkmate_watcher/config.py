@@ -148,18 +148,30 @@ class AnalyticsConfig:
     endpoint: str = DEFAULT_ANALYTICS_ENDPOINT
 
 
-def parse_updates_channel(table: dict) -> str:
-    """Lit `[updates] channel`, avec `include_prerelease` en alias historique."""
-    raw_channel = table.get("channel")
-    if raw_channel is None:
-        if "include_prerelease" in table:
-            return BETA_CHANNEL if bool(table["include_prerelease"]) else STABLE_CHANNEL
-        return STABLE_CHANNEL
-    channel = str(raw_channel).strip().lower()
+def _legacy_channel(table: dict) -> str | None:
+    if "include_prerelease" not in table:
+        return None
+    return BETA_CHANNEL if bool(table["include_prerelease"]) else STABLE_CHANNEL
+
+
+def _normalize_channel(raw: object) -> str:
+    return str(raw).strip().lower()
+
+
+def _validate_channel(channel: str) -> str:
     if channel not in CHANNELS:
         values = ", ".join(f"'{item}'" for item in CHANNELS)
         raise ConfigError(f"[updates] channel doit valoir {values}")
     return channel
+
+
+def parse_updates_channel(table: dict) -> str:
+    """Lit `[updates] channel`, avec `include_prerelease` en alias historique."""
+    raw = table.get("channel")
+    if raw is None:
+        legacy = _legacy_channel(table)
+        return STABLE_CHANNEL if legacy is None else legacy
+    return _validate_channel(_normalize_channel(raw))
 
 
 @dataclass(frozen=True)
@@ -188,51 +200,81 @@ def _require(table: dict, key: str, table_name: str) -> str:
     return value.strip()
 
 
-def _resolve_password(
-    table: dict, username: str, service: str, required: bool = True
-) -> str:
+def _direct_password(table: dict) -> str:
     direct = table.get("password")
     if isinstance(direct, str) and direct:
         return direct
+    return ""
 
+
+def _env_password(table: dict) -> str:
     env_name = table.get("password_env")
-    if isinstance(env_name, str) and env_name:
-        value = os.environ.get(env_name)
-        if value:
-            return value
-        logger.debug("variable %s absente, essai du trousseau", env_name)
+    if not isinstance(env_name, str) or not env_name:
+        return ""
+    value = os.environ.get(env_name)
+    if value:
+        return value
+    logger.debug("variable %s absente, essai du trousseau", env_name)
+    return ""
 
-    stored = get_keyring_password(service, username)
-    if stored:
-        return stored
 
+def _required_password(required: bool) -> str:
     if required:
         raise ConfigError(
-            "[cesar] mot de passe introuvable : renseigne password ou password_env, "
-            "ou lance 'checkmate-watcher set-password'"
+            "[cesar] mot de passe introuvable : renseigne password ou "
+            "password_env, ou lance 'checkmate-watcher set-password'"
         )
     return ""
 
 
+def _resolve_password(
+    table: dict, username: str, service: str, required: bool = True
+) -> str:
+    for source in (
+        lambda: _direct_password(table),
+        lambda: _env_password(table),
+        lambda: get_keyring_password(service, username),
+    ):
+        if value := source():
+            return value
+    return _required_password(required)
+
+
+def _default_cesar() -> CesarConfig:
+    return CesarConfig(
+        base_url="https://cesar.emineo-education.fr",
+        username="",
+        password="",
+    )
+
+
+def _default_watcher() -> WatcherConfig:
+    return WatcherConfig(poll_interval=10, headless=True)
+
+
+def _default_schedule() -> Schedule:
+    return Schedule(
+        enabled=True,
+        days=parse_days(DEFAULT_DAYS),
+        windows=parse_windows(DEFAULT_WINDOWS),
+    )
+
+
+def _default_sections() -> dict:
+    return {
+        "cesar": _default_cesar(),
+        "watcher": _default_watcher(),
+        "signature": SignatureConfig(),
+        "notifications": NotificationConfig(),
+        "selectors": Selectors.from_dict({}),
+        "schedule": _default_schedule(),
+        "updates": UpdatesConfig(),
+    }
+
+
 def default_config() -> Config:
     """Configuration proposee par l'assistant : reglages recommandes."""
-    return Config(
-        cesar=CesarConfig(
-            base_url="https://cesar.emineo-education.fr",
-            username="",
-            password="",
-        ),
-        watcher=WatcherConfig(poll_interval=10, headless=True),
-        signature=SignatureConfig(),
-        notifications=NotificationConfig(),
-        selectors=Selectors.from_dict({}),
-        schedule=Schedule(
-            enabled=True,
-            days=parse_days(DEFAULT_DAYS),
-            windows=parse_windows(DEFAULT_WINDOWS),
-        ),
-        updates=UpdatesConfig(),
-    )
+    return Config(**_default_sections())
 
 
 def _days_to_names(days: tuple[int, ...]) -> list[str]:
