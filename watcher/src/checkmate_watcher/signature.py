@@ -55,7 +55,7 @@ def points_extent(points: list[Point]) -> tuple[float, float]:
 
 
 def parse_points(data: object) -> list[Point]:
-    """Accepte la liste brute ou l'objet exporte par l'extension."""
+    """Accepte la liste brute ou un objet exporte (signatureData/points)."""
     if isinstance(data, dict):
         data = data.get("signatureData", data.get("points"))
     if not isinstance(data, list):
