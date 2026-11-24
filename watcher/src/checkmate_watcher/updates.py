@@ -194,6 +194,11 @@ class UpdatePolicy:
             and self.latest.version > self.current
         )
 
+    @property
+    def install_target(self) -> Release | None:
+        """La migration a passer d'abord, sinon la derniere version disponible."""
+        return self.migration or (self.latest if self.available else None)
+
 
 def _required_release(window):
     return max(
