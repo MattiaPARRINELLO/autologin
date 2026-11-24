@@ -539,45 +539,90 @@ def _afficher_configuration_interrompue() -> None:
     print("Configuration interrompue (delai depasse).")
 
 
+def _load_setup_config(config_path: Path) -> tuple[Config | None, int | None]:
+    try:
+        config = load_config(config_path, require_password=False)
+    except ConfigError as exc:
+        if config_path.is_file():
+            _afficher_config_invalide(exc)
+            return None, 2
+        return None, None
+    return config, None
+
+
+def _start_setup_server(
+    config_path: Path,
+    config: Config,
+    token: str,
+) -> tuple[SetupSession, ThreadingHTTPServer]:
+    session = SetupSession(config_path, config, token)
+    server = create_server(session)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    return session, server
+
+
+def _setup_url(server: ThreadingHTTPServer, token: str) -> str:
+    port = server.server_address[1]
+    return f"http://127.0.0.1:{port}/?token={token}"
+
+
+def _open_setup_browser(url: str, session: SetupSession) -> bool:
+    native = open_url(url, close_event=session.finished)
+    if native and not session.finished.is_set():
+        _afficher_fenetre_fermee()
+        return True
+    return False
+
+
+def _stop_setup_server(server: ThreadingHTTPServer) -> None:
+    server.shutdown()
+    server.server_close()
+
+
+def _wait_for_setup(
+    session: SetupSession,
+    server: ThreadingHTTPServer,
+    timeout: int,
+) -> bool:
+    try:
+        session.finished.wait(timeout)
+    finally:
+        _stop_setup_server(server)
+    return session.finished.is_set()
+
+
+def _await_setup_result(
+    session: SetupSession, server: ThreadingHTTPServer, timeout: int
+) -> int:
+    if _wait_for_setup(session, server, timeout):
+        _afficher_configuration_terminee()
+        return 0
+    _afficher_configuration_interrompue()
+    return 1
+
+
+def _serve_setup(
+    config_path: Path, config: Config, open_browser: bool, timeout: int
+) -> int:
+    token = secrets.token_urlsafe(24)
+    session, server = _start_setup_server(config_path, config, token)
+    url = _setup_url(server, token)
+    _afficher_url(url)
+    if open_browser and _open_setup_browser(url, session):
+        _stop_setup_server(server)
+        return 1
+    return _await_setup_result(session, server, timeout)
+
+
 def run_setup(
     config_path: Path,
     *,
     open_browser: bool = True,
     timeout: int = MAX_TIMEOUT,
 ) -> int:
-    try:
-        config = load_config(config_path, require_password=False)
-    except ConfigError as exc:
-        if config_path.is_file():
-            _afficher_config_invalide(exc)
-            return 2
-        config = default_config()
-
-    token = secrets.token_urlsafe(24)
-    session = SetupSession(config_path, config, token)
-    server = create_server(session)
-    thread = threading.Thread(target=server.serve_forever, daemon=True)
-    thread.start()
-
-    port = server.server_address[1]
-    url = f"http://127.0.0.1:{port}/?token={token}"
-    _afficher_url(url)
-    if open_browser:
-        native = open_url(url, close_event=session.finished)
-        if native and not session.finished.is_set():
-            _afficher_fenetre_fermee()
-            server.shutdown()
-            server.server_close()
-            return 1
-
-    try:
-        session.finished.wait(timeout)
-    finally:
-        server.shutdown()
-        server.server_close()
-
-    if session.finished.is_set():
-        _afficher_configuration_terminee()
-        return 0
-    _afficher_configuration_interrompue()
-    return 1
+    config, error = _load_setup_config(config_path)
+    if error is not None:
+        return error
+    config = config or default_config()
+    return _serve_setup(config_path, config, open_browser, timeout)
