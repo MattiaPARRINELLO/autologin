@@ -31,7 +31,7 @@ class Window:
     end: time
 
     def contains(self, moment: time) -> bool:
-        return self.start <= moment < self.end
+        return self.start <= moment and moment < self.end
 
     def __str__(self) -> str:
         return f"{self.start.strftime('%H:%M')}-{self.end.strftime('%H:%M')}"

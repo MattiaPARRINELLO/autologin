@@ -135,7 +135,7 @@ async def _check_update(config: Config, state: StateStore) -> None:
             ),
             timeout=10,
         )
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         logger.debug("verification de mise a jour impossible : %s", exc)
         return
     if release is None:
@@ -261,7 +261,7 @@ async def run_loop(
 
     try:
         points = load_signature(config.signature.file)
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         if not dry_run:
             logger.error("signature indisponible : %s", exc)
             logger.error("lance 'checkmate-watcher capture' pour en creer une")
@@ -440,7 +440,7 @@ async def run_loop(
 
                 except StopRequested:
                     return 0
-                except Exception as exc:  # noqa: BLE001
+                except Exception as exc:
                     consecutive_errors += 1
                     state.increment("stats.errors")
                     _record_error(state, exc)
@@ -453,7 +453,7 @@ async def run_loop(
                         try:
                             await session.restart()
                             consecutive_errors = 0
-                        except Exception as restart_exc:  # noqa: BLE001
+                        except Exception as restart_exc:
                             logger.error("redemarrage impossible : %s", restart_exc)
                             return 1
 

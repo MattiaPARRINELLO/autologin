@@ -14,7 +14,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from collector import Store, make_server  # noqa: E402
+from collector import Store, make_server
 
 KEY = "cle-de-test"
 

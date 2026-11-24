@@ -70,7 +70,7 @@ def wait_for_state(base_url: str, attempts: int = 60) -> dict:
         try:
             with urllib.request.urlopen(f"{base_url}/api/state", timeout=1) as response:
                 return json.loads(response.read())
-        except Exception:  # noqa: BLE001
+        except Exception:
             time.sleep(0.2)
     raise AssertionError("l'emulateur n'a pas demarre")
 

@@ -118,7 +118,7 @@ def status_alive(runtime: dict, timeout: float = 1.5) -> bool:
         )
         with urllib.request.urlopen(request, timeout=timeout) as response:
             return response.status == 200
-    except Exception:  # noqa: BLE001
+    except Exception:
         return False
 
 
@@ -224,7 +224,7 @@ class StatusSession:
         folder.mkdir(parents=True, exist_ok=True)
         try:
             if sys.platform.startswith("win"):
-                os.startfile(folder)  # type: ignore[attr-defined]
+                getattr(os, "startfile")(folder)
             elif sys.platform == "darwin":
                 subprocess.Popen(["open", str(folder)])
             else:

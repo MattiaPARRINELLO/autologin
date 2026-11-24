@@ -58,7 +58,7 @@ def install_id(path: Path | None = None) -> str:
         target = path or (data_dir() / "install-id")
         try:
             existing = target.read_text(encoding="utf-8").strip()
-            if 8 <= len(existing) <= 64:
+            if 8 <= len(existing) and len(existing) <= 64:
                 _install_id = existing
                 return existing
         except OSError:
@@ -125,7 +125,7 @@ def record(config, event: str) -> None:
         return
     try:
         _send(config, event)
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         logger.debug("statistique ignoree : %s", exc)
 
 

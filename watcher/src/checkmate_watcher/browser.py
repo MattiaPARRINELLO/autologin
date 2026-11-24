@@ -137,7 +137,7 @@ def resolve_launch_options(
 
     try:
         expected = browser_type.executable_path
-    except Exception:  # noqa: BLE001
+    except Exception:
         expected = ""
 
     if expected and Path(expected).is_file():

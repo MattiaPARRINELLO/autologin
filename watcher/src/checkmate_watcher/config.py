@@ -469,7 +469,10 @@ def load_config(path: str | Path, *, require_password: bool = True) -> Config:
         raise ConfigError("[watcher] confirm_timeout doit etre >= 10 secondes")
     if watcher.prompt_retry < 30:
         raise ConfigError("[watcher] prompt_retry doit etre >= 30 secondes")
-    if not MIN_PADDING_RATIO <= signature.padding_ratio <= MAX_PADDING_RATIO:
+    if (
+        signature.padding_ratio < MIN_PADDING_RATIO
+        or signature.padding_ratio > MAX_PADDING_RATIO
+    ):
         raise ConfigError(
             f"[signature] padding_ratio doit etre entre "
             f"{MIN_PADDING_RATIO} et {MAX_PADDING_RATIO}"

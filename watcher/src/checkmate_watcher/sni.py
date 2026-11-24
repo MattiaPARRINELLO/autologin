@@ -30,8 +30,8 @@ def available() -> bool:
     if not os.environ.get("DBUS_SESSION_BUS_ADDRESS"):
         return False
     try:
-        import dbus_next  # noqa: F401
-    except Exception:  # noqa: BLE001 - dependance optionnelle hors Linux
+        import dbus_next
+    except Exception:  # dependance optionnelle hors Linux
         return False
     return True
 
@@ -148,7 +148,7 @@ class MenuModel:
             return
         try:
             action()
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.warning("action du menu echouee : %s", exc)
 
 
@@ -345,7 +345,7 @@ class SniTray:
             self._loop = asyncio.new_event_loop()
             asyncio.set_event_loop(self._loop)
             self._loop.run_until_complete(self._connect())
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.warning("icone StatusNotifierItem indisponible : %s", exc)
             self._ok = False
             self._ready.set()

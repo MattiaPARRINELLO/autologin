@@ -36,7 +36,7 @@ def test_parse_version_ordonne_les_betas_avant_la_stable():
     beta2 = parse_version("watcher-v0.6.0-beta.2")
     stable = parse_version("watcher-v0.6.0")
     assert beta1 is not None and beta2 is not None and stable is not None
-    assert beta1 < beta2 < stable
+    assert beta1 < beta2 and beta2 < stable
     assert parse_version("watcher-v0.6.0-beta1") == beta1
     assert str(stable) == "0.6.0"
     assert str(beta1) == "0.6.0-beta.1"

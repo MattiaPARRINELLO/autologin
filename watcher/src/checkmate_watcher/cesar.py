@@ -412,7 +412,7 @@ class CesarSession:
                     };
                 }"""
             )
-        except Exception:  # noqa: BLE001
+        except Exception:
             payload = {"action": "", "row": "", "label": ""}
 
         label = (payload.get("label") or "").strip() or "Emargement ouvert"
@@ -606,7 +606,7 @@ class CesarSession:
         """
         try:
             return bool(await canvas.evaluate(CANVAS_HITTABLE_JS))
-        except Exception:  # noqa: BLE001
+        except Exception:
             return True
 
     def _fit_points(self, points: list[Point], box: dict) -> list[FittedPoint]:
@@ -683,7 +683,7 @@ class CesarSession:
             return ""
         try:
             return (await locator.inner_text()).strip()
-        except Exception:  # noqa: BLE001
+        except Exception:
             return ""
 
     async def _wait_for_confirmation(

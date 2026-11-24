@@ -99,7 +99,7 @@ def fit_points(
         raise SignatureError("aucun point a mettre a l'echelle")
     if width <= 0 or height <= 0:
         raise SignatureError("dimensions de canvas invalides")
-    if not MIN_PADDING_RATIO <= padding_ratio <= MAX_PADDING_RATIO:
+    if padding_ratio < MIN_PADDING_RATIO or padding_ratio > MAX_PADDING_RATIO:
         raise SignatureError(
             f"padding_ratio doit etre entre {MIN_PADDING_RATIO} et {MAX_PADDING_RATIO}"
         )

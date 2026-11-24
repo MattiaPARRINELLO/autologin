@@ -1,0 +1,3 @@
+[lint.per-file-ignores]
+"collector.py" = ["N802"]
+"tests/test_collector.py" = ["E402"]

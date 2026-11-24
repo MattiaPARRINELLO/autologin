@@ -34,7 +34,7 @@ def get_password(service: str, username: str) -> str | None:
         return None
     try:
         value = keyring.get_password(service, username)
-    except Exception as exc:  # noqa: BLE001 - backend absent ou verrouille
+    except Exception as exc:  # backend absent ou verrouille
         logger.warning("trousseau inaccessible : %s", exc)
         return None
     return value or None
@@ -47,6 +47,6 @@ def set_password(service: str, username: str, password: str) -> bool:
     try:
         keyring.set_password(service, username, password)
         return keyring.get_password(service, username) == password
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         logger.warning("ecriture dans le trousseau impossible : %s", exc)
         return False
