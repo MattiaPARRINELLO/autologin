@@ -184,6 +184,11 @@ def _beta_session(tmp_path) -> StatusSession:
     )
 
 
+def test_le_message_stable_sur_beta_explique_le_maintien(monkeypatch):
+    monkeypatch.setattr(status_server, "__version__", "0.7.0-beta.2")
+    assert "restes" in status_server._channel_message("stable")
+
+
 def _channel_config():
     base = default_config()
     cesar = replace(base.cesar, username="eleve", password="secret")
