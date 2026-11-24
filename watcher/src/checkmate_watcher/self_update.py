@@ -22,8 +22,8 @@ from .paths import default_update_dir
 from .updates import (
     Release,
     UpdateError,
-    check_for_update,
     download_update,
+    update_policy,
 )
 
 logger = logging.getLogger(__name__)
@@ -169,15 +169,22 @@ def _transient_unit_active(unit: str, attempts: int = 5) -> bool:
 
 def prepare(config) -> tuple[Release, Path]:
     """Verifie, telecharge et controle la mise a jour. Rend (version, archive)."""
-    release = check_for_update(
-        __version__,
-        channel=config.updates.channel,
-    )
-    if release is None:
+    policy = update_policy(__version__, channel=config.updates.channel)
+    if not policy.available:
         raise UpdateError(f"CheckMate {__version__} est deja a jour")
+    if policy.migration is not None:
+        raise UpdateError(_migration_message(policy.migration))
+    release = policy.latest
     directory = default_update_dir() / release.version_text
     archive = download_update(release, directory)
     return release, archive
+
+
+def _migration_message(release: Release) -> str:
+    return (
+        f"migration obligatoire par {release.tag} ({release.migration_reason}) : "
+        "installe d'abord cette version avant de continuer"
+    )
 
 
 def update_now(config) -> str:
