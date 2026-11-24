@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import logging
 import secrets
 import sys
 import tempfile
 import threading
+from collections.abc import Iterator
 from dataclasses import replace
 from http.server import ThreadingHTTPServer
 from pathlib import Path
@@ -61,17 +63,63 @@ DAY_LABELS = {
 }
 
 
+def _ordered_day_items() -> list[tuple[str, int]]:
+    return sorted(DAY_NAMES.items(), key=lambda item: item[1])
+
+
 def _days_html(days: tuple[int, ...]) -> str:
-    ordered = sorted(DAY_NAMES.items(), key=lambda item: item[1])
     return "\n".join(
         f'<label><input type="checkbox" value="{name}"'
         f"{' checked' if index in days else ''}>{DAY_LABELS[name]}</label>"
-        for name, index in ordered
+        for name, index in _ordered_day_items()
     )
+
+
+def _escape_env_value(value: str) -> str:
+    return value.replace("\\", "\\\\").replace('"', '\\"')
+
+
+_AUTOSTART_DISABLED = (
+    "Configuration enregistree. Le demarrage automatique est desactive."
+)
+_AUTOSTART_FAILED = (
+    "Configuration enregistree, mais le demarrage automatique a echoue. "
+    "Tu peux lancer CheckMate depuis le menu Demarrer."
+)
+_AUTOSTART_WINDOWS = (
+    "Configuration enregistree. Le demarrage automatique prendra "
+    "effet a la prochaine ouverture de session. Tu peux aussi "
+    "lancer CheckMate depuis le menu Demarrer."
+)
+_AUTOSTART_INSTALLED = "Configuration enregistree et service redemarre."
+
+
+def _autostart_outcome(requested: bool, ok: bool) -> tuple[str, str]:
+    if not requested:
+        return _AUTOSTART_DISABLED, "disabled"
+    if not ok:
+        return _AUTOSTART_FAILED, "failed"
+    if sys.platform.startswith("win"):
+        return _AUTOSTART_WINDOWS, "installed"
+    return _AUTOSTART_INSTALLED, "installed"
 
 
 class SetupError(LocalError):
     """Etape d'onboarding refusee."""
+
+
+def _signature_payload(raw: object) -> object:
+    try:
+        return raw if isinstance(raw, dict) else json.loads(raw)
+    except (TypeError, json.JSONDecodeError) as exc:
+        raise SetupError("JSON de signature invalide") from exc
+
+
+def _parse_signature_points(data: object) -> list:
+    try:
+        return parse_points(data)
+    except SignatureError as exc:
+        raise SetupError(str(exc)) from exc
 
 
 class SetupSession:
@@ -88,25 +136,30 @@ class SetupSession:
     # --- etat ---
 
     def state(self) -> dict:
-        has_signature = False
-        if self.config.signature.file.is_file():
-            try:
-                has_signature = len(load_signature(self.config.signature.file)) > 0
-            except SignatureError:
-                has_signature = False
         return {
             "username": self.config.cesar.username,
             "base_url": self.config.cesar.base_url,
-            "has_signature": has_signature,
-            "days": [
-                name
-                for name, index in sorted(DAY_NAMES.items(), key=lambda item: item[1])
-                if index in self.config.schedule.days
-            ],
+            "has_signature": self._has_signature(),
+            "days": self._active_days(),
             "windows": [str(window) for window in self.config.schedule.windows],
             "notifications": self.config.notifications.enabled,
             "keyring": keyring_available(),
         }
+
+    def _has_signature(self) -> bool:
+        if not self.config.signature.file.is_file():
+            return False
+        try:
+            return len(load_signature(self.config.signature.file)) > 0
+        except SignatureError:
+            return False
+
+    def _active_days(self) -> list[str]:
+        return [
+            name
+            for name, index in _ordered_day_items()
+            if index in self.config.schedule.days
+        ]
 
     # --- validation ---
 
@@ -122,72 +175,100 @@ class SetupSession:
             raise SetupError(f"{label} trop long")
         return value
 
-    # --- actions ---
-
-    def test_login(self, payload: dict) -> dict:
-        base_url = self._text(payload, "base_url", "adresse du site").rstrip("/")
-        username = self._text(payload, "username", "identifiant")
+    @staticmethod
+    def _required_password(payload: dict) -> str:
         password = payload.get("password")
         if not isinstance(password, str) or not password:
             raise SetupError("mot de passe obligatoire")
+        return password
 
+    def _login_inputs(self, payload: dict) -> tuple[str, str, str]:
+        base_url = self._text(payload, "base_url", "adresse du site").rstrip("/")
+        username = self._text(payload, "username", "identifiant")
+        return base_url, username, self._required_password(payload)
+
+    def _require_credentials(self) -> None:
+        if not self.credentials_saved:
+            raise SetupError("enregistre d'abord les identifiants")
+
+    def _require_finish_ready(self) -> None:
+        self._require_credentials()
+        if not self.config.signature.file.is_file():
+            raise SetupError("enregistre d'abord la signature")
+
+    def _parse_schedule(self, payload: dict) -> Schedule:
+        try:
+            days = parse_days(payload.get("days"))
+            windows = parse_windows(payload.get("windows"))
+        except ScheduleError as exc:
+            raise SetupError(str(exc)) from exc
+        return Schedule(enabled=True, days=days, windows=windows)
+
+    # --- actions ---
+
+    @contextlib.contextmanager
+    def _login_guard(self) -> Iterator[None]:
         if not self.login_lock.acquire(blocking=False):
             raise SetupError("un test de connexion est deja en cours", status=409)
         try:
-            message = _test_connection(self.config, base_url, username, password)
+            yield
         finally:
             self.login_lock.release()
+
+    def test_login(self, payload: dict) -> dict:
+        base_url, username, password = self._login_inputs(payload)
+        with self._login_guard():
+            message = _test_connection(self.config, base_url, username, password)
         return {"ok": True, "message": message}
 
     def save_credentials(self, payload: dict) -> dict:
+        base_url, username, password = self._credential_fields(payload)
+        stored = self._store_in_keyring(username, password)
+        self._apply_credentials(base_url, username, password)
+        return {"ok": True, "message": self._credential_message(stored)}
+
+    def _credential_fields(self, payload: dict) -> tuple[str, str, str]:
         base_url = self._text(payload, "base_url", "adresse du site").rstrip("/")
         username = self._text(payload, "username", "identifiant")
-        password = payload.get("password")
-        if not isinstance(password, str) or not password:
-            raise SetupError("mot de passe obligatoire")
+        password = self._required_password(payload)
         if "\n" in password or "\r" in password:
             raise SetupError("mot de passe invalide")
+        return base_url, username, password
 
-        stored = (
-            set_password(self.config.cesar.keyring_service, username, password)
-            if prefer_keyring()
-            else False
-        )
+    def _store_in_keyring(self, username: str, password: str) -> bool:
+        if not prefer_keyring():
+            return False
+        return set_password(self.config.cesar.keyring_service, username, password)
+
+    def _apply_credentials(self, base_url: str, username: str, password: str) -> None:
         with self.lock:
             self.password = password
             self.credentials_saved = True
-            self.config = replace(
-                self.config,
-                cesar=replace(
-                    self.config.cesar,
-                    base_url=base_url,
-                    username=username,
-                ),
-            )
+            self.config = self._config_with_cesar(base_url, username)
             self._persist()
 
+    def _config_with_cesar(self, base_url: str, username: str) -> Config:
+        cesar = replace(self.config.cesar, base_url=base_url, username=username)
+        return replace(self.config, cesar=cesar)
+
+    @staticmethod
+    def _credential_message(stored: bool) -> str:
         if stored:
-            message = "Identifiants enregistres dans le trousseau du systeme."
-        elif prefer_keyring():
-            message = "Identifiants enregistres dans un fichier prive."
-        else:
-            message = "Identifiants enregistres pour le service."
-        return {"ok": True, "message": message}
+            return "Identifiants enregistres dans le trousseau du systeme."
+        if prefer_keyring():
+            return "Identifiants enregistres dans un fichier prive."
+        return "Identifiants enregistres pour le service."
 
     def import_signature(self, payload: dict) -> dict:
-        raw = payload.get("raw")
-        try:
-            data = raw if isinstance(raw, dict) else json.loads(raw)
-        except (TypeError, json.JSONDecodeError) as exc:
-            raise SetupError("JSON de signature invalide") from exc
-        try:
-            parsed = parse_points(data)
-        except SignatureError as exc:
-            raise SetupError(str(exc)) from exc
+        data = _signature_payload(payload.get("raw"))
+        parsed = _parse_signature_points(data)
+        return self._store_signature(parsed, "importee")
+
+    def _store_signature(self, parsed: list, adjective: str) -> dict:
         save_signature(self.config.signature.file, parsed)
         return {
             "ok": True,
-            "message": f"Signature importee ({len(parsed)} points).",
+            "message": f"Signature {adjective} ({len(parsed)} points).",
         }
 
     def save_signature(self, payload: dict) -> dict:
@@ -203,21 +284,15 @@ class SetupSession:
         }
 
     def save_schedule(self, payload: dict) -> dict:
-        if not self.credentials_saved:
-            raise SetupError("enregistre d'abord les identifiants")
-        try:
-            days = parse_days(payload.get("days"))
-            windows = parse_windows(payload.get("windows"))
-        except ScheduleError as exc:
-            raise SetupError(str(exc)) from exc
-
-        with self.lock:
-            self.config = replace(
-                self.config,
-                schedule=Schedule(enabled=True, days=days, windows=windows),
-            )
-            self._persist()
+        self._require_credentials()
+        schedule = self._parse_schedule(payload)
+        self._store_schedule(schedule)
         return {"ok": True, "message": "Planning enregistre."}
+
+    def _store_schedule(self, schedule: Schedule) -> None:
+        with self.lock:
+            self.config = replace(self.config, schedule=schedule)
+            self._persist()
 
     def test_notification(self) -> dict:
         notifier = Notifier.from_config(self.config)
@@ -230,118 +305,115 @@ class SetupSession:
             raise SetupError("notification impossible sur ce systeme")
         return {"ok": True, "message": "Notification envoyee."}
 
-    def finish(self, payload: dict) -> dict:
-        if not self.credentials_saved:
-            raise SetupError("enregistre d'abord les identifiants")
-        if not self.config.signature.file.is_file():
-            raise SetupError("enregistre d'abord la signature")
+    def _install_autostart(self, payload: dict) -> tuple[bool, bool]:
+        requested = bool(payload.get("autostart", True))
+        if not requested:
+            return requested, True
+        ok = enable_autostart(current_executable(), self.config_path)
+        if ok:
+            restart_autostart()
+        return requested, ok
 
+    def finish(self, payload: dict) -> dict:
+        self._require_finish_ready()
         with self.lock:
             self._persist()
+        message, state = _autostart_outcome(*self._install_autostart(payload))
+        return self._finish_result(message, state)
 
-        autostart_requested = bool(payload.get("autostart", True))
-        autostart_ok = True
-        if autostart_requested:
-            autostart_ok = enable_autostart(current_executable(), self.config_path)
-            if autostart_ok:
-                restart_autostart()
-
-        if not autostart_requested:
-            message = (
-                "Configuration enregistree. Le demarrage automatique est desactive."
-            )
-        elif autostart_ok:
-            if sys.platform.startswith("win"):
-                message = (
-                    "Configuration enregistree. Le demarrage automatique prendra "
-                    "effet a la prochaine ouverture de session. Tu peux aussi "
-                    "lancer CheckMate depuis le menu Demarrer."
-                )
-            else:
-                message = "Configuration enregistree et service redemarre."
-        else:
-            message = (
-                "Configuration enregistree, mais le demarrage automatique a echoue. "
-                "Tu peux lancer CheckMate depuis le menu Demarrer."
-            )
-
-        if not autostart_requested:
-            autostart_state = "disabled"
-        elif autostart_ok:
-            autostart_state = "installed"
-        else:
-            autostart_state = "failed"
+    def _finish_result(self, message: str, state: str) -> dict:
         return {
             "ok": True,
             "message": message,
             "username": self.config.cesar.username,
             "windows": [str(window) for window in self.config.schedule.windows],
-            "autostart": autostart_state,
+            "autostart": state,
         }
 
     # --- persistance ---
 
     def _persist(self) -> None:
         if prefer_keyring():
-            stored = False
-            if self.password:
-                stored = set_password(
-                    self.config.cesar.keyring_service,
-                    self.config.cesar.username,
-                    self.password,
-                )
-            save_config(
-                self.config_path,
-                self.config,
-                password=None if stored else (self.password or None),
-            )
+            self._persist_keyring()
             return
+        self._persist_env()
 
+    def _persist_keyring(self) -> None:
+        stored = self._store_keyring_password()
+        save_config(
+            self.config_path,
+            self.config,
+            password=None if stored else (self.password or None),
+        )
+
+    def _store_keyring_password(self) -> bool:
+        if not self.password:
+            return False
+        return set_password(
+            self.config.cesar.keyring_service,
+            self.config.cesar.username,
+            self.password,
+        )
+
+    def _persist_env(self) -> None:
         if self.password:
-            env_path = default_env_path()
-            escaped = self.password.replace("\\", "\\\\").replace('"', '\\"')
-            env_path.parent.mkdir(parents=True, exist_ok=True)
-            env_path.write_text(f'CHECKMATE_PASSWORD="{escaped}"\n', encoding="utf-8")
-            env_path.chmod(0o600)
+            self._write_password_env(self.password)
         save_config(
             self.config_path,
             self.config,
             password_env="CHECKMATE_PASSWORD" if self.password else None,
         )
 
+    def _write_password_env(self, password: str) -> None:
+        env_path = default_env_path()
+        escaped = _escape_env_value(password)
+        env_path.parent.mkdir(parents=True, exist_ok=True)
+        env_path.write_text(f'CHECKMATE_PASSWORD="{escaped}"\n', encoding="utf-8")
+        env_path.chmod(0o600)
+
+
+def _with_credentials(
+    config: Config, base_url: str, username: str, password: str
+) -> Config:
+    cesar = replace(
+        config.cesar, base_url=base_url, username=username, password=password
+    )
+    return replace(config, cesar=cesar)
+
+
+def _with_profile(config: Config, profile_dir: Path) -> Config:
+    watcher = replace(config.watcher, profile_dir=profile_dir)
+    return replace(config, watcher=watcher)
+
+
+async def _login_in_profile(config: Config, profile: Path) -> None:
+    session = CesarSession(_with_profile(config, profile))
+    try:
+        await session.open(headless=True)
+        await session.login()
+    finally:
+        await session.close()
+
+
+async def _login_attempt(candidate: Config) -> None:
+    with tempfile.TemporaryDirectory(prefix="checkmate-login-") as profile:
+        await _login_in_profile(candidate, Path(profile))
+
+
+def _run_login(candidate: Config) -> None:
+    try:
+        asyncio.run(asyncio.wait_for(_login_attempt(candidate), timeout=90))
+    except Exception as exc:
+        message = str(exc).splitlines()[0] or exc.__class__.__name__
+        raise SetupError(f"connexion echouee : {message}") from exc
+
 
 def _test_connection(
     config: Config, base_url: str, username: str, password: str
 ) -> str:
     """Reproduit la connexion reelle, avec les selecteurs et le flux du watcher."""
-    candidate = replace(
-        config,
-        cesar=replace(
-            config.cesar,
-            base_url=base_url,
-            username=username,
-            password=password,
-        ),
-    )
-
-    async def attempt() -> None:
-        with tempfile.TemporaryDirectory(prefix="checkmate-login-") as profile:
-            accessible = replace(
-                candidate,
-                watcher=replace(candidate.watcher, profile_dir=Path(profile)),
-            )
-            session = CesarSession(accessible)
-            try:
-                await session.open(headless=True)
-                await session.login()
-            finally:
-                await session.close()
-
-    try:
-        asyncio.run(asyncio.wait_for(attempt(), timeout=90))
-    except Exception as exc:
-        message = str(exc).splitlines()[0] or exc.__class__.__name__
-        raise SetupError(f"connexion echouee : {message}") from exc
+    candidate = _with_credentials(config, base_url, username, password)
+    _run_login(candidate)
     return "Connexion reussie."
 
 
