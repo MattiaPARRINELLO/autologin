@@ -193,6 +193,10 @@ def platform_asset(release: Release, platform: str) -> Asset | None:
     return None
 
 
+def _ecrire_morceau(handle, chunk) -> None:
+    handle.write(chunk)
+
+
 def download(url: str, destination: Path, *, timeout: int = 60) -> Path:
     destination.parent.mkdir(parents=True, exist_ok=True)
     request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
@@ -204,7 +208,7 @@ def download(url: str, destination: Path, *, timeout: int = 60) -> Path:
             chunk = response.read(256 * 1024)
             if not chunk:
                 break
-            handle.write(chunk)
+            _ecrire_morceau(handle, chunk)
     return destination
 
 
