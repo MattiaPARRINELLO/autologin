@@ -13,6 +13,7 @@ from pathlib import Path
 
 import tomli_w
 
+from . import __version__
 from .analytics import DEFAULT_ENDPOINT as DEFAULT_ANALYTICS_ENDPOINT
 from .credentials import DEFAULT_SERVICE
 from .credentials import get_password as get_keyring_password
@@ -136,10 +137,14 @@ class SignatureConfig:
     padding_ratio: float = 0.9
 
 
+def _default_channel() -> str:
+    return BETA_CHANNEL if "-beta" in __version__ else STABLE_CHANNEL
+
+
 @dataclass(frozen=True)
 class UpdatesConfig:
     enabled: bool = True
-    channel: str = STABLE_CHANNEL
+    channel: str = field(default_factory=_default_channel)
 
 
 @dataclass(frozen=True)
@@ -170,7 +175,7 @@ def parse_updates_channel(table: dict) -> str:
     raw = table.get("channel")
     if raw is None:
         legacy = _legacy_channel(table)
-        return STABLE_CHANNEL if legacy is None else legacy
+        return _default_channel() if legacy is None else legacy
     return _validate_channel(_normalize_channel(raw))
 
 
