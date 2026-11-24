@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Deploie le collecteur de statistiques sur le VPS qui heberge deja Caddy.
 #
-#   CHECKMATE_STATS_KEY=~/.ssh/id_ed25519 ./stats/deploy.sh
+#   Exemple d'utilisation : CHECKMATE_STATS_KEY=~/.ssh/id_ed25519 ./stats/deploy.sh
 #
-# Variables :
+# Variables d'environnement acceptees :
 #   CHECKMATE_STATS_HOST  cible SSH (defaut ubuntu@main.mprnl.fr)
 #   CHECKMATE_STATS_KEY   cle SSH privee (defaut ~/.ssh/id_ed25519)
 #   CHECKMATE_STATS_DOMAIN nom public (defaut stats.mprnl.fr)
