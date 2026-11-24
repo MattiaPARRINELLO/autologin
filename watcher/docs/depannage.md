@@ -28,10 +28,14 @@ reussie`, `signature` ou `ERREUR`.
 
 1. Lance `checkmate-watcher test-notification`.
 2. Coupe le mode silencieux, "Ne pas déranger" ou "Concentration".
-3. Sur Windows, autorise CheckMate dans les notifications système.
-4. Dans l'assistant, la case "J'ai vérifié que la notification s'affiche"
+3. Sur Windows, autorise CheckMate dans les notifications système : Paramètres >
+   Système > Notifications > CheckMate doit être activé.
+4. Si tu as installé CheckMate via l'installeur, la notification s'affiche sous
+   le nom "CheckMate" ; en mode portable (archive zip), elle s'affiche sous
+   "Windows PowerShell", ce qui est normal.
+5. Dans l'assistant, la case "J'ai vérifié que la notification s'affiche"
    doit être cochée pour terminer la configuration.
-4. Sur Linux, `notify-send` peut être cassé : CheckMate bascule alors sur D-Bus.
+6. Sur Linux, `notify-send` peut être cassé : CheckMate bascule alors sur D-Bus.
    Le self-test le signale.
 
 ## L'émargement n'est pas détecté

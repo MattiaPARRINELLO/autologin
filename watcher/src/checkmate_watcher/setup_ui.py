@@ -526,7 +526,7 @@ __DAYS__
       <p class="lede">Vérifie que la notification s'affiche, puis installe le démarrage automatique pour ne plus y penser.</p>
       <div class="notice">
         <strong>Coupe le mode silencieux</strong>
-        <p>Désactive le mode silencieux ou "Ne pas déranger" avant de tester. Sinon la notification peut ne pas s'afficher, même si CheckMate l'a bien envoyée.</p>
+        <p>Désactive le mode silencieux ou "Ne pas déranger" avant de tester. Vérifie aussi que "CheckMate" est activé dans Paramètres > Système > Notifications. Sinon la notification peut ne pas s'afficher, même si CheckMate l'a bien envoyée.</p>
       </div>
       <div class="actions">
         <button type="button" class="secondary" onclick="testNotification()" id="notifyBtn">Tester la notification</button>
@@ -795,7 +795,7 @@ async function testNotification() {
     await api("/api/test-notification", {});
     setStatus(
       "notifyStatus",
-      "Notification envoyée. Si tu ne la vois pas, coupe le mode silencieux puis relance le test.",
+      "Notification envoyée. Si tu ne la vois pas, coupe le mode silencieux et vérifie l'interrupteur \"CheckMate\" dans les notifications système, puis relance le test.",
       "ok"
     );
   } catch (error) {

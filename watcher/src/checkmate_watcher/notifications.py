@@ -8,15 +8,20 @@ import os
 import shutil
 import subprocess
 import sys
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
 ZENITY_TIMEOUT_CODE = 5
 
+START_MENU_LINK = "Microsoft\\Windows\\Start Menu\\Programs\\{name}.lnk"
+
 
 class DialogUnavailable(Exception):
     """L'outil de dialogue n'est pas disponible ; un autre peut le remplacer."""
 
+
+CHECKMATE_APP_ID = "CheckMate.Watcher"
 
 POWERSHELL_APP_ID = (
     "{1AC14E77-02E7-4E5D-B744-2EB1AE5198B7}\\WindowsPowerShell\\v1.0\\powershell.exe"
@@ -148,17 +153,29 @@ def _send_gdbus(title: str, message: str, *, app_name: str, icon: str) -> bool:
     return True
 
 
-def send_windows(title: str, message: str, *, app_name: str) -> bool:
-    powershell = shutil.which("powershell") or shutil.which("pwsh")
-    if not powershell:
-        logger.warning("PowerShell introuvable, notification impossible")
-        return False
+def _start_menu_shortcut(app_name: str) -> Path | None:
+    """Windows n'accepte un toast que si un raccourci porte son AUMID."""
+    base = os.environ.get("APPDATA")
+    if not base:
+        return None
+    return Path(base) / START_MENU_LINK.format(name=app_name)
 
+
+def _windows_app_id(app_name: str) -> str:
+    """AUMID CheckMate si son raccourci existe, sinon celui de PowerShell."""
+    shortcut = _start_menu_shortcut(app_name)
+    if shortcut is not None and shortcut.is_file():
+        return CHECKMATE_APP_ID
+    logger.info("raccourci CheckMate absent, toast sous PowerShell")
+    return POWERSHELL_APP_ID
+
+
+def _show_toast(powershell: str, title: str, message: str, app_id: str) -> bool:
     encoded = base64.b64encode(TOAST_SCRIPT.encode("utf-16-le")).decode("ascii")
     env = os.environ.copy()
     env["CHECKMATE_TITLE"] = title
     env["CHECKMATE_MESSAGE"] = message
-    env["CHECKMATE_APP_ID"] = POWERSHELL_APP_ID
+    env["CHECKMATE_APP_ID"] = app_id
     try:
         result = subprocess.run(
             [
@@ -180,12 +197,28 @@ def send_windows(title: str, message: str, *, app_name: str) -> bool:
 
     if result.returncode != 0:
         logger.warning(
-            "notification Windows code %s : %s",
+            "notification Windows code %s (AUMID %s) : %s",
             result.returncode,
+            app_id,
             (result.stderr or result.stdout).strip(),
         )
         return False
     return True
+
+
+def send_windows(title: str, message: str, *, app_name: str) -> bool:
+    powershell = shutil.which("powershell") or shutil.which("pwsh")
+    if not powershell:
+        logger.warning("PowerShell introuvable, notification impossible")
+        return False
+
+    app_id = _windows_app_id(app_name)
+    if _show_toast(powershell, title, message, app_id):
+        return True
+    if app_id == POWERSHELL_APP_ID:
+        return False
+    logger.info("AUMID %s refuse, repli sur PowerShell", app_id)
+    return _show_toast(powershell, title, message, POWERSHELL_APP_ID)
 
 
 def send_macos(title: str, message: str) -> bool:
