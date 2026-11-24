@@ -337,6 +337,12 @@ document.querySelectorAll("[data-action]").forEach((button) => {
 
 document.getElementById("betaChannel").addEventListener("change", async (event) => {
   const enabled = event.target.checked;
+  if (!enabled && !window.confirm(
+    "Revenir au canal stable ? Tu restes sur cette version beta, mais les prochaines betas ne seront plus proposees."
+  )) {
+    event.target.checked = true;
+    return;
+  }
   if (enabled && !window.confirm(
     "Activer le canal beta ? Les mises a jour arrivent souvent et la stabilite n'est pas garantie."
   )) {

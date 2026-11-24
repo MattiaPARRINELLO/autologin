@@ -73,7 +73,13 @@ def _channel_message(channel: str) -> str:
             "Canal beta active. Les mises a jour arrivent souvent et la "
             "stabilite du projet n'est pas garantie."
         )
-    return "Canal stable reactive : mises a jour moins frequentes."
+    if "-beta" in __version__:
+        return (
+            "Canal stable active. Tu restes sur cette version beta : les "
+            "prochaines betas ne seront plus proposees, et la prochaine "
+            "version stable te sera proposee."
+        )
+    return "Canal stable active : mises a jour moins frequentes."
 
 
 def runtime_path() -> Path:
