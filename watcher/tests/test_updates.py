@@ -16,14 +16,16 @@ from checkmate_watcher.updates import (
 )
 
 
-def release(
-    tag: str, *, prerelease: bool = False, assets: tuple[Asset, ...] = ()
-) -> Release:
+def _parsed_version(tag: str) -> Version:
     version = parse_version(tag)
     assert version is not None
+    return version
+
+
+def release(tag: str, *, prerelease: bool = False, assets: tuple = ()) -> Release:
     return Release(
         tag=tag,
-        version=version,
+        version=_parsed_version(tag),
         url=f"https://example.com/{tag}",
         name=tag,
         prerelease=prerelease,
