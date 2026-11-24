@@ -120,7 +120,7 @@ def _verifier_statut(base: str, token: str) -> None:
     statut, snapshot = _statut(base, token)
     assert statut == 200
     assert snapshot["version"]
-    assert snapshot["channel"] == "stable"
+    assert snapshot["channel"] == default_config().updates.channel
     assert "counters" in snapshot
 
 
