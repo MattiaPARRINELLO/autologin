@@ -617,6 +617,18 @@ def _load_parts(data: dict, require_password: bool) -> dict:
     }
 
 
+def save_updates_channel(path: str | Path, channel: str) -> Config:
+    """Change le canal de mise a jour sans toucher aux secrets du fichier."""
+    target = expand_path(str(path))
+    data = tomllib.loads(target.read_text(encoding="utf-8"))
+    updates = data.setdefault("updates", {})
+    if not isinstance(updates, dict):
+        raise ConfigError("[updates] doit etre une table TOML")
+    updates["channel"] = _validate_channel(_normalize_channel(channel))
+    _write_config_atomically(target, tomli_w.dumps(data))
+    return load_config(target, require_password=False)
+
+
 def load_config(path: str | Path, *, require_password: bool = True) -> Config:
     data = _read_toml(Path(path))
     parts = _load_parts(data, require_password)
