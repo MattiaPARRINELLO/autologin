@@ -34,20 +34,23 @@ def test_suffixe_inconnu_refuse():
         channel_for_tag("watcher-v0.6.0-rc.1")
 
 
-def test_sortie_github(capsys):
-    assert main(["watcher-v0.7.0-beta.2"]) == 0
-    out = capsys.readouterr().out
-    assert "channel=beta" in out
-    assert "branch=beta" in out
-    assert "version=0.7.0" in out
-    assert "prerelease=true" in out
+def _sortie_pour_tag(capsys, tag):
+    assert main([tag]) == 0
+    return capsys.readouterr().out
 
-    assert main(["watcher-v0.7.0"]) == 0
-    out = capsys.readouterr().out
-    assert "channel=stable" in out
-    assert "branch=main" in out
-    assert "version=0.7.0" in out
-    assert "prerelease=false" in out
+
+def _assert_lignes(out, channel, branch, version, prerelease):
+    assert f"channel={channel}" in out
+    assert f"branch={branch}" in out
+    assert f"version={version}" in out
+    assert f"prerelease={prerelease}" in out
+
+
+def test_sortie_github(capsys):
+    tag = "watcher-v0.7.0-beta.2"
+    _assert_lignes(_sortie_pour_tag(capsys, tag), "beta", "beta", "0.7.0", "true")
+    tag = "watcher-v0.7.0"
+    _assert_lignes(_sortie_pour_tag(capsys, tag), "stable", "main", "0.7.0", "false")
 
 
 def test_tag_invalide_retourne_une_erreur(capsys):
