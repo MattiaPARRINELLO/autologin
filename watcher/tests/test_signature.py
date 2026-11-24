@@ -52,7 +52,9 @@ def _points_ligne() -> list[Point]:
 
 def _assert_dans_bornes(fitted, largeur, hauteur) -> None:
     assert len(fitted) == 3
-    assert all(0 <= p.x <= largeur and 0 <= p.y <= hauteur for p in fitted)
+    dans_x = all(0 <= p.x and p.x <= largeur for p in fitted)
+    dans_y = all(0 <= p.y and p.y <= hauteur for p in fitted)
+    assert dans_x and dans_y
 
 
 def _centres(fitted) -> tuple[float, float]:
