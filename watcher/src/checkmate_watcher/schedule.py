@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass
-from datetime import datetime, time, timedelta
+from datetime import date, datetime, time, timedelta
 from itertools import pairwise
 
 DAY_NAMES = {
@@ -79,26 +79,39 @@ class Schedule:
         """Decrit le creneau courant : desactive, hors plage, signe ou actif."""
         if not self.enabled:
             return Situation("disabled")
+        return self._situation_in_window(moment, is_signed)
+
+    def _situation_in_window(
+        self, moment: datetime, is_signed: Callable[[str], bool]
+    ) -> Situation:
         window = self.active_window(moment)
         if window is None:
             return Situation("outside")
         key = self.window_key(moment)
-        if key and is_signed(key):
-            return Situation("signed", window, key)
-        return Situation("active", window, key)
+        reason = "signed" if key and is_signed(key) else "active"
+        return Situation(reason, window, key)
+
+    def _upcoming_days(self, start: date) -> Iterator[date]:
+        for offset in range(8):
+            day = start + timedelta(days=offset)
+            if day.weekday() in self.days:
+                yield day
+
+    def _first_start_after(self, day: date, moment: datetime) -> datetime | None:
+        for window in sorted(self.windows, key=lambda item: item.start):
+            candidate = datetime.combine(day, window.start)
+            if candidate > moment:
+                return candidate
+        return None
 
     def next_start(self, moment: datetime) -> datetime | None:
         """Prochain debut de plage apres l'instant donne."""
         if not self.enabled:
             return None
-        for offset in range(8):
-            day = moment.date() + timedelta(days=offset)
-            if day.weekday() not in self.days:
-                continue
-            for window in sorted(self.windows, key=lambda item: item.start):
-                candidate = datetime.combine(day, window.start)
-                if candidate > moment:
-                    return candidate
+        for day in self._upcoming_days(moment.date()):
+            candidate = self._first_start_after(day, moment)
+            if candidate is not None:
+                return candidate
         return None
 
     def seconds_until_next(self, moment: datetime) -> float:
@@ -136,30 +149,39 @@ def parse_window(value: str) -> Window:
     return Window(start=start, end=end)
 
 
-def parse_windows(values: object) -> tuple[Window, ...]:
+def _require_sequence(values: object, message: str) -> list | tuple:
     if isinstance(values, str):
-        values = [values]
+        return [values]
     if not isinstance(values, (list, tuple)) or not values:
-        raise ScheduleError(
-            "windows doit etre une liste non vide de plages HH:MM-HH:MM"
-        )
+        raise ScheduleError(message)
+    return values
+
+
+def _sorted_windows(values: list | tuple) -> list[Window]:
     windows = [parse_window(str(value)) for value in values]
-    ordered = sorted(windows, key=lambda window: window.start)
+    return sorted(windows, key=lambda window: window.start)
+
+
+def _reject_overlaps(ordered: list[Window]) -> None:
     for previous, current in pairwise(ordered):
         if current.start < previous.end:
             raise ScheduleError(f"les plages se chevauchent : {previous} et {current}")
+
+
+def parse_windows(values: object) -> tuple[Window, ...]:
+    message = "windows doit etre une liste non vide de plages HH:MM-HH:MM"
+    ordered = _sorted_windows(_require_sequence(values, message))
+    _reject_overlaps(ordered)
     return tuple(ordered)
 
 
+def _parse_day(value: object) -> int:
+    key = str(value).strip().lower()[:3]
+    if key not in DAY_NAMES:
+        raise ScheduleError(f"jour inconnu : {value!r} (mon, tue, wed, ...)")
+    return DAY_NAMES[key]
+
+
 def parse_days(values: object) -> tuple[int, ...]:
-    if isinstance(values, str):
-        values = [values]
-    if not isinstance(values, (list, tuple)) or not values:
-        raise ScheduleError("days doit etre une liste non vide de jours")
-    days = []
-    for value in values:
-        key = str(value).strip().lower()[:3]
-        if key not in DAY_NAMES:
-            raise ScheduleError(f"jour inconnu : {value!r} (mon, tue, wed, ...)")
-        days.append(DAY_NAMES[key])
-    return tuple(sorted(set(days)))
+    items = _require_sequence(values, "days doit etre une liste non vide de jours")
+    return tuple(sorted({_parse_day(item) for item in items}))
