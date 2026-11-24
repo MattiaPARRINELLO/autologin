@@ -31,33 +31,47 @@ ARTIFACT = re.compile(r"CheckMate-(?:Setup|linux)-\d+\.\d+\.\d+")
 STABLE_STATE = re.compile(r"Version stable actuelle\s*:\s*\*{0,2}\d+\.\d+\.\d+")
 
 
+def _matches(line: str) -> list[str]:
+    found = []
+    for pattern in (ARTIFACT, STABLE_STATE):
+        match = pattern.search(line)
+        if match:
+            found.append(match.group(0))
+    return found
+
+
 def violations(path: Path) -> list[tuple[int, str, str]]:
     try:
         lines = path.read_text(encoding="utf-8").splitlines()
     except FileNotFoundError:
         return []
-    found = []
-    for number, line in enumerate(lines, start=1):
-        for pattern in (ARTIFACT, STABLE_STATE):
-            match = pattern.search(line)
-            if match:
-                found.append((number, match.group(0), line.strip()))
-    return found
+    return [
+        (number, found, line.strip())
+        for number, line in enumerate(lines, start=1)
+        for found in _matches(line)
+    ]
 
 
-def report(results: list[tuple[Path, int, str, str]], doc_count: int) -> None:
-    for relative, number, match, line in results:
-        print(f"{relative}:{number}: version figee `{match}`", file=sys.stderr)
-        print(f"  {line}", file=sys.stderr)
+def _print_result(relative: Path, number: int, match: str, line: str) -> None:
+    print(f"{relative}:{number}: version figee `{match}`", file=sys.stderr)
+    print(f"  {line}", file=sys.stderr)
 
+
+def _print_summary(results: list, doc_count: int) -> None:
     if results:
         print(
             "\nRemplace la version par `<version>` et renvoie vers "
             "`releases/latest` : le README doit rester valable a chaque release.",
             file=sys.stderr,
         )
-    else:
-        print(f"Documentation a jour : {doc_count} fichiers verifies.")
+        return
+    print(f"Documentation a jour : {doc_count} fichiers verifies.")
+
+
+def report(results: list[tuple[Path, int, str, str]], doc_count: int) -> None:
+    for result in results:
+        _print_result(*result)
+    _print_summary(results, doc_count)
 
 
 def main() -> int:
