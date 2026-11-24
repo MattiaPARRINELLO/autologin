@@ -423,46 +423,79 @@ class _Handler(LocalHandler):
 
     def do_GET(self) -> None:
         path = urlparse(self.path).path
-        if path == "/":
-            self._serve_page(
-                SETUP_HTML,
-                {
-                    "DAYS": _days_html(parse_days(DEFAULT_DAYS)),
-                    "WINDOWS": ", ".join(DEFAULT_WINDOWS),
-                },
-            )
+        if (
+            self._route_page(path)
+            or self._route_favicon(path)
+            or self._route_state(path)
+        ):
             return
-        if path == "/favicon.ico":
-            self._favicon()
+        self._route_unknown()
+
+    def _route_page(self, path: str) -> bool:
+        if path != "/":
+            return False
+        self._serve_page(
+            SETUP_HTML,
+            {
+                "DAYS": _days_html(parse_days(DEFAULT_DAYS)),
+                "WINDOWS": ", ".join(DEFAULT_WINDOWS),
+            },
+        )
+        return True
+
+    def _route_favicon(self, path: str) -> bool:
+        if path != "/favicon.ico":
+            return False
+        self._favicon()
+        return True
+
+    def _serve_state(self) -> None:
+        if not self._authorized():
+            self._json(403, {"error": "acces refuse"})
             return
-        if path == "/api/state":
-            if not self._authorized():
-                self._json(403, {"error": "acces refuse"})
-                return
-            self._json(200, self.session.state())
-            return
+        self._json(200, self.session.state())
+
+    def _route_state(self, path: str) -> bool:
+        if path != "/api/state":
+            return False
+        self._serve_state()
+        return True
+
+    def _route_unknown(self) -> None:
         self._json(404, {"error": "route inconnue"})
 
     def do_POST(self) -> None:
         if not self._authorized():
             self._json(403, {"error": "acces refuse"})
             return
-        path = urlparse(self.path).path
+        self._dispatch(urlparse(self.path).path)
+
+    def _dispatch(self, path: str) -> None:
         try:
-            payload = self._read_json()
-            handler = self._routes().get(path)
-            if handler is None:
-                self._json(404, {"error": "route inconnue"})
-                return
-            result = handler(payload)
+            result = self._invoke(path, self._read_json())
         except LocalError as exc:
             self._json(exc.status, {"error": str(exc)})
             return
         except Exception as exc:
-            logger.exception("erreur pendant l'onboarding")
-            self._json(500, {"error": f"erreur interne : {exc}"})
+            self._json_internal_error(exc)
             return
+        self._send_result(path, result)
+
+    def _json_internal_error(self, exc: Exception) -> None:
+        logger.exception("erreur pendant l'onboarding")
+        self._json(500, {"error": f"erreur interne : {exc}"})
+
+    def _send_result(self, path: str, result: Any) -> None:
         self._json(200, result)
+        self._finish_if_needed(path)
+
+    def _invoke(self, path: str, payload: dict[str, Any]) -> Any:
+        handler = self._routes().get(path)
+        if handler is None:
+            raise LocalError("route inconnue", 404)
+        return handler(payload)
+
+    def _finish_if_needed(self, path: str) -> None:
         if path == "/api/finish":
             self.session.finished.set()
 
