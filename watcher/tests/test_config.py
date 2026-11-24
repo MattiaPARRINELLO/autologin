@@ -153,9 +153,9 @@ def test_refuse_un_ficher_absent(tmp_path):
         load_config(tmp_path / "absent.toml")
 
 
-def test_canal_stable_par_defaut(tmp_path):
+def test_canal_par_defaut_du_fichier_suit_la_version(tmp_path):
     config = load_config(write_config(tmp_path))
-    assert config.updates.channel == "stable"
+    assert config.updates.channel == config_module._default_channel()
 
 
 def test_lit_le_canal_beta(tmp_path):
