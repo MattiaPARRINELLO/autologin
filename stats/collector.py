@@ -195,9 +195,9 @@ class Handler(BaseHTTPRequestHandler):
     dashboard_password: str | None
     limiter: RateLimiter
 
-    def log_message(self, format: str, *args) -> None:  # noqa: A002
+    def log_message(self, fmt: str, *args) -> None:
         # Pas d'adresse IP dans les journaux.
-        logger.info("%s", format % args)
+        logger.info("%s", fmt % args)
 
     def _send(self, status: int, body: bytes, content_type: str) -> None:
         self.send_response(status)
@@ -241,7 +241,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", "0")
         self.end_headers()
 
-    def do_GET(self) -> None:  # noqa: N802
+    def do_GET(self) -> None:
         path = self.path.split("?", 1)[0]
         if path == "/health":
             self._json(200, {"ok": True})
@@ -259,7 +259,7 @@ class Handler(BaseHTTPRequestHandler):
         else:
             self._json(404, {"error": "not_found"})
 
-    def do_POST(self) -> None:  # noqa: N802
+    def do_POST(self) -> None:
         if self.path.split("?", 1)[0] != "/api/event":
             self._json(404, {"error": "not_found"})
             return
