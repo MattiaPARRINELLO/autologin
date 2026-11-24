@@ -12,6 +12,7 @@ from checkmate_watcher.config import (
     default_config,
     load_config,
     save_config,
+    save_updates_channel,
 )
 
 
@@ -183,3 +184,16 @@ def test_le_canal_prime_sur_l_alias(tmp_path):
 def test_refuse_un_canal_inconnu(tmp_path):
     with pytest.raises(ConfigError, match="channel doit valoir"):
         load_config(write_config(tmp_path, '[updates]\nchannel = "nightly"'))
+
+
+def test_save_updates_channel_preserve_le_mot_de_passe(tmp_path):
+    path = _write_config_env(tmp_path, "CHECKMATE_TEST_PASSWORD")
+    config = save_updates_channel(path, "beta")
+    assert config.updates.channel == "beta"
+    assert "password_env" in path.read_text(encoding="utf-8")
+
+
+def test_save_updates_channel_refuse_un_canal_inconnu(tmp_path):
+    path = _write_config_env(tmp_path, "CHECKMATE_TEST_PASSWORD")
+    with pytest.raises(ConfigError):
+        save_updates_channel(path, "nightly")
