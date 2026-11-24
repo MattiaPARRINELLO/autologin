@@ -11,8 +11,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
-from .config import Config
-
 logger = logging.getLogger(__name__)
 
 LINUX_CANDIDATES = (
@@ -71,17 +69,31 @@ def playwright_cache_dir(platform: str | None = None) -> Path:
     return Path.home() / ".cache/ms-playwright"
 
 
+BUNDLED_CHROMIUM_PATTERNS = (
+    "chromium-*/chrome-linux*/chrome",
+    "chromium-*/chrome-win*/chrome.exe",
+    "chromium-*/chrome-mac*/Chromium.app/Contents/MacOS/Chromium",
+)
+
+
+def bundled_chromium_path(
+    platform: str | None = None,
+    root: Path | None = None,
+) -> str | None:
+    """Chemin du Chromium installe par `playwright install chromium`."""
+    cache = root or playwright_cache_dir(platform)
+    for pattern in BUNDLED_CHROMIUM_PATTERNS:
+        for candidate in sorted(cache.glob(pattern)):
+            if candidate.is_file():
+                return str(candidate)
+    return None
+
+
 def bundled_browser_present(
     platform: str | None = None,
     root: Path | None = None,
 ) -> bool:
-    cache = root or playwright_cache_dir(platform)
-    patterns = (
-        "chromium-*/chrome-linux*/chrome",
-        "chromium-*/chrome-win*/chrome.exe",
-        "chromium-*/chrome-mac*/Chromium.app/Contents/MacOS/Chromium",
-    )
-    return any(cache.glob(pattern) for pattern in patterns)
+    return bundled_chromium_path(platform, root) is not None
 
 
 def system_chromium() -> str | None:
@@ -114,41 +126,67 @@ def platform_channel(
     return None
 
 
+def _expected_executable(browser_type: BrowserType) -> str:
+    try:
+        return browser_type.executable_path
+    except Exception:
+        return ""
+
+
+def _playwright_missing(expected: str) -> bool:
+    return not (expected and Path(expected).is_file())
+
+
+def _system_launch(current: str) -> LaunchOptions | None:
+    channel = platform_channel(current)
+    if not channel:
+        return None
+    logger.info("utilisation du navigateur systeme : %s", channel)
+    return LaunchOptions(channel=channel)
+
+
+def _log_fallback(expected: str, fallback: str) -> None:
+    logger.warning(
+        "Chromium de Playwright absent (%s), utilisation de %s",
+        expected or "chemin inconnu",
+        fallback,
+    )
+
+
+def _linux_fallback(current: str, expected: str) -> LaunchOptions | None:
+    if not current.startswith("linux"):
+        return None
+    fallback = system_chromium()
+    if not fallback:
+        return None
+    _log_fallback(expected, fallback)
+    return LaunchOptions(executable_path=fallback)
+
+
+def _bundle_available(browser_type: BrowserType) -> bool:
+    expected = _expected_executable(browser_type)
+    return not _playwright_missing(expected)
+
+
+def _default_launch(current: str, expected: str) -> LaunchOptions:
+    system = _system_launch(current)
+    if system:
+        return system
+    return _linux_fallback(current, expected) or LaunchOptions()
+
+
 def resolve_launch_options(
     browser_type: BrowserType,
-    config: Config,
+    executable_path: str | None = None,
     platform: str | None = None,
 ) -> LaunchOptions:
-    """Priorite : config, Chromium du bundle, navigateur systeme."""
-    configured = config.watcher.executable_path
-    if configured:
-        return LaunchOptions(executable_path=configured)
-
-    try:
-        expected = browser_type.executable_path
-    except Exception:  # noqa: BLE001
-        expected = ""
-
-    if expected and Path(expected).is_file():
+    # Priorite : chemin configure, Chromium du bundle, navigateur systeme.
+    if executable_path:
+        return LaunchOptions(executable_path=executable_path)
+    if _bundle_available(browser_type):
         return LaunchOptions()
-
     current = platform or sys.platform
-    channel = platform_channel(current)
-    if channel:
-        logger.info("utilisation du navigateur systeme : %s", channel)
-        return LaunchOptions(channel=channel)
-
-    if current.startswith("linux"):
-        fallback = system_chromium()
-        if fallback:
-            logger.warning(
-                "Chromium de Playwright absent (%s), utilisation de %s",
-                expected or "chemin inconnu",
-                fallback,
-            )
-            return LaunchOptions(executable_path=fallback)
-
-    return LaunchOptions()
+    return _default_launch(current, _expected_executable(browser_type))
 
 
 def missing_browser_message() -> str:

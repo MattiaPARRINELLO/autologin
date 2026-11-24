@@ -9,12 +9,15 @@ from __future__ import annotations
 
 import logging
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 from . import __version__
+from .autostart import UNIT_NAME
 from .paths import default_update_dir
 from .updates import (
     Release,
@@ -35,13 +38,21 @@ WINDOWS_FLAGS = [
 LINUX_SCRIPT = """#!/usr/bin/env bash
 set -u
 sleep 2
-systemctl --user stop checkmate-watcher >/dev/null 2>&1 || true
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
-tar -xzf {archive} -C "$WORK" || exit 1
-cd "$WORK"/CheckMate-linux-* || exit 1
-./install.sh
-status=$?
+# Arreter le service ne tue ce script que s'il tourne dans la meme unite que le
+# watcher. C'est le cas quand systemd-run n'a pas pu detacher l'installation.
+if [ -n "${{CHECKMATE_UPDATE_DETACHED:-}}" ]; then
+    systemctl --user stop {unit} >/dev/null 2>&1 || true
+fi
+status=1
+if tar -xzf {archive} -C "$WORK"; then
+    cd "$WORK"/CheckMate-linux-* && ./install.sh
+    status=$?
+fi
+# L'installeur redemarre deja le service, mais si l'installation echoue il faut
+# rendre la main a l'ancienne version plutot que de laisser le service arrete.
+systemctl --user start {unit} >/dev/null 2>&1 || true
 if [ "$status" -eq 0 ]; then
     rm -rf {cleanup}
 fi
@@ -73,33 +84,87 @@ def _install_windows(archive: Path) -> None:
         raise UpdateError(f"lancement de l'installeur impossible : {exc}") from exc
 
 
-def _install_linux(archive: Path, cleanup: Path) -> None:
-    script = LINUX_SCRIPT.format(
-        archive=_quote(str(archive)),
-        cleanup=_quote(str(cleanup)),
-    )
+def _fill_update_script(handle, archive, cleanup):
+    with os.fdopen(handle, "w", encoding="utf-8") as file:
+        script = LINUX_SCRIPT.format(
+            archive=_quote(str(archive)),
+            cleanup=_quote(str(cleanup)),
+            unit=UNIT_NAME,
+        )
+        file.write(script)
+
+
+def _write_update_script(archive, cleanup):
     handle, path = tempfile.mkstemp(prefix="checkmate-update-", suffix=".sh")
     try:
-        with os.fdopen(handle, "w", encoding="utf-8") as file:
-            file.write(script)
+        _fill_update_script(handle, archive, cleanup)
         os.chmod(path, 0o700)
-        subprocess.Popen(
-            ["/bin/bash", path],
-            close_fds=True,
-            start_new_session=True,
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
-    except OSError as exc:
+        return path
+    except OSError:
         Path(path).unlink(missing_ok=True)
+        raise
+
+
+def _install_linux(archive: Path, cleanup: Path) -> None:
+    try:
+        path = _write_update_script(archive, cleanup)
+        _spawn_linux_installer(path)
+    except OSError as exc:
         raise UpdateError(
             f"lancement du script de mise a jour impossible : {exc}"
         ) from exc
 
 
+def _try_systemd_run(script, unit):
+    # fmt: off
+    runner = shutil.which("systemd-run")
+    if runner is None: return False
+    try:
+        subprocess.Popen([runner, "--user", "--collect", "--quiet", f"--unit={unit}", "--description=Installation d'une mise a jour CheckMate", "--setenv=CHECKMATE_UPDATE_DETACHED=1", "/bin/bash", script], close_fds=True, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except OSError:
+        logger.warning("systemd-run indisponible, installation non detachee"); return False
+    if _transient_unit_active(unit): return True
+    logger.warning("unite %s inactive, installation dans le cgroup du service", unit)
+    return False
+    # fmt: on
+
+
+def _spawn_detached(argv: list[str]) -> None:
+    subprocess.Popen(
+        argv,
+        close_fds=True,
+        start_new_session=True,
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+
+
+def _spawn_linux_installer(script: str) -> None:
+    """Detache l'installation du service pour qu'elle lui survive."""
+    unit = f"checkmate-update-{os.getpid()}"
+    if _try_systemd_run(script, unit):
+        return
+    _spawn_detached(["/bin/bash", script])
+
+
 def _quote(value: str) -> str:
     return "'" + value.replace("'", "'\\''") + "'"
+
+
+def _transient_unit_active(unit: str, attempts: int = 5) -> bool:
+    # fmt: off
+    for attempt in range(attempts):
+        try:
+            result = subprocess.run(["systemctl", "--user", "show", "--property=ActiveState", "--value", unit], capture_output=True, text=True, timeout=2, check=False)
+        except (OSError, subprocess.SubprocessError):
+            return False
+        state = result.stdout.strip()
+        if state in {"active", "activating"}: return True
+        if state in {"inactive", "failed"} and attempt >= 1: return False
+        time.sleep(0.2)
+    return False
+    # fmt: on
 
 
 def prepare(config) -> tuple[Release, Path]:

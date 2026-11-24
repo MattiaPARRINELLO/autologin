@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CESAR Emineo - tableau de bord</title>
+<link rel="stylesheet" href="/assets/cesar.css">
+</head>
+<body class="page-dashboard" data-scenario="cesar-simplifie">
+<div id="app">
+  <header class="topbar">
+    <span class="brand">CESAR Emineo</span>
+    <nav class="topbar-nav">
+      <a href="/admin">Administration</a>
+      <a href="/connexion?logout=1">Deconnexion</a>
+    </nav>
+  </header>
+  <main class="layout">
+    <section class="calendar-panel card toastui-calendar-day-view">
+      <h2 class="panel-title">Journee</h2>
+      <div class="toastui-calendar-layout">
+        <ul class="slot-list">
+          <li class="slot"><strong>08:30</strong> Culture generale</li>
+          <li class="slot"><strong>10:15</strong> Maths</li>
+          <li class="slot"><strong>14:00</strong> Developpement</li>
+        </ul>
+      </div>
+    </section>
+    <section class="attendance-panel card">
+      <p class="status closed">Aucun emargement en cours</p>
+      <p class="hint">Ouvre un emargement depuis /admin pour tester le scenario.</p>
+    </section>
+  </main>
+</div>
+<script src="/assets/cesar-lib.js"></script>
+</body>
+</html>

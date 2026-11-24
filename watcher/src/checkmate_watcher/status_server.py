@@ -10,14 +10,17 @@ import subprocess
 import sys
 import threading
 import urllib.request
+from dataclasses import dataclass
 from datetime import datetime
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from http.server import ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import urlparse
 
-from . import BUILD, __version__
+from . import __version__
 from .autostart import current_executable
 from .config import Config
+from .local_http import LocalError, LocalHandler
+from .local_http import create_server as _create_server
 from .notifications import Notifier
 from .paths import data_dir, default_log_file
 from .self_update import update_now
@@ -27,48 +30,94 @@ from .updates import UpdateError, check_for_update
 
 logger = logging.getLogger(__name__)
 
-MAX_BODY = 100_000
 RUNTIME_NAME = "runtime.json"
 
 
-class StatusError(Exception):
-    def __init__(self, message: str, status: int = 400) -> None:
-        super().__init__(message)
-        self.status = status
+class StatusError(LocalError):
+    """Action du tableau de bord refusee."""
+
+
+@dataclass(frozen=True)
+class Action:
+    name: str
+    label: str
+    method: str
+    in_tray: bool = False
+
+
+ACTIONS = (
+    Action("configure", "Reconfigurer", "configure", in_tray=True),
+    Action(
+        "test-notification",
+        "Tester la notification",
+        "test_notification",
+        in_tray=True,
+    ),
+    Action(
+        "check-update",
+        "Verifier les mises a jour",
+        "check_update",
+        in_tray=True,
+    ),
+    Action("install-update", "Installer la mise a jour", "install_update"),
+    Action("open-logs", "Ouvrir les logs", "open_logs"),
+    Action("quit", "Quitter", "quit"),
+)
+ACTIONS_BY_NAME = {action.name: action for action in ACTIONS}
 
 
 def runtime_path() -> Path:
     return data_dir() / RUNTIME_NAME
 
 
+def _read_runtime_file(path):
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+
+
+def _has_required_runtime_keys(data):
+    required = ("pid", "port", "token", "url")
+    return all(key in data for key in required)
+
+
+def _is_valid_runtime(data):
+    return isinstance(data, dict) and _has_required_runtime_keys(data)
+
+
 def read_runtime() -> dict | None:
     path = runtime_path()
     if not path.is_file():
         return None
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return None
-    if not isinstance(data, dict):
-        return None
-    required = ("pid", "port", "token", "url")
-    if not all(key in data for key in required):
-        return None
-    return data
+    data = _read_runtime_file(path)
+    return data if _is_valid_runtime(data) else None
 
 
-def write_runtime(session: StatusSession) -> None:
-    path = runtime_path()
-    path.parent.mkdir(parents=True, exist_ok=True)
-    payload = {
+def _runtime_payload(session: StatusSession) -> dict:
+    return {
         "pid": os.getpid(),
         "port": session.port,
         "token": session.token,
         "url": session.url,
         "started_at": session.started_at.isoformat(timespec="seconds"),
     }
+
+
+def _ensure_runtime_dir(path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+
+def _write_runtime_file(path: Path, payload: dict) -> None:
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
     path.chmod(0o600)
+
+
+def write_runtime(session: StatusSession) -> None:
+    path = runtime_path()
+    _ensure_runtime_dir(path)
+    payload = _runtime_payload(session)
+    _write_runtime_file(path, payload)
 
 
 def remove_runtime() -> None:
@@ -89,7 +138,7 @@ def status_alive(runtime: dict, timeout: float = 1.5) -> bool:
         )
         with urllib.request.urlopen(request, timeout=timeout) as response:
             return response.status == 200
-    except Exception:  # noqa: BLE001
+    except Exception:
         return False
 
 
@@ -101,11 +150,26 @@ class StatusSession:
         state,
         started_at: datetime,
     ) -> None:
+        self._store_inputs(config, config_path, state, started_at)
+        self._init_token()
+        self._init_runtime()
+
+    def _store_inputs(
+        self,
+        config: Config,
+        config_path: Path,
+        state,
+        started_at: datetime,
+    ) -> None:
         self.config = config
         self.config_path = config_path
         self.state = state
         self.started_at = started_at
+
+    def _init_token(self) -> None:
         self.token = secrets.token_urlsafe(24)
+
+    def _init_runtime(self) -> None:
         self.stop_event = threading.Event()
         self.port = 0
         self.url = ""
@@ -118,22 +182,27 @@ class StatusSession:
             self.config_path,
         )
 
-    def test_notification(self) -> dict:
-        notifier = Notifier(
-            app_name=self.config.notifications.app_name,
-            icon=self.config.notifications.icon,
-        )
-        sent = notifier.send(
+    def _create_notifier(self) -> Notifier:
+        return Notifier.from_config(self.config)
+
+    def _send_test_notification(self, notifier: Notifier) -> bool:
+        return notifier.send(
             "CheckMate",
             "Test de notification. Si tu ne la vois pas, coupe le mode silencieux.",
             urgency="normal",
         )
-        if not sent:
-            raise StatusError("notification impossible sur ce systeme")
+
+    def _test_notification_result(self) -> dict:
         return {
             "ok": True,
             "message": "Notification envoyée. Si tu ne la vois pas, coupe le mode silencieux.",
         }
+
+    def test_notification(self) -> dict:
+        sent = self._send_test_notification(self._create_notifier())
+        if not sent:
+            raise StatusError("notification impossible sur ce systeme")
+        return self._test_notification_result()
 
     def check_update(self) -> dict:
         release = check_for_update(
@@ -141,12 +210,18 @@ class StatusSession:
             channel=self.config.updates.channel,
         )
         if release is None:
-            return {
-                "ok": True,
-                "available": False,
-                "channel": self.config.updates.channel,
-                "message": f"CheckMate {__version__} est à jour.",
-            }
+            return self._up_to_date_response()
+        return self._update_available_response(release)
+
+    def _up_to_date_response(self) -> dict:
+        return {
+            "ok": True,
+            "available": False,
+            "channel": self.config.updates.channel,
+            "message": f"CheckMate {__version__} est à jour.",
+        }
+
+    def _update_available_response(self, release) -> dict:
         return {
             "ok": True,
             "available": True,
@@ -158,33 +233,45 @@ class StatusSession:
         }
 
     def install_update(self) -> dict:
+        version = self._run_self_update()
+        return self._build_install_update_result(version)
+
+    def _run_self_update(self):
         try:
-            version = update_now(self.config)
+            return update_now(self.config)
         except UpdateError as exc:
             raise StatusError(str(exc)) from exc
         except Exception as exc:
             raise StatusError(f"mise a jour impossible : {exc}") from exc
+
+    def _build_install_update_result(self, version) -> dict:
         return {
             "ok": True,
             "version": version,
-            "message": (
-                f"Mise a jour {version} en cours. CheckMate redemarre dans "
-                "quelques secondes."
-            ),
+            "message": self._install_update_message(version),
         }
 
+    def _install_update_message(self, version) -> str:
+        return (
+            f"Mise a jour {version} en cours. CheckMate redemarre dans "
+            "quelques secondes."
+        )
+
     def configure(self) -> dict:
+        self._start_assistant()
+        return self._assistant_started_response()
+
+    def _build_assistant_command(self) -> list[str]:
         executable = current_executable()
-        command = [
-            str(executable),
-            "--config",
-            str(self.config_path),
-            "setup",
-        ]
+        return [str(executable), "--config", str(self.config_path), "setup"]
+
+    def _start_assistant(self) -> None:
         try:
-            subprocess.Popen(command, close_fds=True)
+            subprocess.Popen(self._build_assistant_command(), close_fds=True)
         except OSError as exc:
             raise StatusError(f"impossible de lancer l'assistant : {exc}") from exc
+
+    def _assistant_started_response(self) -> dict:
         return {
             "ok": True,
             "message": (
@@ -194,130 +281,103 @@ class StatusSession:
         }
 
     def open_logs(self) -> dict:
-        folder = default_log_file().parent
-        folder.mkdir(parents=True, exist_ok=True)
+        folder = self._log_folder()
+        self._ensure_log_folder(folder)
         try:
-            if sys.platform.startswith("win"):
-                os.startfile(folder)  # type: ignore[attr-defined]
-            elif sys.platform == "darwin":
-                subprocess.Popen(["open", str(folder)])
-            else:
-                subprocess.Popen(["xdg-open", str(folder)])
+            self._launch_log_folder(folder)
         except OSError as exc:
             raise StatusError(f"impossible d'ouvrir le dossier : {exc}") from exc
         return {"ok": True, "message": f"Dossier ouvert : {folder}"}
+
+    def _log_folder(self):
+        return default_log_file().parent
+
+    def _ensure_log_folder(self, folder) -> None:
+        folder.mkdir(parents=True, exist_ok=True)
+
+    def _launch_log_folder(self, folder) -> None:
+        if sys.platform.startswith("win"):
+            getattr(os, "startfile")(folder)
+        elif sys.platform == "darwin":
+            subprocess.Popen(["open", str(folder)])
+        else:
+            subprocess.Popen(["xdg-open", str(folder)])
 
     def quit(self) -> dict:
         self.stop_event.set()
         return {"ok": True, "message": "CheckMate est arrêté."}
 
+    def action(self, name: str) -> dict:
+        action = ACTIONS_BY_NAME.get(name)
+        if action is None:
+            raise StatusError("action inconnue")
+        return getattr(self, action.method)()
 
-class _Handler(BaseHTTPRequestHandler):
+
+class _Handler(LocalHandler):
     session: StatusSession
 
-    def log_message(self, format: str, *args: object) -> None:
-        return
-
-    def _send(self, status: int, payload: bytes, content_type: str) -> None:
-        self.send_response(status)
-        self.send_header("Content-Type", content_type)
-        self.send_header("Content-Length", str(len(payload)))
-        self.send_header("Cache-Control", "no-store")
-        self.send_header("X-Content-Type-Options", "nosniff")
-        self.send_header("Referrer-Policy", "no-referrer")
-        self.end_headers()
-        self.wfile.write(payload)
-
-    def _json(self, status: int, data: dict) -> None:
-        self._send(
-            status,
-            json.dumps(data, ensure_ascii=False).encode("utf-8"),
-            "application/json; charset=utf-8",
-        )
-
-    def _authorized(self) -> bool:
-        return self.headers.get("X-CheckMate-Token") == self.session.token
-
-    def _read_json(self) -> dict:
-        length = int(self.headers.get("Content-Length") or 0)
-        if length <= 0 or length > MAX_BODY:
-            return {}
-        try:
-            data = json.loads(self.rfile.read(length).decode("utf-8"))
-        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-            raise StatusError("corps JSON invalide") from exc
-        return data if isinstance(data, dict) else {}
-
     def do_GET(self) -> None:
-        parsed = urlparse(self.path)
-        if parsed.path == "/":
-            token = (parse_qs(parsed.query).get("token") or [""])[0]
-            if token != self.session.token:
-                self._send(403, b"Jeton invalide", "text/plain; charset=utf-8")
-                return
-            html = STATUS_HTML.replace("__TOKEN__", self.session.token).replace(
-                "__VERSION__", f"{__version__} - build {BUILD}"
-            )
-            self._send(200, html.encode("utf-8"), "text/html; charset=utf-8")
-            return
-        if parsed.path == "/favicon.ico":
-            self.send_response(204)
-            self.end_headers()
-            return
-        if parsed.path == "/api/status":
-            if not self._authorized():
-                self._json(403, {"error": "acces refuse"})
-                return
-            self._json(200, self.session.snapshot())
-            return
-        self._json(404, {"error": "route inconnue"})
+        path = self._request_path()
+        if path == "/":
+            self._serve_page(STATUS_HTML)
+        elif path == "/favicon.ico":
+            self._favicon()
+        elif path == "/api/status":
+            self._serve_status()
+        else:
+            self._json(404, {"error": "route inconnue"})
 
-    def do_POST(self) -> None:
+    def _request_path(self) -> str:
+        return urlparse(self.path).path
+
+    def _serve_status(self) -> None:
         if not self._authorized():
             self._json(403, {"error": "acces refuse"})
             return
-        path = urlparse(self.path).path
-        if path != "/api/action":
-            self._json(404, {"error": "route inconnue"})
-            return
+        self._json(200, self.session.snapshot())
 
-        action = ""
+    def do_POST(self) -> None:
+        if self._reject_unauthorized():
+            return
+        if self._reject_unknown_route():
+            return
+        self._execute_action()
+
+    def _reject_unauthorized(self) -> bool:
+        if self._authorized():
+            return False
+        self._json(403, {"error": "acces refuse"})
+        return True
+
+    def _reject_unknown_route(self) -> bool:
+        if urlparse(self.path).path == "/api/action":
+            return False
+        self._json(404, {"error": "route inconnue"})
+        return True
+
+    def _execute_action(self) -> None:
         try:
-            payload = self._read_json()
-            action = str(payload.get("action") or "")
-            if action == "configure":
-                result = self.session.configure()
-            elif action == "test-notification":
-                result = self.session.test_notification()
-            elif action == "check-update":
-                result = self.session.check_update()
-            elif action == "install-update":
-                result = self.session.install_update()
-            elif action == "open-logs":
-                result = self.session.open_logs()
-            elif action == "quit":
-                result = self.session.quit()
-            else:
-                raise StatusError("action inconnue")
-        except StatusError as exc:
+            result = self._perform_action()
+        except Exception as exc:
+            self._report_action_error(exc)
+            return
+        self._json(200, result)
+
+    def _perform_action(self):
+        payload = self._read_json()
+        return self.session.action(str(payload.get("action") or ""))
+
+    def _report_action_error(self, exc) -> None:
+        if isinstance(exc, LocalError):
             self._json(exc.status, {"error": str(exc)})
             return
-        except Exception as exc:
-            logger.exception("erreur dans le tableau de bord")
-            self._json(500, {"error": f"erreur interne : {exc}"})
-            return
-
-        self._json(200, result)
-        if action == "quit":
-            # La reponse est envoyee ; la boucle verra l'evenement et fermera tout.
-            self.session.stop_event.set()
+        logger.exception("erreur dans le tableau de bord")
+        self._json(500, {"error": f"erreur interne : {exc}"})
 
 
 def create_server(session: StatusSession) -> ThreadingHTTPServer:
-    handler = type("StatusHandler", (_Handler,), {"session": session})
-    server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
-    server.daemon_threads = True
-    return server
+    return _create_server(session, _Handler)
 
 
 def start_status_server(session: StatusSession) -> ThreadingHTTPServer:

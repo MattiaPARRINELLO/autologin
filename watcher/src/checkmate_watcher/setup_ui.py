@@ -486,7 +486,7 @@ SETUP_HTML = """<!doctype html>
       <p class="lede">Dessine ta signature à la souris ou au doigt. Elle sera rejouée telle quelle dans le canvas de CESAR.</p>
       <canvas id="pad" width="640" height="240" aria-label="Zone de signature"></canvas>
       <div class="import-line">
-        <span>Signature deja dans l'extension ?</span>
+        <span>Signature deja existante ?</span>
         <label class="file-button" for="signatureFile">Importer le JSON
           <input id="signatureFile" type="file" accept=".json,application/json">
         </label>
@@ -506,18 +506,12 @@ SETUP_HTML = """<!doctype html>
       <fieldset class="days-field">
         <legend>Jours</legend>
         <div class="days" id="days">
-          <label><input type="checkbox" value="mon" checked>Lun</label>
-          <label><input type="checkbox" value="tue" checked>Mar</label>
-          <label><input type="checkbox" value="wed" checked>Mer</label>
-          <label><input type="checkbox" value="thu" checked>Jeu</label>
-          <label><input type="checkbox" value="fri" checked>Ven</label>
-          <label><input type="checkbox" value="sat">Sam</label>
-          <label><input type="checkbox" value="sun">Dim</label>
+__DAYS__
         </div>
       </fieldset>
       <div class="field">
         <label for="windows">Créneaux</label>
-        <input id="windows" type="text" value="09:00-12:00, 13:30-16:30">
+        <input id="windows" type="text" value="__WINDOWS__">
       </div>
       <p class="hint">Format HH:MM-HH:MM, séparés par des virgules.</p>
       <div class="status" id="scheduleStatus" aria-live="polite"></div>
@@ -532,7 +526,7 @@ SETUP_HTML = """<!doctype html>
       <p class="lede">Vérifie que la notification s'affiche, puis installe le démarrage automatique pour ne plus y penser.</p>
       <div class="notice">
         <strong>Coupe le mode silencieux</strong>
-        <p>Désactive le mode silencieux ou "Ne pas déranger" avant de tester. Sinon la notification peut ne pas s'afficher, même si CheckMate l'a bien envoyée.</p>
+        <p>Désactive le mode silencieux ou "Ne pas déranger" avant de tester. Vérifie aussi que "CheckMate" est activé dans Paramètres > Système > Notifications. Sinon la notification peut ne pas s'afficher, même si CheckMate l'a bien envoyée.</p>
       </div>
       <div class="actions">
         <button type="button" class="secondary" onclick="testNotification()" id="notifyBtn">Tester la notification</button>
@@ -731,9 +725,24 @@ function clearPad() {
   setStatus("signatureStatus", "");
 }
 
+function pointsExtent(list) {
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  for (const point of list) {
+    if (point.x < minX) minX = point.x;
+    if (point.y < minY) minY = point.y;
+    if (point.x > maxX) maxX = point.x;
+    if (point.y > maxY) maxY = point.y;
+  }
+  if (!Number.isFinite(minX) || !Number.isFinite(minY)) return 0;
+  return Math.max(maxX - minX, maxY - minY);
+}
+
 async function saveSignature() {
-  if (points.length < 2) {
-    setStatus("signatureStatus", "Dessine d'abord une signature.", "err");
+  if (points.length < 2 || pointsExtent(points) < 2) {
+    setStatus("signatureStatus", "Dessine d'abord une vraie signature.", "err");
     return;
   }
   try {
@@ -786,7 +795,7 @@ async function testNotification() {
     await api("/api/test-notification", {});
     setStatus(
       "notifyStatus",
-      "Notification envoyée. Si tu ne la vois pas, coupe le mode silencieux puis relance le test.",
+      "Notification envoyée. Si tu ne la vois pas, coupe le mode silencieux et vérifie l'interrupteur \"CheckMate\" dans les notifications système, puis relance le test.",
       "ok"
     );
   } catch (error) {

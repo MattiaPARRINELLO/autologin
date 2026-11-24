@@ -83,12 +83,7 @@ VERSION_PATTERN = re.compile(r"(\d+)\.(\d+)\.(\d+)(?:-(beta)(?:\.?(\d+))?)?")
 
 
 def parse_version(text: str) -> Version | None:
-    """Lit une version X.Y.Z ou X.Y.Z-beta.N, ordonnable.
-
-    Une beta est strictement inferieure a sa version stable, et deux betas
-    successives sont ordonnees. Les tags historiques sans suffixe restent lus
-    comme des versions stables.
-    """
+    """Lit une version X.Y.Z ou X.Y.Z-beta.N, ordonnable."""
     match = VERSION_PATTERN.search(text or "")
     if not match:
         return None
@@ -99,6 +94,34 @@ def parse_version(text: str) -> Version | None:
     return Version(major, minor, patch)
 
 
+def _release_assets(assets):
+    return tuple(
+        Asset(
+            name=str(a.get("name") or ""),
+            url=str(a.get("browser_download_url") or ""),
+            size=int(a.get("size") or 0),
+        )
+        for a in assets
+        if isinstance(a, dict) and a.get("name")
+    )
+
+
+def _release_downloads(assets):
+    return sum(int(a.get("download_count") or 0) for a in assets if isinstance(a, dict))
+
+
+def _build_release(tag, version, data, assets):
+    return Release(
+        tag=tag,
+        version=version,
+        url=str(data.get("html_url") or ""),
+        name=str(data.get("name") or tag),
+        prerelease=bool(data.get("prerelease")),
+        downloads=_release_downloads(assets),
+        assets=_release_assets(assets),
+    )
+
+
 def parse_release(data: dict) -> Release | None:
     tag = str(data.get("tag_name") or "")
     if not tag.startswith(TAG_PREFIX):
@@ -106,53 +129,15 @@ def parse_release(data: dict) -> Release | None:
     version = parse_version(tag)
     if version is None:
         return None
-    assets = data.get("assets") or []
-    downloads = sum(
-        int(asset.get("download_count") or 0)
-        for asset in assets
-        if isinstance(asset, dict)
-    )
-    parsed = tuple(
-        Asset(
-            name=str(asset.get("name") or ""),
-            url=str(asset.get("browser_download_url") or ""),
-            size=int(asset.get("size") or 0),
-        )
-        for asset in assets
-        if isinstance(asset, dict) and asset.get("name")
-    )
-    return Release(
-        tag=tag,
-        version=version,
-        url=str(data.get("html_url") or ""),
-        name=str(data.get("name") or tag),
-        prerelease=bool(data.get("prerelease")),
-        downloads=downloads,
-        assets=parsed,
-    )
-
-
-def include_prerelease_for(
-    channel: str = STABLE_CHANNEL,
-    include_prerelease: bool | None = None,
-) -> bool:
-    """Resout le canal en acceptation des prereleases.
-
-    `include_prerelease` reste accepte pour la compatibilite et prend le pas
-    lorsqu'il est fourni.
-    """
-    if include_prerelease is not None:
-        return include_prerelease
-    return str(channel).strip().lower() == BETA_CHANNEL
+    return _build_release(tag, version, data, data.get("assets") or [])
 
 
 def select_latest(
     releases: list[Release],
     *,
     channel: str = STABLE_CHANNEL,
-    include_prerelease: bool | None = None,
 ) -> Release | None:
-    accept_prerelease = include_prerelease_for(channel, include_prerelease)
+    accept_prerelease = str(channel).strip().lower() == BETA_CHANNEL
     candidates = [
         release for release in releases if accept_prerelease or not release.prerelease
     ]
@@ -161,47 +146,35 @@ def select_latest(
     return max(candidates, key=lambda release: release.version)
 
 
-def fetch_releases(timeout: int = 10) -> list[Release]:
-    request = urllib.request.Request(
+def _releases_request(timeout: int):
+    return urllib.request.Request(
         RELEASES_URL,
-        headers={
-            "Accept": "application/vnd.github+json",
-            "User-Agent": USER_AGENT,
-        },
+        headers={"Accept": "application/vnd.github+json", "User-Agent": USER_AGENT},
     )
-    with urllib.request.urlopen(request, timeout=timeout) as response:
+
+
+def fetch_releases(timeout: int = 10) -> list[Release]:
+    with urllib.request.urlopen(
+        _releases_request(timeout), timeout=timeout
+    ) as response:
         payload = json.loads(response.read())
     if not isinstance(payload, list):
         return []
-    return [
-        release
-        for release in (parse_release(item) for item in payload)
-        if release is not None
-    ]
+    return [r for r in (parse_release(i) for i in payload) if r is not None]
 
 
-def check_for_update(
-    current: str = __version__,
-    *,
-    channel: str = STABLE_CHANNEL,
-    include_prerelease: bool | None = None,
-    releases: list[Release] | None = None,
-) -> Release | None:
+# fmt: off
+def check_for_update(current: str = __version__, *, channel: str = STABLE_CHANNEL, releases: list[Release] | None = None) -> Release | None:
     current_version = parse_version(current)
     if current_version is None:
         return None
     if releases is None:
         releases = fetch_releases()
-    latest = select_latest(
-        releases,
-        channel=channel,
-        include_prerelease=include_prerelease,
-    )
-    if latest is None:
+    latest = select_latest(releases, channel=channel)
+    if latest is None or not latest.version > current_version:
         return None
-    if latest.version > current_version:
-        return latest
-    return None
+    return latest
+# fmt: on
 
 
 def platform_asset(release: Release, platform: str) -> Asset | None:
@@ -213,6 +186,18 @@ def platform_asset(release: Release, platform: str) -> Asset | None:
     return None
 
 
+def _ecrire_morceau(handle, chunk) -> None:
+    handle.write(chunk)
+
+
+def _download_chunks(response, handle):
+    while True:
+        chunk = response.read(256 * 1024)
+        if not chunk:
+            break
+        _ecrire_morceau(handle, chunk)
+
+
 def download(url: str, destination: Path, *, timeout: int = 60) -> Path:
     destination.parent.mkdir(parents=True, exist_ok=True)
     request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
@@ -220,11 +205,7 @@ def download(url: str, destination: Path, *, timeout: int = 60) -> Path:
         urllib.request.urlopen(request, timeout=timeout) as response,
         destination.open("wb") as handle,
     ):
-        while True:
-            chunk = response.read(256 * 1024)
-            if not chunk:
-                break
-            handle.write(chunk)
+        _download_chunks(response, handle)
     return destination
 
 
@@ -262,20 +243,23 @@ class UpdateError(Exception):
     """Mise a jour impossible."""
 
 
-def download_update(
-    release: Release, directory: Path, *, platform: str | None = None
-) -> Path:
-    """Telecharge l'artefact et verifie sa somme. Rend le chemin local."""
-    platform = platform or sys.platform
+def _download_update_asset(release, platform):
     asset = platform_asset(release, platform)
     if asset is None:
         raise UpdateError("aucun paquet pour cette plateforme")
+    return asset
+
+
+# fmt: off
+def download_update(release: Release, directory: Path, *, platform: str | None = None) -> Path:
+    """Telecharge l'artefact et verifie sa somme. Rend le chemin local."""
+    platform = platform or sys.platform
+    asset = _download_update_asset(release, platform)
     target = directory / asset.name
     download(asset.url, target)
     checksums_asset = release.asset(CHECKSUMS_NAME)
-    if checksums_asset is None:
-        raise UpdateError("sommes de controle absentes de la release")
+    if checksums_asset is None: raise UpdateError("sommes de controle absentes de la release")
     sums_path = download(checksums_asset.url, directory / CHECKSUMS_NAME)
-    checksums = parse_checksums(sums_path.read_text(encoding="utf-8"))
-    verify_checksum(target, checksums)
+    verify_checksum(target, parse_checksums(sums_path.read_text(encoding="utf-8")))
     return target
+# fmt: on

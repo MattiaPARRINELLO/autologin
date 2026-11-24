@@ -155,6 +155,7 @@ STATUS_HTML = """<!doctype html>
       <div class="event-row"><span>Démarré le</span><strong id="startedAt">-</strong></div>
       <div class="event-row"><span>Dernière détection</span><strong id="lastDetection">-</strong></div>
       <div class="event-row"><span>Dernière signature</span><strong id="lastSigned">-</strong></div>
+      <div class="event-row"><span>Dernière erreur</span><strong id="lastError">-</strong></div>
     </div>
 
     <div class="actions">
@@ -216,6 +217,13 @@ function render(snapshot) {
   document.getElementById("stateLabel").textContent = snapshot.label;
 
   let detail = "";
+  if (snapshot.mode === "error" && snapshot.last_error_message) {
+    detail = snapshot.last_error_message;
+    if (snapshot.last_error_at) {
+      detail += " (" + formatDate(snapshot.last_error_at) + ")";
+    }
+    detail += " ";
+  }
   if (snapshot.window) detail += "Créneau " + snapshot.window + ". ";
   if (snapshot.next_window) detail += "Prochaine ouverture " + formatDate(snapshot.next_window) + ".";
   if (!snapshot.schedule.enabled) detail = "Le planning est désactivé, la surveillance est continue.";
@@ -250,6 +258,7 @@ function render(snapshot) {
   document.getElementById("startedAt").textContent = formatDate(snapshot.started_at);
   document.getElementById("lastDetection").textContent = formatDate(snapshot.last_detection_at);
   document.getElementById("lastSigned").textContent = formatDate(snapshot.last_signed_at);
+  document.getElementById("lastError").textContent = formatDate(snapshot.last_error_at);
 }
 
 async function refresh() {

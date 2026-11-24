@@ -2,10 +2,11 @@ from __future__ import annotations
 
 from checkmate_watcher.browser import (
     LaunchOptions,
+    bundled_browser_present,
+    bundled_chromium_path,
     platform_channel,
     resolve_launch_options,
 )
-from checkmate_watcher.config import WatcherConfig
 
 
 class FakeBrowserType:
@@ -17,14 +18,9 @@ class FakeBrowserType:
         return self._executable_path
 
 
-def make_config(executable_path: str | None = None):
-    return type("C", (), {"watcher": WatcherConfig(executable_path=executable_path)})()
-
-
 def test_la_config_a_la_priorite():
-    config = make_config("/opt/chrome")
     options = resolve_launch_options(
-        FakeBrowserType("/absent"), config, platform="linux"
+        FakeBrowserType("/absent"), "/opt/chrome", platform="linux"
     )
     assert options == LaunchOptions(executable_path="/opt/chrome")
 
@@ -32,10 +28,7 @@ def test_la_config_a_la_priorite():
 def test_utilise_le_bundle_quand_il_existe(tmp_path):
     bundled = tmp_path / "chrome"
     bundled.write_text("")
-    config = make_config()
-    options = resolve_launch_options(
-        FakeBrowserType(str(bundled)), config, platform="linux"
-    )
+    options = resolve_launch_options(FakeBrowserType(str(bundled)), platform="linux")
     assert options == LaunchOptions()
 
 
@@ -43,20 +36,31 @@ def test_bascule_sur_le_chromium_systeme(monkeypatch):
     monkeypatch.setattr(
         "checkmate_watcher.browser.system_chromium", lambda: "/usr/bin/chromium"
     )
-    config = make_config()
     options = resolve_launch_options(
-        FakeBrowserType("/absent/chrome"), config, platform="linux"
+        FakeBrowserType("/absent/chrome"), platform="linux"
     )
     assert options == LaunchOptions(executable_path="/usr/bin/chromium")
 
 
 def test_aucun_navigateur_disponible(monkeypatch):
     monkeypatch.setattr("checkmate_watcher.browser.system_chromium", lambda: None)
-    config = make_config()
     options = resolve_launch_options(
-        FakeBrowserType("/absent/chrome"), config, platform="linux"
+        FakeBrowserType("/absent/chrome"), platform="linux"
     )
     assert options == LaunchOptions()
+
+
+def test_bundled_chromium_path_trouve_le_binaire(tmp_path):
+    binary = tmp_path / "chromium-1234" / "chrome-linux" / "chrome"
+    binary.parent.mkdir(parents=True)
+    binary.write_text("")
+    assert bundled_chromium_path("linux", tmp_path) == str(binary)
+    assert bundled_browser_present("linux", tmp_path) is True
+
+
+def test_bundled_chromium_path_absent(tmp_path):
+    assert bundled_chromium_path("linux", tmp_path) is None
+    assert bundled_browser_present("linux", tmp_path) is False
 
 
 def test_windows_choisit_edge_ou_chrome():

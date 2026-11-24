@@ -1,0 +1,51 @@
+name: PR title
+
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  title:
+    name: PR title
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verifier le format du titre
+        env:
+          TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          pattern='^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([a-z0-9._/-]+\))?!?: .+'
+          if [[ ! "$TITLE" =~ $pattern ]]; then
+            echo "::error::Le titre doit suivre le format conventionnel, par exemple : feat: ajoute un canal beta"
+            echo "Prefixes autorises : feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert."
+            exit 1
+          fi
+          echo "Titre valide : $TITLE"
+
+      - name: Etiqueter la pull request avec son type
+        # Un jeton de `pull_request` est en lecture seule sur une PR de fork :
+        # le labelling est reserve aux branches du depot.
+        if: github.event.pull_request.head.repo.full_name == github.repository
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          types="feat fix docs style refactor perf test build ci chore revert"
+          type="$(sed -E "s/^(${types// /|})(\([a-z0-9._/-]+\))?!?: .*/\1/" <<< "$TITLE")"
+          # `gh label create` ecraserait couleur et description d'un label existant.
+          if ! gh label list --limit 100 --json name --jq '.[].name' | grep -qx "$type"; then
+            gh label create "$type" > /dev/null
+          fi
+          for autre in $types; do
+            if [ "$autre" != "$type" ]; then
+              gh pr edit "$PR" --remove-label "$autre" > /dev/null 2>&1 || true
+            fi
+          done
+          gh pr edit "$PR" --add-label "$type" > /dev/null
+          echo "Label de type applique : $type"

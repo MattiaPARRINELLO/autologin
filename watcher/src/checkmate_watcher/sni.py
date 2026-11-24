@@ -13,8 +13,32 @@ import logging
 import os
 import threading
 from collections.abc import Callable
+from types import SimpleNamespace
 
 logger = logging.getLogger(__name__)
+
+try:
+    from dbus_next.constants import PropertyAccess
+    from dbus_next.service import ServiceInterface, dbus_property, method, signal
+
+    HAS_DBUS = True
+except Exception:  # dependance optionnelle hors Linux
+    HAS_DBUS = False
+    PropertyAccess = SimpleNamespace(READ=1)
+
+    def dbus_property(**kwargs):
+        def decorate(fn):
+            return fn
+
+        return decorate
+
+    method = dbus_property
+    signal = dbus_property
+
+    class ServiceInterface:
+        def __init__(self, name: str) -> None:
+            self._name = name
+
 
 BUS_NAME = "org.kde.StatusNotifierItem"
 WATCHER_NAME = "org.kde.StatusNotifierWatcher"
@@ -29,11 +53,7 @@ MenuItem = tuple[str, Callable[[], None]] | None
 def available() -> bool:
     if not os.environ.get("DBUS_SESSION_BUS_ADDRESS"):
         return False
-    try:
-        import dbus_next  # noqa: F401
-    except Exception:  # noqa: BLE001 - dependance optionnelle hors Linux
-        return False
-    return True
+    return HAS_DBUS
 
 
 def _argb32(image) -> bytes:
@@ -47,19 +67,17 @@ def _argb32(image) -> bytes:
     return bytes(data)
 
 
-def pixmaps(image, sizes: tuple[int, ...] = (64, 32)) -> list:
-    """Prepare les pixmaps attendus par IconPixmap : (largeur, hauteur, ARGB32)."""
+def _framed(image, size: int):
     from PIL import Image
 
-    result = []
-    for size in sizes:
-        scaled = (
-            image
-            if image.size == (size, size)
-            else image.resize((size, size), Image.LANCZOS)
-        )
-        result.append([size, size, _argb32(scaled)])
-    return result
+    if image.size == (size, size):
+        return image
+    return image.resize((size, size), Image.LANCZOS)
+
+
+def pixmaps(image, sizes: tuple[int, ...] = (64, 32)) -> list:
+    """Prepare les pixmaps attendus par IconPixmap : (largeur, hauteur, ARGB32)."""
+    return [[size, size, _argb32(_framed(image, size))] for size in sizes]
 
 
 class _Item:
@@ -81,29 +99,30 @@ class MenuModel:
     def __init__(self, items: list[MenuItem]) -> None:
         self.entries: list[dict] = []
         self.actions: dict[int, Callable[[], None]] = {}
-        identifier = 0
         for item in items:
-            identifier += 1
-            if item is None:
-                self.entries.append({"id": identifier, "type": "separator"})
-                continue
-            label, action = item
-            self.actions[identifier] = action
-            self.entries.append({"id": identifier, "type": "item", "label": label})
+            self._add(item)
 
-    def properties(self, entry: dict) -> dict:
+    def _add(self, item: MenuItem | None) -> None:
+        identifier = len(self.entries) + 1
+        if item is None:
+            self.entries.append({"id": identifier, "type": "separator"})
+            return
+        label, action = item
+        self.actions[identifier] = action
+        self.entries.append({"id": identifier, "type": "item", "label": label})
+
+    def _variant(self, **props) -> dict:
         from dbus_next import Variant
 
-        if entry["type"] == "separator":
-            return {
-                "type": Variant("s", "separator"),
-                "visible": Variant("b", True),
-            }
         return {
-            "label": Variant("s", entry["label"]),
-            "enabled": Variant("b", True),
-            "visible": Variant("b", True),
+            key: Variant("b" if isinstance(value, bool) else "s", value)
+            for key, value in props.items()
         }
+
+    def properties(self, entry: dict) -> dict:
+        if entry["type"] == "separator":
+            return self._variant(type="separator", visible=True)
+        return self._variant(label=entry["label"], enabled=True, visible=True)
 
     def children(self) -> list:
         from dbus_next import Variant
@@ -148,171 +167,173 @@ class MenuModel:
             return
         try:
             action()
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.warning("action du menu echouee : %s", exc)
 
 
+class _ItemService(ServiceInterface):
+    def __init__(self, state: _Item, activate: Callable[[], None]) -> None:
+        super().__init__(BUS_NAME)
+        self._state = state
+        self._activate = activate
+
+    @dbus_property(access=PropertyAccess.READ)
+    def Category(self) -> "s":
+        return "ApplicationStatus"
+
+    @dbus_property(access=PropertyAccess.READ)
+    def Id(self) -> "s":
+        return "checkmate"
+
+    @dbus_property(access=PropertyAccess.READ)
+    def Title(self) -> "s":
+        return self._state.title
+
+    @dbus_property(access=PropertyAccess.READ)
+    def Status(self) -> "s":
+        return self._state.status
+
+    @dbus_property(access=PropertyAccess.READ)
+    def WindowId(self) -> "i":
+        return 0
+
+    @dbus_property(access=PropertyAccess.READ)
+    def IconName(self) -> "s":
+        return ""
+
+    @dbus_property(access=PropertyAccess.READ)
+    def IconPixmap(self) -> "a(iiay)":
+        return self._state.pixmaps
+
+    @dbus_property(access=PropertyAccess.READ)
+    def OverlayIconName(self) -> "s":
+        return ""
+
+    @dbus_property(access=PropertyAccess.READ)
+    def OverlayIconPixmap(self) -> "a(iiay)":
+        return []
+
+    @dbus_property(access=PropertyAccess.READ)
+    def AttentionIconName(self) -> "s":
+        return ""
+
+    @dbus_property(access=PropertyAccess.READ)
+    def AttentionIconPixmap(self) -> "a(iiay)":
+        return []
+
+    @dbus_property(access=PropertyAccess.READ)
+    def AttentionMovieName(self) -> "s":
+        return ""
+
+    @dbus_property(access=PropertyAccess.READ)
+    def ToolTip(self) -> "(sa(iiay)ss)":
+        return self._state.tooltip()
+
+    @dbus_property(access=PropertyAccess.READ)
+    def ItemIsMenu(self) -> "b":
+        return False
+
+    @dbus_property(access=PropertyAccess.READ)
+    def Menu(self) -> "o":
+        return MENU_PATH
+
+    @method()
+    def ContextMenu(self, x: "i", y: "i"):
+        return None
+
+    @method()
+    def Activate(self, x: "i", y: "i"):
+        self._activate()
+
+    @method()
+    def SecondaryActivate(self, x: "i", y: "i"):
+        self._activate()
+
+    @method()
+    def Scroll(self, delta: "i", orientation: "s"):
+        return None
+
+    @signal()
+    def NewIcon(self) -> "s":
+        return ""
+
+    @signal()
+    def NewTitle(self) -> "s":
+        return ""
+
+    @signal()
+    def NewStatus(self) -> "s":
+        return self._state.status
+
+    @signal()
+    def NewToolTip(self) -> "s":
+        return ""
+
+
+class _MenuService(ServiceInterface):
+    def __init__(self, model: MenuModel) -> None:
+        super().__init__("com.canonical.dbusmenu")
+        self._model = model
+        self.revision = 1
+
+    @dbus_property(access=PropertyAccess.READ)
+    def Version(self) -> "u":
+        return 3
+
+    @dbus_property(access=PropertyAccess.READ)
+    def TextDirection(self) -> "s":
+        return "ltr"
+
+    @dbus_property(access=PropertyAccess.READ)
+    def Status(self) -> "s":
+        return "normal"
+
+    @dbus_property(access=PropertyAccess.READ)
+    def IconThemePath(self) -> "as":
+        return []
+
+    @method()
+    def GetLayout(self, parent: "i", depth: "i", names: "as") -> "u(ia{sv}av)":
+        return self._model.layout(parent, self.revision)
+
+    @method()
+    def GetGroupProperties(self, ids: "ai", names: "as") -> "a(ia{sv})":
+        return self._model.group_properties(ids)
+
+    @method()
+    def GetProperty(self, id: "i", name: "s") -> "v":
+        return self._model.property(id, name)
+
+    @method()
+    def Event(self, id: "i", event: "s", data: "v", timestamp: "u"):
+        if event == "clicked":
+            self._model.click(id)
+
+    @method()
+    def EventGroup(self, events: "a(isvu)"):
+        return None
+
+    @method()
+    def AboutToShow(self, id: "i") -> "b":
+        return False
+
+    @method()
+    def AboutToShowGroup(self, ids: "ai") -> "aiai":
+        return [[], []]
+
+    @signal()
+    def LayoutUpdated(self, revision: "u", parent: "i") -> "ui":
+        return [revision, parent]
+
+    @signal()
+    def ItemsPropertiesUpdated(
+        self, updated: "a(ia{sv})", removed: "a(ias)"
+    ) -> "a(ia{sv})a(ias)":
+        return [[], []]
+
+
 def _build_services(state: _Item, model: MenuModel, activate: Callable):
-    from dbus_next.constants import PropertyAccess
-    from dbus_next.service import ServiceInterface, dbus_property, method, signal
-
-    class Item(ServiceInterface):
-        def __init__(self) -> None:
-            super().__init__(BUS_NAME)
-
-        @dbus_property(access=PropertyAccess.READ)
-        def Category(self) -> "s":
-            return "ApplicationStatus"
-
-        @dbus_property(access=PropertyAccess.READ)
-        def Id(self) -> "s":
-            return "checkmate"
-
-        @dbus_property(access=PropertyAccess.READ)
-        def Title(self) -> "s":
-            return state.title
-
-        @dbus_property(access=PropertyAccess.READ)
-        def Status(self) -> "s":
-            return state.status
-
-        @dbus_property(access=PropertyAccess.READ)
-        def WindowId(self) -> "i":
-            return 0
-
-        @dbus_property(access=PropertyAccess.READ)
-        def IconName(self) -> "s":
-            return ""
-
-        @dbus_property(access=PropertyAccess.READ)
-        def IconPixmap(self) -> "a(iiay)":
-            return state.pixmaps
-
-        @dbus_property(access=PropertyAccess.READ)
-        def OverlayIconName(self) -> "s":
-            return ""
-
-        @dbus_property(access=PropertyAccess.READ)
-        def OverlayIconPixmap(self) -> "a(iiay)":
-            return []
-
-        @dbus_property(access=PropertyAccess.READ)
-        def AttentionIconName(self) -> "s":
-            return ""
-
-        @dbus_property(access=PropertyAccess.READ)
-        def AttentionIconPixmap(self) -> "a(iiay)":
-            return []
-
-        @dbus_property(access=PropertyAccess.READ)
-        def AttentionMovieName(self) -> "s":
-            return ""
-
-        @dbus_property(access=PropertyAccess.READ)
-        def ToolTip(self) -> "(sa(iiay)ss)":
-            return state.tooltip()
-
-        @dbus_property(access=PropertyAccess.READ)
-        def ItemIsMenu(self) -> "b":
-            return False
-
-        @dbus_property(access=PropertyAccess.READ)
-        def Menu(self) -> "o":
-            return MENU_PATH
-
-        @method()
-        def ContextMenu(self, x: "i", y: "i"):
-            return None
-
-        @method()
-        def Activate(self, x: "i", y: "i"):
-            activate()
-
-        @method()
-        def SecondaryActivate(self, x: "i", y: "i"):
-            activate()
-
-        @method()
-        def Scroll(self, delta: "i", orientation: "s"):
-            return None
-
-        @signal()
-        def NewIcon(self) -> "s":
-            return ""
-
-        @signal()
-        def NewTitle(self) -> "s":
-            return ""
-
-        @signal()
-        def NewStatus(self) -> "s":
-            return state.status
-
-        @signal()
-        def NewToolTip(self) -> "s":
-            return ""
-
-    class Menu(ServiceInterface):
-        def __init__(self) -> None:
-            super().__init__("com.canonical.dbusmenu")
-            self.revision = 1
-
-        @dbus_property(access=PropertyAccess.READ)
-        def Version(self) -> "u":
-            return 3
-
-        @dbus_property(access=PropertyAccess.READ)
-        def TextDirection(self) -> "s":
-            return "ltr"
-
-        @dbus_property(access=PropertyAccess.READ)
-        def Status(self) -> "s":
-            return "normal"
-
-        @dbus_property(access=PropertyAccess.READ)
-        def IconThemePath(self) -> "as":
-            return []
-
-        @method()
-        def GetLayout(self, parent: "i", depth: "i", names: "as") -> "u(ia{sv}av)":
-            return model.layout(parent, self.revision)
-
-        @method()
-        def GetGroupProperties(self, ids: "ai", names: "as") -> "a(ia{sv})":
-            return model.group_properties(ids)
-
-        @method()
-        def GetProperty(self, id: "i", name: "s") -> "v":
-            return model.property(id, name)
-
-        @method()
-        def Event(self, id: "i", event: "s", data: "v", timestamp: "u"):
-            if event == "clicked":
-                model.click(id)
-
-        @method()
-        def EventGroup(self, events: "a(isvu)"):
-            return None
-
-        @method()
-        def AboutToShow(self, id: "i") -> "b":
-            return False
-
-        @method()
-        def AboutToShowGroup(self, ids: "ai") -> "aiai":
-            return [[], []]
-
-        @signal()
-        def LayoutUpdated(self, revision: "u", parent: "i") -> "ui":
-            return [revision, parent]
-
-        @signal()
-        def ItemsPropertiesUpdated(
-            self, updated: "a(ia{sv})", removed: "a(ias)"
-        ) -> "a(ia{sv})a(ias)":
-            return [[], []]
-
-    return Item(), Menu()
+    return _ItemService(state, activate), _MenuService(model)
 
 
 class SniTray:
@@ -327,10 +348,12 @@ class SniTray:
         self.state = _Item()
         self._model = MenuModel(menu_items)
         self._activate = activate
+        self._reset_transport()
+
+    def _reset_transport(self) -> None:
         self._loop: asyncio.AbstractEventLoop | None = None
         self._thread: threading.Thread | None = None
-        self._bus = None
-        self._item = None
+        self._bus = self._item = None
         self._ready = threading.Event()
         self._ok = False
 
@@ -342,16 +365,26 @@ class SniTray:
 
     def _run(self) -> None:
         try:
-            self._loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(self._loop)
+            self._loop = self._new_loop()
             self._loop.run_until_complete(self._connect())
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("icone StatusNotifierItem indisponible : %s", exc)
-            self._ok = False
-            self._ready.set()
+        except Exception as exc:
+            self._unavailable(exc)
             return
         self._ok = True
         self._ready.set()
+        self._serve()
+
+    def _new_loop(self):
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        return loop
+
+    def _unavailable(self, exc: Exception) -> None:
+        logger.warning("icone StatusNotifierItem indisponible : %s", exc)
+        self._ok = False
+        self._ready.set()
+
+    def _serve(self) -> None:
         try:
             self._loop.run_forever()
         finally:

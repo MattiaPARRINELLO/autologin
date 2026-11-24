@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, time
+from pathlib import Path
 
 import pytest
 
@@ -12,7 +13,7 @@ from checkmate_watcher.schedule import (
     parse_window,
     parse_windows,
 )
-from checkmate_watcher.state import StateStore
+from checkmate_watcher.state import StateStore, _parse_number_map
 
 WINDOWS = parse_windows(["09:00-12:00", "13:30-16:30"])
 SCHEDULE = Schedule(enabled=True, days=(0, 1, 2, 3, 4), windows=WINDOWS)
@@ -92,42 +93,42 @@ def test_state_memorise_un_creneau(tmp_path):
     assert not reloaded.window_done("2026-11-16#1")
 
 
-def test_config_lit_le_planning(tmp_path):
-    path = tmp_path / "config.toml"
-    path.write_text(
-        """
+DEF_CONFIG = """
 [cesar]
 base_url = "https://cesar.example.fr"
 username = "eleve"
 password = "secret"
 
-[schedule]
+"""
+
+
+def write_config(tmp_path, planning: str = "") -> Path:
+    path = tmp_path / "config.toml"
+    path.write_text(DEF_CONFIG + planning, encoding="utf-8")
+    return path
+
+
+def test_config_lit_le_planning(tmp_path):
+    planning = """[schedule]
 enabled = true
 days = ["mon", "tue"]
 windows = ["09:00-12:00", "13:30-16:30"]
-""",
-        encoding="utf-8",
-    )
-    config = load_config(path)
+"""
+    config = load_config(write_config(tmp_path, planning))
     assert config.schedule.enabled is True
     assert config.schedule.days == (0, 1)
     assert len(config.schedule.windows) == 2
 
 
 def test_config_refuse_un_planning_invalide(tmp_path):
-    path = tmp_path / "config.toml"
-    path.write_text(
-        """
-[cesar]
-base_url = "https://cesar.example.fr"
-username = "eleve"
-password = "secret"
-
-[schedule]
+    planning = """[schedule]
 enabled = true
 windows = ["09:00-12:00", "11:00-13:00"]
-""",
-        encoding="utf-8",
-    )
+"""
     with pytest.raises(ConfigError):
-        load_config(path)
+        load_config(write_config(tmp_path, planning))
+
+
+def test_parse_number_map_filtre_les_valeurs_non_numeriques():
+    value = {"a": 1, "b": 2.5, "c": "x", 7: 3}
+    assert _parse_number_map(value) == {"a": 1.0, "b": 2.5, "7": 3.0}

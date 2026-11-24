@@ -17,9 +17,9 @@ jobs:
         working-directory: watcher
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: astral-sh/setup-uv@v6
+      - uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
 
@@ -34,3 +34,93 @@ jobs:
 
       - name: Tests
         run: uv run pytest -q
+
+  lock:
+    name: Lockfile (uv)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: watcher
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Verifier uv.lock
+        run: uv lock --check
+
+  docs:
+    name: Docs versions
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Verifier qu'aucune version figee ne reste
+        run: python3 scripts/check_doc_versions.py
+
+  stats:
+    name: Collecteur de stats
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+
+      - name: Tests
+        run: python -m unittest discover -s stats/tests -v
+
+  ui:
+    name: UI Rust
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ui
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Dependances systeme
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libxkbcommon-dev libwayland-dev
+
+      - name: Format
+        run: cargo fmt --check
+
+      - name: Clippy
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: Tests
+        run: cargo test
+
+  e2e:
+    name: E2E emulateur
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: watcher
+    env:
+      CHECKMATE_E2E: "1"
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Verifier Chromium
+        run: command -v google-chrome || command -v chromium
+
+      - name: Installer les dependances
+        run: uv sync
+
+      - name: Test de bout en bout
+        run: uv run pytest -q -rs tests/test_emulator_e2e.py

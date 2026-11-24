@@ -9,6 +9,15 @@ présence, et la signature est rejouée automatiquement.
 Pendant l'attente, aucun navigateur visible. Une fenêtre s'ouvre uniquement au
 moment de signer, puis se referme.
 
+> **Avertissement.** CheckMate signe uniquement **ta** présence, pour un cours
+> auquel tu assistes réellement. Ne l'utilise pas pour falsifier une présence :
+> signer pour un cours auquel tu n'assistes pas, ou à la place de quelqu'un
+> d'autre, est un usage détourné. L'auteur n'est pas responsable de ce qui est
+> fait avec le logiciel. Le projet n'est ni affilié à CESAR, ni à Emineo
+> Education, ni à ton établissement ; CESAR et Emineo sont des marques
+> d'Emineo Education et de leurs titulaires respectifs. Détails dans les
+> [mentions légales](mentions-legales.md).
+
 ## Prérequis
 
 - Windows 10 ou 11, ou une distribution Linux avec systemd.
@@ -52,9 +61,9 @@ GTK 3 et WebKit2 sont installés. Sinon, il s'ouvre dans le navigateur.
 1. **Mise en route** : ce que fait CheckMate et ce qui reste sur l'ordinateur.
 2. **Connexion CESAR** : identifiant et mot de passe, avec un test de connexion
    réel dans un navigateur invisible.
-3. **Signature** : dessin à la souris ou au doigt. Si tu utilisais l'extension,
-   clique sur "Exporter" dans sa section Signature, puis "Importer le JSON"
-   dans l'assistant.
+3. **Signature** : dessin à la souris ou au doigt. Tu peux aussi importer une
+   signature déjà existante au format JSON (liste de points x/y) via le bouton
+   "Importer le JSON".
 4. **Planning** : jours et créneaux surveillés. Par défaut, du lundi au vendredi,
    09:00-12:00 et 13:30-16:30.
 5. **Finition** : test de notification, démarrage automatique, récapitulatif.
@@ -205,6 +214,19 @@ autre choix à faire. Pour revenir aux versions stables, remets
 L'ancienne clé `include_prerelease = true` reste acceptée et équivaut à
 `channel = "beta"` si `channel` est absent.
 
+### Désactiver les statistiques anonymes
+
+CheckMate compte les installations et les signatures avec un identifiant
+aléatoire, sans aucune donnée CESAR. Pour couper ces envois :
+
+```toml
+[analytics]
+enabled = false
+```
+
+ou lance l'application avec `CHECKMATE_ANALYTICS=0`. Voir la
+[page vie privée](vie-privee.md).
+
 ## Limites
 
 - La machine doit être allumée et la session ouverte. En veille, la reprise est
@@ -213,5 +235,6 @@ L'ancienne clé `include_prerelease = true` reste acceptée et équivaut à
   automatique échouera et le self-test le signalera.
 - Une mise à jour de CESAR peut casser les sélecteurs. Les logs indiquent alors
   qu'aucun bouton n'est trouvé.
-- CheckMate signe à ta place, avec ta signature. Tu restes responsable de son
-  usage.
+- CheckMate signe à ta place, avec ta signature, uniquement si tu es présent.
+  Ne l'utilise pas pour falsifier une présence : l'auteur n'est pas responsable
+  de ce qui est fait avec le logiciel.

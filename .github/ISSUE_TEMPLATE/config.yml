@@ -1,0 +1,17 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Poser une question d'usage
+    url: https://github.com/MattiaPARRINELLO/autologin/issues/new?template=question.yml
+    about: Installation, configuration, dépannage. Les Discussions ne sont pas activées.
+  - name: Politique de sécurité
+    url: https://github.com/MattiaPARRINELLO/autologin/security/policy
+    about: Signaler une faille en privé, sans ouvrir d'issue publique.
+  - name: Guide utilisateur
+    url: https://github.com/MattiaPARRINELLO/autologin/blob/main/watcher/docs/guide-utilisateur.md
+    about: Installation, configuration, mise à jour et dépannage.
+  - name: Guide de contribution
+    url: https://github.com/MattiaPARRINELLO/autologin/blob/main/CONTRIBUTING.md
+    about: Branches, tests, conventions de commit et procédure de PR.
+  - name: Support
+    url: https://github.com/MattiaPARRINELLO/autologin/blob/main/SUPPORT.md
+    about: Canaux de support, versions et historique des releases.

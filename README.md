@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="icons/icon128.png" alt="CheckMate" width="96" />
+  <img src="watcher/assets/checkmate.png" alt="CheckMate" width="96" />
   <h1>CheckMate</h1>
   <p><strong>Surveille CESAR et signe l'émargement sans y penser.</strong></p>
 
@@ -7,10 +7,10 @@
   ![Windows](https://img.shields.io/badge/Windows-10%20%2F%2011-0078D4)
   ![Linux](https://img.shields.io/badge/Linux-systemd-FCC624)
   ![Licence](https://img.shields.io/badge/licence-MIT-green)
-  ![Tests](https://img.shields.io/badge/tests-85%20passing-brightgreen)
-  ![Statut](https://img.shields.io/badge/statut-pr%C3%A9--version-orange)
+  ![CI](https://github.com/MattiaPARRINELLO/autologin/actions/workflows/ci.yml/badge.svg)
+  ![Version stable](https://img.shields.io/github/v/release/MattiaPARRINELLO/autologin?label=version%20stable&color=brightgreen)
 
-  [Télécharger](https://github.com/MattiaPARRINELLO/autologin/releases/tag/watcher-v0.5.1) ·
+  [Télécharger](https://github.com/MattiaPARRINELLO/autologin/releases/latest) ·
   [Documentation](watcher/docs/README.md) ·
   [Présentation](watcher/presentation/index.html) ·
   [Vie privée](PRIVACY.md)
@@ -69,10 +69,16 @@ CheckMate ne prend pas de décision à ta place.
 - il ne connaît pas tes notes, tes absences ou tes justificatifs
 - il ne contourne pas un captcha ou une double authentification
 - il ne fonctionne pas si l'ordinateur est éteint
+- il ne sert pas à falsifier une présence : tu dois être réellement présent au
+  cours et signer uniquement pour toi
 - il n'est pas affilié à CESAR, Emineo Education ou ton établissement
 
-Tu restes responsable de l'usage de ta signature et du respect des règles de ton
-école.
+CESAR et Emineo sont des noms et des marques appartenant à Emineo Education et à
+leurs titulaires respectifs, cités uniquement pour décrire l'interopérabilité du
+logiciel. L'auteur n'est pas responsable de ce qui est fait avec CheckMate ni des
+conséquences qui en découlent. Tu restes seul responsable de l'usage de ta
+signature et du respect des règles de ton école. Voir les
+[mentions légales](watcher/docs/mentions-legales.md).
 
 ## Installation sur Windows
 
@@ -84,9 +90,10 @@ Tu restes responsable de l'usage de ta signature et du respect des règles de to
 
 ### Les étapes
 
-1. Va sur la page de la version :
-   [CheckMate desktop 0.5.1](https://github.com/MattiaPARRINELLO/autologin/releases/tag/watcher-v0.5.1).
-2. Télécharge `CheckMate-Setup-0.5.1.exe`.
+1. Va sur la page de la dernière version stable :
+   [CheckMate desktop](https://github.com/MattiaPARRINELLO/autologin/releases/latest).
+2. Télécharge `CheckMate-Setup-<version>.exe`, en remplaçant `<version>` par le
+   numéro affiché sur la page des releases.
 3. Lance l'installeur. Il s'installe dans ton dossier utilisateur, sans demander
    les droits administrateur.
 4. Windows peut afficher un avertissement SmartScreen. C'est normal tant que la
@@ -165,8 +172,9 @@ la signature de code, pour ne pas exécuter un binaire non signé.
 ### Les étapes
 
 ```bash
-tar -xzf CheckMate-linux-0.5.1.tar.gz
-cd CheckMate-linux-0.5.1
+# remplace <version> par le numero affiche sur la page des releases
+tar -xzf CheckMate-linux-<version>.tar.gz
+cd CheckMate-linux-<version>
 ./install.sh
 ```
 
@@ -196,8 +204,8 @@ accepte la connexion avant d'enregistrer quoi que ce soit.
 Tu dessines ta signature à la souris ou au doigt. Elle sera rejouée à
 l'identique dans le canvas de CESAR.
 
-Si tu utilisais l'ancienne extension Chrome, tu peux cliquer sur "Exporter"
-dans sa section Signature, puis importer le fichier JSON dans l'assistant.
+Tu peux aussi importer une signature déjà existante au format JSON (liste de
+points x/y) via le bouton "Importer le JSON".
 
 ### 4. Planning
 
@@ -272,6 +280,11 @@ notification du bureau, avec une fenêtre de confirmation.
 **Important** : coupe le mode silencieux et le mode "Ne pas déranger" avant de
 tester. Windows peut envoyer le toast sans l'afficher. L'assistant te demande de
 confirmer que tu l'as bien vu avant de terminer la configuration.
+
+Sur Windows, la notification s'affiche sous le nom "CheckMate" (pas "Windows
+PowerShell"). Si tu ne la vois pas, vérifie deux réglages : le mode "Ne pas
+déranger" et l'interrupteur "CheckMate" dans Paramètres > Système >
+Notifications.
 
 La confirmation est volontaire. CheckMate ne signe pas dans ton dos. Si tu
 veux tester, l'assistant propose un bouton "Tester la notification".
@@ -366,6 +379,25 @@ Les sélecteurs sont configurables, mais une grosse mise à jour de CESAR peut
 nécessiter une mise à jour de CheckMate. Les logs indiquent alors qu'aucun
 bouton n'a été trouvé.
 
+### Pourquoi un autre navigateur s'ouvre-t-il au moment de signer ?
+
+C'est normal. Pour signer, CheckMate a besoin de piloter lui-même un
+navigateur : il remplit le formulaire CESAR, reproduit la signature puis ferme
+la fenêtre. Cela passe par Chromium, le seul moteur que l'automatisation
+utilise ici, avec un profil dédié à CheckMate. Ton navigateur par défaut et ton
+profil personnel ne sont donc ni ouverts ni modifiés.
+
+Si plusieurs Chromium sont installés, tu peux imposer celui qui s'ouvre :
+
+```toml
+[watcher]
+executable_path = "/usr/bin/chromium"
+```
+
+Le tableau de bord et l'assistant ne sont pas concernés : ils s'affichent dans
+une fenêtre CheckMate native. `CHECKMATE_BROWSER=1` force leur ouverture dans
+le navigateur par défaut.
+
 ### Est-ce que je peux utiliser plusieurs comptes CESAR ?
 
 Une installation correspond à un compte. Pour un autre compte, il faut une
@@ -403,13 +435,21 @@ rm -rf ~/.config/checkmate-watcher
 
 ## État du projet
 
-- Version actuelle : **0.5.1**, version publique.
+- Version stable actuelle : celle du badge **version stable** en haut de ce
+  README et de la
+  [page des releases](https://github.com/MattiaPARRINELLO/autologin/releases/latest).
+  Les mises à jour suivent le canal `stable` par défaut ; le canal `beta` reçoit
+  les préversions.
+- macOS : **pas encore supporté**. Le code contient des chemins `darwin`, mais
+  il n'existe ni release, ni démarrage automatique (`launchd` prévu), ni
+  validation réelle. Ne l'installe pas en pensant que c'est pris en charge.
 - Validation Windows effectuée sur un runner GitHub Actions : bundle,
   connexion, signature, toast, Credential Manager, tâche planifiée et
   installeur.
 - Vérification visuelle du toast et de l'installeur sur un Windows réel :
   à faire.
-- Signature de code Windows : dossier SignPath en cours.
+- Signature de code Windows : dossier SignPath en cours. Tant qu'elle n'est pas
+  active, l'installeur publié n'est pas signé.
 
 ## Documentation
 
@@ -422,10 +462,33 @@ rm -rf ~/.config/checkmate-watcher
 - [Branchement SignPath](watcher/docs/signpath-setup.md)
 - [Présentation HTML](watcher/presentation/index.html)
 
-## Pour les développeurs
+## Périmètre et statut des surfaces
 
-Le code de l'application est dans [`watcher/`](watcher/). Le README technique
-explique l'architecture, les tests, l'émulateur CESAR et les builds.
+Le dépôt contient plusieurs surfaces, avec des statuts différents :
+
+| Surface | Contenu | Statut |
+|---------|---------|--------|
+| [`watcher/`](watcher/) | application Python, CLI et tableau de bord local | maintenue, produit publié |
+| [`emulator/`](emulator/) | serveur CESAR de test | maintenue, outil de test |
+| [`ui/`](ui/) | tableau de bord expérimental en Rust (egui) | expérimentale, hors release |
+
+L'application de bureau (`watcher/`) est le seul produit publié. `ui/` explore
+une interface native alternative ; elle n'est pas livrée avec les releases et
+peut casser sans préavis.
+
+## Architecture du watcher
+
+Le code de l'application est dans [`watcher/`](watcher/). Son architecture est
+décrite dans [watcher/docs/architecture.md](watcher/docs/architecture.md) : carte
+des modules, déroulé d'un cycle de surveillance, état persistant, tableau de
+bord, onboarding et mises à jour.
+
+En résumé, `watcher.py` porte la boucle, `cesar.py` pilote CESAR avec Playwright,
+`browser.py` choisit le navigateur, `schedule.py` décide des créneaux,
+`status_server.py` et `setup_server.py` servent les interfaces locales, et
+`self_update.py` installe les mises à jour vérifiées.
+
+## Développement
 
 ```bash
 cd watcher
@@ -441,14 +504,10 @@ cd watcher
 uv run checkmate-watcher --config ../emulator/watcher.toml run -v
 ```
 
-## Ancienne extension Chrome
-
-Le dépôt contient encore l'extension historique à la racine (`manifest.json`,
-`popup.html`, `content.js`, `background.js`). Elle automatise le pointage dans
-un onglet CESAR.
-
-L'application de bureau la remplace : elle ne nécessite aucun onglet ouvert et
-garde le navigateur invisible pendant l'attente.
+Pour contribuer, lire [CONTRIBUTING.md](CONTRIBUTING.md) : environnement,
+conventions de commit, checks obligatoires et cycle de release. Le projet suit
+le [code de conduite](CODE_OF_CONDUCT.md). Pour une faille de sécurité, utiliser
+la [politique de sécurité](SECURITY.md), sans issue publique.
 
 ## Licence
 

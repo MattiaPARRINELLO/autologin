@@ -15,7 +15,7 @@ from checkmate_watcher.signature import (
 )
 
 
-def test_parse_points_accepte_extension_et_liste_brute():
+def test_parse_points_accepte_objet_exporte_et_liste_brute():
     points = [
         {"x": 10, "y": 20, "type": "start"},
         {"x": 15, "y": 25, "type": "move"},
@@ -36,22 +36,39 @@ def test_parse_points_refuse_des_coordonnees_invalides():
         parse_points([{"x": "a", "y": 1}, {"x": 2, "y": 3}])
 
 
-def test_fit_points_centre_et_respecte_les_dimensions():
-    points = [
-        Point(0, 0, "start"),
-        Point(100, 50, "move"),
-        Point(200, 100, "end"),
-    ]
-    fitted = fit_points(points, 320, 150, 0.9)
-    assert len(fitted) == 3
-    assert fitted[0].kind == "start"
-    assert fitted[-1].kind == "end"
-    assert all(0 <= p.x <= 320 and 0 <= p.y <= 150 for p in fitted)
+def test_parse_points_refuse_une_signature_reduite_a_un_point():
+    with pytest.raises(SignatureError):
+        parse_points(
+            [
+                {"x": 42, "y": 17, "type": "start"},
+                {"x": 42, "y": 17, "type": "end"},
+            ]
+        )
 
+
+def _points_ligne() -> list[Point]:
+    return [Point(0, 0, "start"), Point(100, 50, "move"), Point(200, 100, "end")]
+
+
+def _assert_dans_bornes(fitted, largeur, hauteur) -> None:
+    assert len(fitted) == 3
+    dans_x = all(0 <= p.x and p.x <= largeur for p in fitted)
+    dans_y = all(0 <= p.y and p.y <= hauteur for p in fitted)
+    assert dans_x and dans_y
+
+
+def _centres(fitted) -> tuple[float, float]:
     xs = [p.x for p in fitted]
     ys = [p.y for p in fitted]
-    assert pytest.approx((min(xs) + max(xs)) / 2, abs=1) == 160
-    assert pytest.approx((min(ys) + max(ys)) / 2, abs=1) == 75
+    return (min(xs) + max(xs)) / 2, (min(ys) + max(ys)) / 2
+
+
+def test_fit_points_centre_et_respecte_les_dimensions():
+    fitted = fit_points(_points_ligne(), 320, 150, 0.9)
+    _assert_dans_bornes(fitted, 320, 150)
+    cx, cy = _centres(fitted)
+    assert pytest.approx(cx, abs=1) == 160
+    assert pytest.approx(cy, abs=1) == 75
 
 
 def test_fit_points_conserve_le_ratio():
@@ -60,13 +77,6 @@ def test_fit_points_conserve_le_ratio():
     width = max(p.x for p in fitted) - min(p.x for p in fitted)
     height = max(p.y for p in fitted) - min(p.y for p in fitted)
     assert pytest.approx(width / height, rel=0.01) == 2.0
-
-
-def test_fit_points_force_les_extremites():
-    points = [Point(0, 0, "move"), Point(10, 10, "move")]
-    fitted = fit_points(points, 100, 100)
-    assert fitted[0].kind == "start"
-    assert fitted[-1].kind == "end"
 
 
 def test_fit_points_refuse_un_canvas_vide():

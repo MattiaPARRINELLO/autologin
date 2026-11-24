@@ -1,0 +1,15 @@
+services:
+  checkmate-stats:
+    build: .
+    container_name: checkmate-stats
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - ./data:/data
+    networks:
+      - homarr
+
+networks:
+  homarr:
+    external: true
+    name: homarr_homarr_net

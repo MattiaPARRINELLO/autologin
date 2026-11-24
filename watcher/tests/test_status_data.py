@@ -24,18 +24,20 @@ def make_config(tmp_path, *, enabled=True):
     )
 
 
+def make_state(tmp_path):
+    return StateStore(tmp_path / "state.json")
+
+
+def snapshot_at(tmp_path, state, started, now, *, enabled=True):
+    config = make_config(tmp_path, enabled=enabled)
+    return build_snapshot(config, state, started, tmp_path / "config.toml", now=now)
+
+
 def test_snapshot_surveillance_active(tmp_path):
-    config = make_config(tmp_path)
-    state = StateStore(tmp_path / "state.json")
+    state = make_state(tmp_path)
     state.increment("stats.detections", 3)
     started = datetime(2026, 11, 16, 9, 55)
-    snapshot = build_snapshot(
-        config,
-        state,
-        started,
-        tmp_path / "config.toml",
-        now=datetime(2026, 11, 16, 10, 0),
-    )
+    snapshot = snapshot_at(tmp_path, state, started, datetime(2026, 11, 16, 10, 0))
     assert snapshot["mode"] == "active"
     assert snapshot["label"] == "Surveillance active"
     assert snapshot["window"] == "09:00-12:00"
@@ -44,29 +46,22 @@ def test_snapshot_surveillance_active(tmp_path):
 
 
 def test_snapshot_creneau_signe(tmp_path):
-    config = make_config(tmp_path)
-    state = StateStore(tmp_path / "state.json")
+    state = make_state(tmp_path)
     state.mark_window("2026-11-16#0", now=1000)
-    snapshot = build_snapshot(
-        config,
+    snapshot = snapshot_at(
+        tmp_path,
         state,
         datetime(2026, 11, 16, 9, 55),
-        tmp_path / "config.toml",
-        now=datetime(2026, 11, 16, 10, 0),
+        datetime(2026, 11, 16, 10, 0),
     )
     assert snapshot["mode"] == "signed"
     assert snapshot["label"] == "Créneau signé"
 
 
 def test_snapshot_hors_creneau(tmp_path):
-    config = make_config(tmp_path)
-    state = StateStore(tmp_path / "state.json")
-    snapshot = build_snapshot(
-        config,
-        state,
-        datetime(2026, 11, 16, 8, 0),
-        tmp_path / "config.toml",
-        now=datetime(2026, 11, 16, 8, 30),
+    state = make_state(tmp_path)
+    snapshot = snapshot_at(
+        tmp_path, state, datetime(2026, 11, 16, 8, 0), datetime(2026, 11, 16, 8, 30)
     )
     assert snapshot["mode"] == "outside"
     assert snapshot["window"] is None
@@ -74,34 +69,20 @@ def test_snapshot_hors_creneau(tmp_path):
 
 
 def test_snapshot_planning_desactive(tmp_path):
-    config = make_config(tmp_path, enabled=False)
-    state = StateStore(tmp_path / "state.json")
-    snapshot = build_snapshot(
-        config,
-        state,
-        datetime(2026, 11, 16, 8, 0),
-        tmp_path / "config.toml",
-        now=datetime(2026, 11, 16, 3, 0),
-    )
+    state = make_state(tmp_path)
+    started, now = datetime(2026, 11, 16, 8, 0), datetime(2026, 11, 16, 3, 0)
+    snapshot = snapshot_at(tmp_path, state, started, now, enabled=False)
     assert snapshot["mode"] == "active"
     assert snapshot["window"] is None
 
 
 def test_snapshot_derniere_signature_et_redemarrage(tmp_path):
-    config = make_config(tmp_path)
-    state = StateStore(tmp_path / "state.json")
+    state = make_state(tmp_path)
     state.set_meta("last_signed_at", "2026-11-16T09:58:00")
     state.set_meta("last_error_at", "2026-11-16T09:00:00")
-    config_path = tmp_path / "config.toml"
-    config_path.write_text("x", encoding="utf-8")
-    started = datetime(2026, 11, 16, 9, 0)
-
-    snapshot = build_snapshot(
-        config,
-        state,
-        started,
-        config_path,
-        now=datetime(2026, 11, 16, 10, 0),
+    (tmp_path / "config.toml").write_text("x", encoding="utf-8")
+    snapshot = snapshot_at(
+        tmp_path, state, datetime(2026, 11, 16, 9, 0), datetime(2026, 11, 16, 10, 0)
     )
     assert snapshot["last_signed_at"] == "2026-11-16T09:58:00"
     assert snapshot["restart_required"] is True
@@ -109,18 +90,49 @@ def test_snapshot_derniere_signature_et_redemarrage(tmp_path):
 
 
 def test_snapshot_erreur_recente(tmp_path):
-    config = make_config(tmp_path)
-    state = StateStore(tmp_path / "state.json")
+    state = make_state(tmp_path)
     state.set_meta("last_error_at", "2026-11-16T09:58:00")
-    snapshot = build_snapshot(
-        config,
-        state,
-        datetime(2026, 11, 16, 9, 0),
-        tmp_path / "config.toml",
-        now=datetime(2026, 11, 16, 10, 0),
-    )
+    state.set_meta("last_error_kind", "reseau")
+    state.set_meta("last_error_message", "CESAR est injoignable pour le moment.")
+    started, now = datetime(2026, 11, 16, 9, 0), datetime(2026, 11, 16, 10, 0)
+    snapshot = snapshot_at(tmp_path, state, started, now)
     assert snapshot["mode"] == "error"
     assert snapshot["label"] == "Erreur récente"
+    assert snapshot["last_error_kind"] == "reseau"
+    assert snapshot["last_error_message"] == "CESAR est injoignable pour le moment."
+
+
+def test_snapshot_erreur_sans_cause(tmp_path):
+    state = make_state(tmp_path)
+    state.set_meta("last_error_at", "2026-11-16T09:58:00")
+    snapshot = snapshot_at(
+        tmp_path, state, datetime(2026, 11, 16, 9, 0), datetime(2026, 11, 16, 10, 0)
+    )
+    assert snapshot["last_error_kind"] is None
+    assert snapshot["last_error_message"] is None
+
+
+def test_snapshot_erreur_resolue(tmp_path):
+    state = make_state(tmp_path)
+    state.set_meta("last_error_at", "2026-11-16T09:50:00")
+    state.set_meta("last_error_message", "CESAR est injoignable pour le moment.")
+    state.set_meta("last_ok_at", "2026-11-16T09:52:00")
+    snapshot = snapshot_at(
+        tmp_path, state, datetime(2026, 11, 16, 9, 0), datetime(2026, 11, 16, 10, 0)
+    )
+    assert snapshot["mode"] == "active"
+    assert snapshot["label"] == "Surveillance active"
+    assert snapshot["last_error_message"] == "CESAR est injoignable pour le moment."
+
+
+def test_snapshot_erreur_posterieure_au_succes(tmp_path):
+    state = make_state(tmp_path)
+    state.set_meta("last_ok_at", "2026-11-16T09:50:00")
+    state.set_meta("last_error_at", "2026-11-16T09:58:00")
+    snapshot = snapshot_at(
+        tmp_path, state, datetime(2026, 11, 16, 9, 0), datetime(2026, 11, 16, 10, 0)
+    )
+    assert snapshot["mode"] == "error"
 
 
 def test_snapshot_uptime(tmp_path):

@@ -10,7 +10,6 @@ pub const APP_NAME: &str = "checkmate-watcher";
 #[derive(Debug, Clone, Deserialize, Default)]
 pub struct Schedule {
     pub enabled: bool,
-    pub days: Vec<String>,
     pub windows: Vec<String>,
 }
 
@@ -27,8 +26,6 @@ pub struct Status {
     pub version: String,
     pub build: String,
     pub started_at: String,
-    pub now: String,
-    pub uptime_seconds: u64,
     pub mode: String,
     pub label: String,
     pub window: Option<String>,
@@ -39,22 +36,17 @@ pub struct Status {
     pub counters: Counters,
     pub last_signed_at: Option<String>,
     pub last_detection_at: Option<String>,
-    pub last_error_at: Option<String>,
     pub restart_required: bool,
-    pub log_file: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct Runtime {
-    pub pid: u32,
     pub port: u16,
     pub token: String,
-    pub url: String,
 }
 
 #[derive(Debug, Clone, Deserialize, Default)]
 pub struct ActionResponse {
-    pub ok: bool,
     pub message: Option<String>,
     pub available: Option<bool>,
     pub url: Option<String>,
@@ -126,38 +118,53 @@ pub fn action(name: &str) -> Result<ActionResponse, ApiError> {
 }
 
 fn backend_candidates() -> Vec<PathBuf> {
-    let mut candidates = Vec::new();
-    if let Ok(path) = std::env::var("CHECKMATE_BACKEND") {
-        candidates.push(PathBuf::from(path));
-    }
-
-    if cfg!(windows) {
-        if let Ok(local) = std::env::var("LOCALAPPDATA") {
-            candidates.push(
-                PathBuf::from(local)
-                    .join("Programs")
-                    .join("CheckMate")
-                    .join("CheckMate.exe"),
-            );
-        }
-        if let Ok(current) = std::env::current_exe() {
-            if let Some(folder) = current.parent() {
-                candidates.push(folder.join("CheckMate.exe"));
-            }
-        }
+    let mut candidates = env_candidate();
+    let defaults = if cfg!(windows) {
+        windows_candidates()
     } else {
-        if let Ok(current) = std::env::current_exe() {
-            if let Some(folder) = current.parent() {
-                candidates.push(folder.join("checkmate-watcher"));
-            }
-        }
-        candidates.push(PathBuf::from("checkmate-watcher"));
+        unix_candidates()
+    };
+    candidates.extend(defaults);
+    candidates
+}
+
+fn env_candidate() -> Vec<PathBuf> {
+    match std::env::var("CHECKMATE_BACKEND") {
+        Ok(path) => vec![PathBuf::from(path)],
+        Err(_) => Vec::new(),
+    }
+}
+
+fn windows_candidates() -> Vec<PathBuf> {
+    let mut candidates = Vec::new();
+    if let Ok(local) = std::env::var("LOCALAPPDATA") {
+        let folder = PathBuf::from(local).join("Programs").join("CheckMate");
+        candidates.push(folder.join("CheckMate.exe"));
+    }
+    if let Ok(current) = std::env::current_exe() {
+        candidates.extend(current.parent().map(|folder| folder.join("CheckMate.exe")));
     }
     candidates
 }
 
+fn unix_candidates() -> Vec<PathBuf> {
+    let mut candidates = sibling_candidate("checkmate-watcher");
+    candidates.push(PathBuf::from("checkmate-watcher"));
+    candidates
+}
+
+fn sibling_candidate(name: &str) -> Vec<PathBuf> {
+    let Ok(current) = std::env::current_exe() else {
+        return Vec::new();
+    };
+    current
+        .parent()
+        .map(|folder| vec![folder.join(name)])
+        .unwrap_or_default()
+}
+
 pub fn start_backend() -> Result<(), String> {
-    if read_runtime().is_some() {
+    if fetch_status().is_ok() {
         return Ok(());
     }
 

@@ -28,10 +28,14 @@ reussie`, `signature` ou `ERREUR`.
 
 1. Lance `checkmate-watcher test-notification`.
 2. Coupe le mode silencieux, "Ne pas déranger" ou "Concentration".
-3. Sur Windows, autorise CheckMate dans les notifications système.
-4. Dans l'assistant, la case "J'ai vérifié que la notification s'affiche"
+3. Sur Windows, autorise CheckMate dans les notifications système : Paramètres >
+   Système > Notifications > CheckMate doit être activé.
+4. Si tu as installé CheckMate via l'installeur, la notification s'affiche sous
+   le nom "CheckMate" ; en mode portable (archive zip), elle s'affiche sous
+   "Windows PowerShell", ce qui est normal.
+5. Dans l'assistant, la case "J'ai vérifié que la notification s'affiche"
    doit être cochée pour terminer la configuration.
-4. Sur Linux, `notify-send` peut être cassé : CheckMate bascule alors sur D-Bus.
+6. Sur Linux, `notify-send` peut être cassé : CheckMate bascule alors sur D-Bus.
    Le self-test le signale.
 
 ## L'émargement n'est pas détecté
@@ -133,6 +137,11 @@ Relance `checkmate-watcher setup`, refais le tracé, puis vérifie la confirmati
 affichée par CESAR. Si le site répond autre chose que "présence prise en
 compte", la signature n'a pas été validée.
 
+Si le message parle d'un tracé "réduit à un point", la signature enregistrée ou
+rejouée ne contient qu'un clic : redessine-la dans l'assistant (le tracé doit
+couvrir la zone) puis relance. CheckMate préfère échouer plutôt que de valider
+un émargement avec un point.
+
 ## La fenêtre visible ne s'ouvre pas
 
 - vérifie que la session graphique est active ;
@@ -147,12 +156,21 @@ Crée une archive propre avec :
 checkmate-watcher support-bundle
 ```
 
-Envoie :
+Le bundle contient la sortie de diagnostic, la configuration sans mot de passe
+et les dernières lignes de logs.
 
-- la sortie de `self-test --notify` ;
-- les 50 dernières lignes de logs ;
-- la configuration **sans le mot de passe** (`check-config` masque déjà le
-  secret).
+Depuis la prochaine version, il embarque aussi `diagnostics/`, les cinq
+dernières tentatives de signature :
+
+- `diagnostic.json` : taille du canvas et de la page, densité de pixels,
+  élément qui recouvre le canvas, nombre d'événements reçus (dont ceux de
+  confiance), encre mesurée, longueur de la valeur enregistrée par le site ;
+- `canvas.png` : ce qui a été réellement tracé dans le canvas ;
+- `page.png` : la page au moment du tracé.
+
+C'est ce qu'il faut pour reproduire un cas où la signature part de travers.
+
+Envoie aussi la sortie de `self-test`.
 
 Ne partage jamais `~/.config/checkmate-watcher/env`, `%LOCALAPPDATA%\checkmate-watcher\config.toml`
 s'il contient `password`, ni le dossier du profil Chromium.

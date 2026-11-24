@@ -26,6 +26,80 @@ Le bouton est rendu cote serveur : un onglet deja ouvert ne le voit apparaitre
 qu'apres un rafraichissement, exactement comme sur le vrai CESAR. C'est ce que
 le watcher teste en rechargeant la page a chaque cycle.
 
+## Servir un scenario capture
+
+Le mode `--scenario` remplace les pages generees par des pages capturees, pour
+reproduire le vrai DOM de CESAR sans toucher au site :
+
+```bash
+python3 emulator/server.py --port 8787 --scenario emulator/scenarios/cesar-simplifie
+```
+
+Un scenario est un dossier autonome :
+
+| Fichier | Role |
+|---------|------|
+| `scenario.json` | manifeste : route vers page, par etat d'emargement |
+| `pages/*.html` | pages capturees, une variante par etat |
+| `harness.js` | script injecte avant `</body>` pour rebrancher les interactions |
+| `assets/` | CSS, JS, polices, images servis sous `/assets/` |
+
+Le manifeste associe chaque route a un fichier, ou a un fichier par etat :
+
+```json
+{
+  "name": "cesar-simplifie",
+  "pages": {
+    "/connexion": "pages/connexion.html",
+    "/": {
+      "default": "pages/tableau-ferme.html",
+      "open": "pages/tableau-ouvert.html",
+      "signed": "pages/tableau-signe.html"
+    }
+  },
+  "harness": "harness.js",
+  "assets": "assets"
+}
+```
+
+- `default` est obligatoire, `open` et `signed` sont optionnels : un etat
+  absent retombe sur `default`.
+- Seules les routes declarees et `/assets/` sont servies depuis le scenario.
+  `/admin`, `/api/state` et `POST /api/attendance/*` restent a l'emulateur, donc
+  tu peux toujours ouvrir et fermer l'emargement depuis `/admin`.
+- Le JavaScript du vrai CESAR ne connait pas `/api/signature` : `harness.js`
+  rebranche l'ouverture de la modale, le trace et l'enregistrement. Le jeton
+  `__ATTENDANCE_CLOSE_DELAY_MS__` y est remplace par la valeur de
+  `--attendance-close-delay-ms`.
+- Un manifeste invalide (fichier absent, chemin hors du dossier, etat `default`
+  manquant) arrete le serveur avec un message explicite.
+
+`emulator/scenarios/cesar-simplifie` sert de reference : il reprend les
+selecteurs par defaut du watcher (`.toastui-calendar-day-view`,
+`.buttonPresent`, `canvas[data-written-signature-target]`,
+`.swal2-html-container`) dans une structure differente des pages generees.
+
+Pour servir une capture reelle et faire tourner le watcher dessus, y compris
+sur Windows, voir [Tester avec une capture CESAR](docs/tester-sans-cesar.md).
+
+## Variantes de comportement
+
+`--variant` (repetable) reproduit des conditions du vrai site, pour les bugs
+qui ne sortent qu'en conditions reelles :
+
+| Variante | Effet |
+|----------|-------|
+| `slow-animation` | la modale s'anime pendant 1,2 s : le canvas bouge encore quand le watcher le mesure |
+| `mouse-events-only` | le canvas n'ecoute que `mousedown` / `mousemove` / `mouseup` et ignore les evenements pointer |
+
+```bash
+python3 emulator/server.py --port 8787 --variant slow-animation
+python3 emulator/server.py --port 8787 --variant mouse-events-only
+```
+
+Les variantes ne s'appliquent qu'aux pages generees : un scenario capture
+(`--scenario`) sert ses propres pages et son propre `harness.js`.
+
 ## Brancher le watcher dessus
 
 ```bash
@@ -50,4 +124,5 @@ en mode automatique et verifie que la signature est bien enregistree :
 CHECKMATE_E2E=1 uv run --project watcher pytest watcher/tests/test_emulator_e2e.py -v
 ```
 
-Il est ignore par defaut car il demande Chromium et ouvre un navigateur.
+Il est ignore par defaut car il demande Chromium et ouvre un navigateur. La CI
+le lance automatiquement dans le job `E2E emulateur`.

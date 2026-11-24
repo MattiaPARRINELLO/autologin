@@ -1,10 +1,11 @@
 name: Windows validation
 
+# Validation complete sur Windows : binaire, emulateur, installeur.
+# Lancee a chaque poussee sur beta, et a la demande pour verifier main.
 on:
   workflow_dispatch:
   push:
     branches:
-      - feat/auto-detect-roll-call
       - beta
 
 permissions:
@@ -18,9 +19,9 @@ jobs:
         working-directory: watcher
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: astral-sh/setup-uv@v6
+      - uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
 
@@ -161,7 +162,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "installeur echoue" }
 
       - name: Publier l'installeur
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: windows-installer
           path: watcher/dist-installer/*.exe
