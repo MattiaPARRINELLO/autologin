@@ -46,6 +46,44 @@ MAX_BODY = 4096
 RATE_WINDOW = 3600
 RATE_LIMIT = 120
 
+SCHEMA = """
+CREATE TABLE IF NOT EXISTS events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    install_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    version TEXT NOT NULL,
+    os TEXT NOT NULL,
+    day TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS one_install
+    ON events(install_id) WHERE name = 'install';
+DROP INDEX IF EXISTS one_daily;
+CREATE INDEX IF NOT EXISTS by_day ON events(day);
+"""
+
+INSERT_EVENT = (
+    "INSERT OR IGNORE INTO events "
+    "(install_id, name, version, os, day, created_at) "
+    "VALUES (?, ?, ?, ?, ?, ?)"
+)
+SQL_INSTALLS = "SELECT COUNT(DISTINCT install_id) FROM events WHERE name = 'install'"
+SQL_SIGNATURES = "SELECT COUNT(*) FROM events WHERE name = 'signature'"
+SQL_SIGNERS = "SELECT COUNT(DISTINCT install_id) FROM events WHERE name = 'signature'"
+SQL_SERIES = (
+    "SELECT day, COALESCE(SUM(name = 'signature'), 0) AS signatures "
+    "FROM events WHERE day >= ? GROUP BY day"
+)
+SQL_VERSIONS = (
+    "SELECT version, COUNT(*) AS installs FROM events "
+    "WHERE name = 'install' GROUP BY version "
+    "ORDER BY installs DESC, version DESC"
+)
+SQL_PLATFORMS = (
+    "SELECT os, COUNT(*) AS installs FROM events "
+    "WHERE name = 'install' GROUP BY os ORDER BY installs DESC"
+)
+
 
 class Store:
     """Acces SQLite, une connexion par operation (serveur multi-thread)."""
@@ -54,116 +92,68 @@ class Store:
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with self._connect() as connection:
-            connection.executescript(
-                """
-                CREATE TABLE IF NOT EXISTS events (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    install_id TEXT NOT NULL,
-                    name TEXT NOT NULL,
-                    version TEXT NOT NULL,
-                    os TEXT NOT NULL,
-                    day TEXT NOT NULL,
-                    created_at TEXT NOT NULL
-                );
-                CREATE UNIQUE INDEX IF NOT EXISTS one_install
-                    ON events(install_id) WHERE name = 'install';
-                DROP INDEX IF EXISTS one_daily;
-                CREATE INDEX IF NOT EXISTS by_day ON events(day);
-                """
-            )
+            connection.executescript(SCHEMA)
 
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.path, timeout=10)
         connection.execute("PRAGMA journal_mode=WAL")
         return connection
 
-    def record(
-        self,
-        install_id: str,
-        name: str,
-        version: str,
-        os_name: str,
-        *,
-        day: str | None = None,
-    ) -> bool:
+    def record(self, install_id, name, version, os_name, *, day=None) -> bool:
         current_day = day or datetime.now(UTC).date().isoformat()
+        created_at = datetime.now(UTC).isoformat(timespec="seconds")
+        values = (install_id, name, version, os_name, current_day, created_at)
         with self._connect() as connection:
-            cursor = connection.execute(
-                "INSERT OR IGNORE INTO events "
-                "(install_id, name, version, os, day, created_at) "
-                "VALUES (?, ?, ?, ?, ?, ?)",
-                (
-                    install_id,
-                    name,
-                    version,
-                    os_name,
-                    current_day,
-                    datetime.now(UTC).isoformat(timespec="seconds"),
-                ),
-            )
+            cursor = connection.execute(INSERT_EVENT, values)
             return cursor.rowcount > 0
 
-    def summary(self, days: int = 30) -> dict:
-        today = datetime.now(UTC).date()
+    def _one(self, query: str, *params) -> int:
+        with self._connect() as connection:
+            row = connection.execute(query, params).fetchone()
+        return int(row[0] or 0) if row else 0
 
-        def one(query: str, *params) -> int:
-            with self._connect() as connection:
-                row = connection.execute(query, params).fetchone()
-            return int(row[0] or 0) if row else 0
+    def _rows(self, query: str, *params) -> list[sqlite3.Row]:
+        with self._connect() as connection:
+            connection.row_factory = sqlite3.Row
+            return list(connection.execute(query, params))
 
-        def rows(query: str, *params) -> list[sqlite3.Row]:
-            with self._connect() as connection:
-                connection.row_factory = sqlite3.Row
-                return list(connection.execute(query, params))
-
-        totals = {
-            "installs": one(
-                "SELECT COUNT(DISTINCT install_id) FROM events WHERE name = 'install'"
-            ),
-            "signatures": one("SELECT COUNT(*) FROM events WHERE name = 'signature'"),
-            "signers": one(
-                "SELECT COUNT(DISTINCT install_id) FROM events WHERE name = 'signature'"
-            ),
-        }
-        start_day = today - timedelta(days=days - 1)
-        series_rows = rows(
-            "SELECT day, COALESCE(SUM(name = 'signature'), 0) AS signatures "
-            "FROM events WHERE day >= ? GROUP BY day",
-            start_day.isoformat(),
-        )
-        found = {row["day"]: row for row in series_rows}
-        series = []
-        for offset in range(days):
-            day = (start_day + timedelta(days=offset)).isoformat()
-            row = found.get(day)
-            series.append(
-                {
-                    "day": day,
-                    "signatures": int(row["signatures"]) if row else 0,
-                }
-            )
-
-        versions = [
-            {"version": row["version"], "installs": int(row["installs"])}
-            for row in rows(
-                "SELECT version, COUNT(*) AS installs FROM events "
-                "WHERE name = 'install' GROUP BY version "
-                "ORDER BY installs DESC, version DESC"
-            )
-        ]
-        platforms = [
-            {"os": row["os"], "installs": int(row["installs"])}
-            for row in rows(
-                "SELECT os, COUNT(*) AS installs FROM events "
-                "WHERE name = 'install' GROUP BY os ORDER BY installs DESC"
-            )
-        ]
-
+    def _totals(self) -> dict:
         return {
-            "totals": totals,
-            "series": series,
-            "versions": versions,
-            "platforms": platforms,
+            "installs": self._one(SQL_INSTALLS),
+            "signatures": self._one(SQL_SIGNATURES),
+            "signers": self._one(SQL_SIGNERS),
+        }
+
+    def _series(self, days: int) -> list[dict]:
+        start_day = datetime.now(UTC).date() - timedelta(days=days - 1)
+        rows = self._rows(SQL_SERIES, start_day.isoformat())
+        found = {row["day"]: row for row in rows}
+        return [self._series_point(start_day, found, offset) for offset in range(days)]
+
+    @staticmethod
+    def _series_point(start_day, found: dict, offset: int) -> dict:
+        day = (start_day + timedelta(days=offset)).isoformat()
+        row = found.get(day)
+        signatures = int(row["signatures"]) if row else 0
+        return {"day": day, "signatures": signatures}
+
+    def _versions(self) -> list[dict]:
+        rows = self._rows(SQL_VERSIONS)
+        return [
+            {"version": row["version"], "installs": int(row["installs"])}
+            for row in rows
+        ]
+
+    def _platforms(self) -> list[dict]:
+        rows = self._rows(SQL_PLATFORMS)
+        return [{"os": row["os"], "installs": int(row["installs"])} for row in rows]
+
+    def summary(self, days: int = 30) -> dict:
+        return {
+            "totals": self._totals(),
+            "series": self._series(days),
+            "versions": self._versions(),
+            "platforms": self._platforms(),
             "updated_at": datetime.now(UTC).isoformat(timespec="seconds"),
         }
 
@@ -185,6 +175,32 @@ class RateLimiter:
                 return False
             hits.append(now)
             return True
+
+
+def _event_fields(payload: dict) -> tuple[str, str, str, str]:
+    return (
+        str(payload.get("install", "")),
+        str(payload.get("event", "")),
+        str(payload.get("version", "")),
+        str(payload.get("os", "")),
+    )
+
+
+def _first_error(fields: tuple[str, str, str, str]) -> str | None:
+    install, name, version, platform = fields
+    if not INSTALL_RE.fullmatch(install):
+        return "bad_install"
+    if name not in EVENTS:
+        return "bad_event"
+    return _platform_error(version, platform)
+
+
+def _platform_error(version: str, platform: str) -> str | None:
+    if not VERSION_RE.fullmatch(version):
+        return "bad_version"
+    if platform not in PLATFORMS:
+        return "bad_os"
+    return None
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -216,19 +232,34 @@ class Handler(BaseHTTPRequestHandler):
         if not self.dashboard_password:
             self._json(503, {"error": "dashboard_disabled"})
             return False
+        credentials = self._basic_credentials()
+        if credentials is None:
+            return False
+        return self._match_credentials(*credentials)
+
+    def _basic_credentials(self) -> tuple[str, str] | None:
         header = self.headers.get("Authorization", "")
         if not header.startswith("Basic "):
             self._challenge()
-            return False
+            return None
+        decoded = self._decode_basic(header)
+        if decoded is None:
+            return None
+        user, _, password = decoded.partition(":")
+        return user, password
+
+    def _decode_basic(self, header: str) -> str | None:
         import base64
 
         try:
-            decoded = base64.b64decode(header[6:]).decode("utf-8")
+            return base64.b64decode(header[6:]).decode("utf-8")
         except (ValueError, UnicodeDecodeError):
             self._challenge()
-            return False
-        user, _, password = decoded.partition(":")
-        if hmac.compare_digest(user, self.dashboard_user or "") and hmac.compare_digest(
+            return None
+
+    def _match_credentials(self, user: str, password: str) -> bool:
+        expected_user = self.dashboard_user or ""
+        if hmac.compare_digest(user, expected_user) and hmac.compare_digest(
             password, self.dashboard_password
         ):
             return True
@@ -246,65 +277,80 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/health":
             self._json(200, {"ok": True})
             return
-        if not self._authorized():
-            return
+        if self._authorized():
+            self._route_get(path)
+
+    def _route_get(self, path: str) -> None:
         if path == "/api/stats":
             self._json(200, self.store.summary())
-        elif path in {"/", "/stats"}:
-            self._send(
-                200,
-                DASHBOARD_HTML.encode("utf-8"),
-                "text/html; charset=utf-8",
-            )
-        else:
-            self._json(404, {"error": "not_found"})
+            return
+        if path in {"/", "/stats"}:
+            self._serve_dashboard()
+            return
+        self._json(404, {"error": "not_found"})
+
+    def _serve_dashboard(self) -> None:
+        self._send(200, DASHBOARD_HTML.encode("utf-8"), "text/html; charset=utf-8")
 
     def do_POST(self) -> None:
+        if not self._post_allowed():
+            return
+        payload = self._read_payload()
+        if payload is not None:
+            self._store_event(payload)
+
+    def _post_allowed(self) -> bool:
         if self.path.split("?", 1)[0] != "/api/event":
-            self._json(404, {"error": "not_found"})
-            return
+            self._reject(404, "not_found")
+            return False
         if not self.limiter.allow(self.client_address[0]):
-            self._json(429, {"error": "rate_limited"})
-            return
-        if self.ingest_key and not hmac.compare_digest(
-            self.headers.get("X-CheckMate-Key", ""), self.ingest_key
-        ):
-            self._json(401, {"error": "bad_key"})
-            return
+            self._reject(429, "rate_limited")
+            return False
+        return self._ingest_authorized()
+
+    def _reject(self, status: int, error: str) -> None:
+        self._json(status, {"error": error})
+
+    def _ingest_authorized(self) -> bool:
+        if not self.ingest_key:
+            return True
+        provided = self.headers.get("X-CheckMate-Key", "")
+        if hmac.compare_digest(provided, self.ingest_key):
+            return True
+        self._reject(401, "bad_key")
+        return False
+
+    def _read_length(self) -> int:
         try:
-            length = int(self.headers.get("Content-Length", "0"))
+            return int(self.headers.get("Content-Length", "0"))
         except ValueError:
-            length = 0
+            return 0
+
+    def _read_payload(self) -> dict | None:
+        length = self._read_length()
         if length <= 0 or length > MAX_BODY:
-            self._json(400, {"error": "bad_size"})
-            return
-        try:
-            payload = json.loads(self.rfile.read(length))
-        except (json.JSONDecodeError, UnicodeDecodeError):
-            self._json(400, {"error": "bad_json"})
-            return
+            self._reject(400, "bad_size")
+            return None
+        payload = self._parse_payload(length)
         if not isinstance(payload, dict):
-            self._json(400, {"error": "bad_payload"})
-            return
+            self._reject(400, "bad_payload")
+            return None
+        return payload
 
-        install = str(payload.get("install", ""))
-        name = str(payload.get("event", ""))
-        version = str(payload.get("version", ""))
-        platform = str(payload.get("os", ""))
-        if not INSTALL_RE.fullmatch(install):
-            self._json(400, {"error": "bad_install"})
-            return
-        if name not in EVENTS:
-            self._json(400, {"error": "bad_event"})
-            return
-        if not VERSION_RE.fullmatch(version):
-            self._json(400, {"error": "bad_version"})
-            return
-        if platform not in PLATFORMS:
-            self._json(400, {"error": "bad_os"})
-            return
+    def _parse_payload(self, length: int):
+        try:
+            return json.loads(self.rfile.read(length))
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            self._reject(400, "bad_json")
+            return None
 
-        inserted = self.store.record(install, name, version, platform)
+    def _store_event(self, payload: dict) -> None:
+        fields = _event_fields(payload)
+        error = _first_error(fields)
+        if error is not None:
+            self._reject(400, error)
+            return
+        inserted = self.store.record(*fields)
         self._json(202, {"ok": True, "duplicate": not inserted})
 
 
@@ -418,6 +464,17 @@ fetch("/api/stats", {headers: {"Accept": "application/json"}})
 """
 
 
+def _handler_class(store, ingest_key, dashboard_user, password):
+    attributes = {
+        "store": store,
+        "ingest_key": ingest_key,
+        "dashboard_user": dashboard_user,
+        "dashboard_password": password,
+        "limiter": RateLimiter(),
+    }
+    return type("BoundHandler", (Handler,), attributes)
+
+
 def make_server(
     port: int,
     store: Store,
@@ -426,25 +483,18 @@ def make_server(
     dashboard_user: str = "checkmate",
     dashboard_password: str | None = None,
 ) -> ThreadingHTTPServer:
-    handler = type(
-        "BoundHandler",
-        (Handler,),
-        {
-            "store": store,
-            "ingest_key": ingest_key,
-            "dashboard_user": dashboard_user,
-            "dashboard_password": dashboard_password,
-            "limiter": RateLimiter(),
-        },
-    )
+    handler = _handler_class(store, ingest_key, dashboard_user, dashboard_password)
     return ThreadingHTTPServer(("0.0.0.0", port), handler)
 
 
-def main() -> int:
+def _configure_logging() -> None:
     logging.basicConfig(
         level=os.environ.get("LOG_LEVEL", "INFO"),
         format="%(asctime)s %(levelname)s %(message)s",
     )
+
+
+def _server_from_env() -> tuple[ThreadingHTTPServer, int]:
     port = int(os.environ.get("PORT", "8099"))
     store = Store(os.environ.get("CHECKMATE_STATS_DB", "stats.sqlite3"))
     server = make_server(
@@ -454,6 +504,12 @@ def main() -> int:
         dashboard_user=os.environ.get("CHECKMATE_DASHBOARD_USER", "checkmate"),
         dashboard_password=os.environ.get("CHECKMATE_DASHBOARD_PASSWORD") or None,
     )
+    return server, port
+
+
+def main() -> int:
+    _configure_logging()
+    server, port = _server_from_env()
     logger.info("collecteur a l'ecoute sur le port %s", port)
     try:
         server.serve_forever()
