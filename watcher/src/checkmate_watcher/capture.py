@@ -419,15 +419,23 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
+def _afficher_interruption_capture() -> None:
+    print("\nCapture interrompue.", file=sys.stderr)
+
+
+def _afficher_erreur_capture(exc: BaseException) -> None:
+    print(f"Capture impossible : {exc}", file=sys.stderr)
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     args = parse_args(argv)
     try:
         asyncio.run(run_capture(args))
     except KeyboardInterrupt:
-        print("\nCapture interrompue.", file=sys.stderr)
+        _afficher_interruption_capture()
         return 130
     except (FileNotFoundError, ValueError) as exc:
-        print(f"Capture impossible : {exc}", file=sys.stderr)
+        _afficher_erreur_capture(exc)
         return 1
     return 0
 
