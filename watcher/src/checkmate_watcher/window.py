@@ -72,36 +72,43 @@ def _load_backend() -> Any | None:
     return webview
 
 
-def show(url: str, *, close_event: threading.Event | None = None) -> bool:
-    """Ouvre une fenetre native et bloque jusqu'a sa fermeture.
+def _create_window(backend: Any, url: str) -> Any:
+    return backend.create_window(
+        TITLE, url, width=WIDTH, height=HEIGHT, min_size=MIN_SIZE
+    )
 
-    Rend True si la fenetre a ete ouverte, False si le moteur web est
-    indisponible. Si ``close_event`` est fourni, la fenetre se ferme d'elle-meme
-    quand l'evenement est arme.
-    """
+
+def _start_close_watcher(window: Any, close_event: threading.Event | None) -> None:
+    if close_event is None:
+        return
+    threading.Thread(
+        target=_close_when_done,
+        args=(window, close_event),
+        daemon=True,
+    ).start()
+
+
+def _startup_options() -> dict[str, Any]:
+    options: dict[str, Any] = {}
+    if sys.platform.startswith("linux"):
+        # Force GTK : evite la sonde Qt de pywebview et ses traces au demarrage.
+        options["gui"] = "gtk"
+    return options
+
+
+def show(url: str, *, close_event: threading.Event | None = None) -> bool:
+    """Ouvre une fenetre native, ou rend False si le moteur est indisponible."""
     backend = _load_backend()
     if backend is None:
         return False
+    return _run_window(backend, url, close_event)
 
+
+def _run_window(backend: Any, url: str, close_event: threading.Event | None) -> bool:
     try:
-        window = backend.create_window(
-            TITLE,
-            url,
-            width=WIDTH,
-            height=HEIGHT,
-            min_size=MIN_SIZE,
-        )
-        if close_event is not None:
-            threading.Thread(
-                target=_close_when_done,
-                args=(window, close_event),
-                daemon=True,
-            ).start()
-        options: dict[str, Any] = {}
-        if sys.platform.startswith("linux"):
-            # Force GTK : evite la sonde Qt de pywebview et ses traces au demarrage.
-            options["gui"] = "gtk"
-        backend.start(**options)
+        window = _create_window(backend, url)
+        _start_close_watcher(window, close_event)
+        backend.start(**_startup_options())
     except Exception as error:  # moteur web absent ou casse
         logger.info("fenetre native indisponible : %s", error)
         return False
