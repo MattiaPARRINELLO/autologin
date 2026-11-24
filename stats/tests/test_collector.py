@@ -17,6 +17,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from collector import Store, make_server
 
 KEY = "cle-de-test"
+SUMMARY_EVENTS = [
+    ("a" * 32, "install", "0.6.2", "linux"),
+    ("b" * 32, "install", "0.6.2", "windows"),
+    ("c" * 32, "install", "0.6.1", "windows"),
+    ("a" * 32, "signature", "0.6.2", "linux"),
+    ("a" * 32, "signature", "0.6.2", "linux"),
+    ("b" * 32, "signature", "0.6.2", "windows"),
+]
 
 
 class StoreTests(unittest.TestCase):
@@ -40,15 +48,16 @@ class StoreTests(unittest.TestCase):
         summary = self.store.summary()
         self.assertEqual(summary["totals"]["signatures"], 3)
 
-    def test_summary_counts_unique_users(self) -> None:
-        self.store.record("a" * 32, "install", "0.6.2", "linux")
-        self.store.record("b" * 32, "install", "0.6.2", "windows")
-        self.store.record("c" * 32, "install", "0.6.1", "windows")
-        self.store.record("a" * 32, "signature", "0.6.2", "linux")
-        self.store.record("a" * 32, "signature", "0.6.2", "linux")
-        self.store.record("b" * 32, "signature", "0.6.2", "windows")
+    def _record_all(self, events: list[tuple[str, str, str, str]]) -> None:
+        for install, name, version, os_name in events:
+            self.store.record(install, name, version, os_name)
 
+    def test_summary_counts_unique_users(self) -> None:
+        self._record_all(SUMMARY_EVENTS)
         summary = self.store.summary()
+        self._assert_summary(summary)
+
+    def _assert_summary(self, summary: dict) -> None:
         totals = summary["totals"]
         self.assertEqual(totals["installs"], 3)
         self.assertEqual(totals["signers"], 2)
@@ -67,15 +76,15 @@ class HttpTests(unittest.TestCase):
     def setUp(self) -> None:
         self.tmp = tempfile.TemporaryDirectory()
         self.store = Store(Path(self.tmp.name) / "stats.sqlite3")
-        self.server = make_server(
-            0,
-            self.store,
-            ingest_key=KEY,
-            dashboard_password="secret",
-        )
+        self._start_http()
+
+    def _start_http(self) -> None:
+        options = {"ingest_key": KEY, "dashboard_password": "secret"}
+        self.server = make_server(0, self.store, **options)
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
         self.thread.start()
-        self.base = f"http://127.0.0.1:{self.server.server_address[1]}"
+        port = self.server.server_address[1]
+        self.base = f"http://127.0.0.1:{port}"
 
     def tearDown(self) -> None:
         self.server.shutdown()
@@ -83,15 +92,16 @@ class HttpTests(unittest.TestCase):
         self.thread.join(timeout=5)
         self.tmp.cleanup()
 
-    def post(self, payload: dict, key: str = KEY) -> tuple[int, dict]:
-        request = urllib.request.Request(
-            self.base + "/api/event",
-            data=json.dumps(payload).encode("utf-8"),
-            headers={"Content-Type": "application/json", "X-CheckMate-Key": key},
-            method="POST",
+    def _post_request(self, payload: dict, key: str) -> urllib.request.Request:
+        headers = {"Content-Type": "application/json", "X-CheckMate-Key": key}
+        body = json.dumps(payload).encode("utf-8")
+        return urllib.request.Request(
+            self.base + "/api/event", data=body, headers=headers, method="POST"
         )
+
+    def post(self, payload: dict, key: str = KEY) -> tuple[int, dict]:
         try:
-            with urllib.request.urlopen(request) as response:
+            with urllib.request.urlopen(self._post_request(payload, key)) as response:
                 return response.status, json.loads(response.read())
         except urllib.error.HTTPError as error:
             return error.code, json.loads(error.read() or b"{}")
@@ -130,20 +140,22 @@ class HttpTests(unittest.TestCase):
             status, _ = self.post(payload)
             self.assertEqual(status, 400, payload)
 
+    def _authorized_request(self, path: str) -> urllib.request.Request:
+        token = base64.b64encode(b"checkmate:secret").decode("ascii")
+        headers = {"Authorization": f"Basic {token}"}
+        return urllib.request.Request(self.base + path, headers=headers)
+
     def test_dashboard_requires_password(self) -> None:
         with urllib.request.urlopen(self.base + "/health") as response:
             self.assertEqual(response.status, 200)
-
-        with self.assertRaises(urllib.error.HTTPError) as raised:
-            urllib.request.urlopen(self.base + "/")
-        self.assertEqual(raised.exception.code, 401)
-
-        token = base64.b64encode(b"checkmate:secret").decode("ascii")
-        request = urllib.request.Request(
-            self.base + "/", headers={"Authorization": f"Basic {token}"}
-        )
-        with urllib.request.urlopen(request) as response:
+        self._assert_unauthorized("/")
+        with urllib.request.urlopen(self._authorized_request("/")) as response:
             self.assertIn("CheckMate", response.read().decode("utf-8"))
+
+    def _assert_unauthorized(self, path: str) -> None:
+        with self.assertRaises(urllib.error.HTTPError) as raised:
+            urllib.request.urlopen(self.base + path)
+        self.assertEqual(raised.exception.code, 401)
 
     def test_stats_endpoint(self) -> None:
         self.post(self.event())
