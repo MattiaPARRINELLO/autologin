@@ -2,7 +2,7 @@
 # ("s", "a(iiay)", ...). Ruff les voit comme des noms non definis et veut retirer
 # les guillemets, ce qui casserait l'introspection D-Bus.
 [lint]
-ignore = ["BLE001"]
+ignore = ["BLE001", "PLR1716"]
 
 [lint.per-file-ignores]
 "src/checkmate_watcher/sni.py" = ["F821", "UP037", "RET501", "F401"]

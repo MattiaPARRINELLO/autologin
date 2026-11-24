@@ -54,7 +54,7 @@ def test_fit_points_centre_et_respecte_les_dimensions():
     ]
     fitted = fit_points(points, 320, 150, 0.9)
     assert len(fitted) == 3
-    assert all(0 <= p.x <= 320 and 0 <= p.y <= 150 for p in fitted)
+    assert all(0 <= p.x and p.x <= 320 and 0 <= p.y and p.y <= 150 for p in fitted)
 
     xs = [p.x for p in fitted]
     ys = [p.y for p in fitted]
