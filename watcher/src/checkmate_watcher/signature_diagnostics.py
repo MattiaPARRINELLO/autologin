@@ -154,24 +154,26 @@ def decode_data_url(data_url: str | None) -> bytes:
     return base64.b64decode(data_url.split(",", 1)[1])
 
 
-def summary(step: dict) -> str:
-    context = step.get("context") or {}
-    events = step.get("events") or {}
-    ink = step.get("ink") or {}
-    box = context.get("box") or {}
-    hit = context.get("hit") or {}
-    if ink:
-        ink_text = (
-            f"encre {ink.get('count')}"
-            f" [{ink.get('minX')},{ink.get('minY')}-{ink.get('maxX')},{ink.get('maxY')}]"
-        )
-    else:
-        ink_text = "encre non mesuree"
+def _ink_text(ink: dict) -> str:
+    if not ink:
+        return "encre non mesuree"
+    return (
+        f"encre {ink.get('count')}"
+        f" [{ink.get('minX')},{ink.get('minY')}-{ink.get('maxX')},{ink.get('maxY')}]"
+    )
+
+
+def _canvas_text(context: dict, box: dict) -> str:
+    canvas = context.get("canvas", {})
     return (
         f"canvas {box.get('width')}x{box.get('height')}"
-        f" ({context.get('canvas', {}).get('width')}x"
-        f"{context.get('canvas', {}).get('height')} px),"
+        f" ({canvas.get('width')}x{canvas.get('height')} px),"
         f" dpr {context.get('devicePixelRatio')},"
+    )
+
+
+def _details_text(context: dict, events: dict, hit: dict, ink_text: str) -> str:
+    return (
         f" recouvert {context.get('covered')}"
         f" par {hit.get('tag')}.{hit.get('className')},"
         f" evenements {events.get('total')}"
@@ -179,6 +181,15 @@ def summary(step: dict) -> str:
         f" {ink_text},"
         f" champ site {context.get('inputLength')} caracteres"
     )
+
+
+def summary(step: dict) -> str:
+    context = step.get("context") or {}
+    events = step.get("events") or {}
+    hit = context.get("hit") or {}
+    box = context.get("box") or {}
+    ink_text = _ink_text(step.get("ink") or {})
+    return _canvas_text(context, box) + _details_text(context, events, hit, ink_text)
 
 
 def prune(directory: Path, keep: int = MAX_ATTEMPTS) -> None:
