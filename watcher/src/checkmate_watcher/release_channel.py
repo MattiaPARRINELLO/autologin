@@ -48,24 +48,36 @@ def channel_for_tag(tag: str) -> ReleaseChannel:
     )
 
 
-def main(argv: list[str] | None = None) -> int:
-    """Affiche le canal sous forme de variables pour `$GITHUB_OUTPUT`."""
-    args = sys.argv[1:] if argv is None else argv
-    if len(args) != 1:
-        print(
-            f"usage : python -m checkmate_watcher.release_channel {TAG_PREFIX}vX.Y.Z",
-            file=sys.stderr,
-        )
-        return 2
-    try:
-        channel = channel_for_tag(args[0])
-    except ValueError as exc:
-        print(f"erreur : {exc}", file=sys.stderr)
-        return 1
+def _afficher_usage() -> None:
+    print(
+        f"usage : python -m checkmate_watcher.release_channel {TAG_PREFIX}vX.Y.Z",
+        file=sys.stderr,
+    )
+
+
+def _afficher_erreur(exc: Exception) -> None:
+    print(f"erreur : {exc}", file=sys.stderr)
+
+
+def _afficher_canal(channel: ReleaseChannel) -> None:
     print(f"channel={channel.name}")
     print(f"branch={channel.expected_branch}")
     print(f"version={channel.version}")
     print(f"prerelease={'true' if channel.prerelease else 'false'}")
+
+
+def main(argv: list[str] | None = None) -> int:
+    """Affiche le canal sous forme de variables pour `$GITHUB_OUTPUT`."""
+    args = sys.argv[1:] if argv is None else argv
+    if len(args) != 1:
+        _afficher_usage()
+        return 2
+    try:
+        channel = channel_for_tag(args[0])
+    except ValueError as exc:
+        _afficher_erreur(exc)
+        return 1
+    _afficher_canal(channel)
     return 0
 
 
