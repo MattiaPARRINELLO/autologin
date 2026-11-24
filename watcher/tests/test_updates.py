@@ -61,7 +61,7 @@ def test_parse_release_compte_les_telechargements():
     assert parsed.downloads == 12
 
 
-def test_parse_release_ignore_les_tags_de_l_extension():
+def test_parse_release_ignore_les_tags_legacy():
     assert parse_release({"tag_name": "v1.6.0"}) is None
     parsed = parse_release(
         {

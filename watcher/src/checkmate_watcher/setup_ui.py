@@ -486,7 +486,7 @@ SETUP_HTML = """<!doctype html>
       <p class="lede">Dessine ta signature à la souris ou au doigt. Elle sera rejouée telle quelle dans le canvas de CESAR.</p>
       <canvas id="pad" width="640" height="240" aria-label="Zone de signature"></canvas>
       <div class="import-line">
-        <span>Signature deja dans l'extension ?</span>
+        <span>Signature deja existante ?</span>
         <label class="file-button" for="signatureFile">Importer le JSON
           <input id="signatureFile" type="file" accept=".json,application/json">
         </label>

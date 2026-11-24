@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="icons/icon128.png" alt="CheckMate" width="96" />
+  <img src="watcher/assets/checkmate.png" alt="CheckMate" width="96" />
   <h1>CheckMate</h1>
   <p><strong>Surveille CESAR et signe l'émargement sans y penser.</strong></p>
 
@@ -204,8 +204,8 @@ accepte la connexion avant d'enregistrer quoi que ce soit.
 Tu dessines ta signature à la souris ou au doigt. Elle sera rejouée à
 l'identique dans le canvas de CESAR.
 
-Si tu utilisais l'ancienne extension Chrome, tu peux cliquer sur "Exporter"
-dans sa section Signature, puis importer le fichier JSON dans l'assistant.
+Tu peux aussi importer une signature déjà existante au format JSON (liste de
+points x/y) via le bouton "Importer le JSON".
 
 ### 4. Planning
 
@@ -470,13 +470,11 @@ Le dépôt contient plusieurs surfaces, avec des statuts différents :
 |---------|---------|--------|
 | [`watcher/`](watcher/) | application Python, CLI et tableau de bord local | maintenue, produit publié |
 | [`emulator/`](emulator/) | serveur CESAR de test | maintenue, outil de test |
-| extension à la racine | `manifest.json`, `background.js`, `content.js`, `popup.*` | figée, plus de nouvelles fonctionnalités |
 | [`ui/`](ui/) | tableau de bord expérimental en Rust (egui) | expérimentale, hors release |
 
-L'extension Chrome historique est remplacée par l'application de bureau : elle
-reste dans le dépôt pour référence, mais ne reçoit plus de fonctionnalités.
-`ui/` explore une interface native alternative ; elle n'est pas livrée avec les
-releases et peut casser sans préavis.
+L'application de bureau (`watcher/`) est le seul produit publié. `ui/` explore
+une interface native alternative ; elle n'est pas livrée avec les releases et
+peut casser sans préavis.
 
 ## Architecture du watcher
 

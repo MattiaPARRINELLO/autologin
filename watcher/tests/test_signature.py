@@ -15,7 +15,7 @@ from checkmate_watcher.signature import (
 )
 
 
-def test_parse_points_accepte_extension_et_liste_brute():
+def test_parse_points_accepte_objet_exporte_et_liste_brute():
     points = [
         {"x": 10, "y": 20, "type": "start"},
         {"x": 15, "y": 25, "type": "move"},

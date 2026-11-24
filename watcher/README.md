@@ -122,9 +122,10 @@ Deux possibilites :
    ```bash
    uv run checkmate-watcher --config ~/.config/checkmate-watcher/config.toml capture
    ```
-2. Reutiliser celle de l'extension : copie le contenu de `signatureData` depuis
-   `chrome.storage.local` dans `~/.config/checkmate-watcher/signature.json`.
-   Les deux formats sont acceptes (`[{x,y,type}]` ou `{"signatureData": [...]}`).
+2. Importer une signature existante au format JSON : copie la liste de points
+   (`[{x,y,type}]`) ou un objet `{"signatureData": [...]}` /
+   `{"points": [...]}` dans `~/.config/checkmate-watcher/signature.json`.
+   Les trois formats sont acceptes.
 
 ## Utilisation
 

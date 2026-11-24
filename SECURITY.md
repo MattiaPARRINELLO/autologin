@@ -40,6 +40,6 @@ publique.
 
 ## Périmètre
 
-Sont concernés : le watcher Python, l'extension navigateur, l'émulateur de test,
-les scripts de packaging et les workflows de release. Les problèmes liés au site
+Sont concernés : le watcher Python, l'émulateur de test, les scripts de
+packaging et les workflows de release. Les problèmes liés au site
 CESAR lui-même ne relèvent pas de ce dépôt.

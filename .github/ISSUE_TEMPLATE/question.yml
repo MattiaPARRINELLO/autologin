@@ -19,7 +19,6 @@ body:
       description: Quelle partie du projet est concernee ?
       options:
         - watcher
-        - extension
         - UI Rust
         - emulateur
         - CI et release

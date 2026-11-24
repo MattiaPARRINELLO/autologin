@@ -76,27 +76,6 @@ jobs:
       - name: Tests
         run: python -m unittest discover -s stats/tests -v
 
-  extension:
-    name: Extension
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 20
-          cache: npm
-
-      - name: Installer les dependances
-        run: npm ci
-
-      - name: Verifier la syntaxe
-        run: npm run test:syntax
-
-      - name: Lint
-        run: npm run lint
-
   ui:
     name: UI Rust
     runs-on: ubuntu-latest
