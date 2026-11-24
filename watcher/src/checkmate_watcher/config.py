@@ -282,74 +282,156 @@ def _days_to_names(days: tuple[int, ...]) -> list[str]:
     return [name for name, index in ordered if index in days]
 
 
-def config_to_dict(
-    config: Config,
-    *,
-    password: str | None = None,
-    password_env: str | None = None,
-) -> dict:
-    cesar: dict = {
-        "base_url": config.cesar.base_url,
-        "login_path": config.cesar.login_path,
-        "dashboard_path": config.cesar.dashboard_path,
-        "username": config.cesar.username,
-        "keyring_service": config.cesar.keyring_service,
-    }
+def _attr_dict(obj, names: tuple[str, ...]) -> dict:
+    return {name: getattr(obj, name) for name in names}
+
+
+def _with_secret(data: dict, password=None, password_env=None) -> dict:
     if password:
-        cesar["password"] = password
+        data["password"] = password
     elif password_env:
-        cesar["password_env"] = password_env
+        data["password_env"] = password_env
+    return data
 
-    watcher = {
-        "poll_interval": config.watcher.poll_interval,
-        "dedupe_ttl": config.watcher.dedupe_ttl,
-        "confirm_timeout": config.watcher.confirm_timeout,
-        "prompt_retry": config.watcher.prompt_retry,
-        "auto_sign": config.watcher.auto_sign,
-        "auto_sign_delay": config.watcher.auto_sign_delay,
-        "headless": config.watcher.headless,
-        "visible_on_sign": config.watcher.visible_on_sign,
-        "profile_dir": str(config.watcher.profile_dir),
-        "state_file": str(config.watcher.state_file),
+
+def _cesar_to_dict(cesar: CesarConfig, password=None, password_env=None) -> dict:
+    data = {
+        "base_url": cesar.base_url,
+        "login_path": cesar.login_path,
+        "dashboard_path": cesar.dashboard_path,
+        "username": cesar.username,
+        "keyring_service": cesar.keyring_service,
     }
-    if config.watcher.executable_path:
-        watcher["executable_path"] = config.watcher.executable_path
+    return _with_secret(data, password, password_env)
 
+
+def _watcher_to_dict(watcher: WatcherConfig) -> dict:
+    scalars = ("poll_interval", "dedupe_ttl", "confirm_timeout", "prompt_retry")
+    flags = ("auto_sign", "auto_sign_delay", "headless", "visible_on_sign")
+    data = {name: getattr(watcher, name) for name in scalars + flags}
+    data["profile_dir"] = str(watcher.profile_dir)
+    data["state_file"] = str(watcher.state_file)
+    if watcher.executable_path:
+        data["executable_path"] = watcher.executable_path
+    return data
+
+
+def _signature_to_dict(signature: SignatureConfig) -> dict:
+    return {"file": str(signature.file), "padding_ratio": signature.padding_ratio}
+
+
+def _notifications_to_dict(notifications: NotificationConfig) -> dict:
+    return _attr_dict(notifications, ("app_name", "icon", "enabled"))
+
+
+def _schedule_to_dict(schedule: Schedule) -> dict:
     return {
-        "cesar": cesar,
-        "watcher": watcher,
-        "signature": {
-            "file": str(config.signature.file),
-            "padding_ratio": config.signature.padding_ratio,
-        },
-        "notifications": {
-            "app_name": config.notifications.app_name,
-            "icon": config.notifications.icon,
-            "enabled": config.notifications.enabled,
-        },
-        "schedule": {
-            "enabled": config.schedule.enabled,
-            "days": _days_to_names(config.schedule.days),
-            "windows": [str(window) for window in config.schedule.windows],
-        },
-        "updates": {
-            "enabled": config.updates.enabled,
-            "channel": config.updates.channel,
-        },
-        "analytics": {
-            "enabled": config.analytics.enabled,
-            "endpoint": config.analytics.endpoint,
-        },
-        "selectors": {
-            "attendance_button": list(config.selectors.attendance_button),
-            "signature_canvas": list(config.selectors.signature_canvas),
-            "signature_save": list(config.selectors.signature_save),
-            "confirmation": list(config.selectors.confirmation),
-            "login_username": list(config.selectors.login_username),
-            "login_password": list(config.selectors.login_password),
-            "login_submit": list(config.selectors.login_submit),
-        },
+        "enabled": schedule.enabled,
+        "days": _days_to_names(schedule.days),
+        "windows": [str(window) for window in schedule.windows],
     }
+
+
+def _selectors_to_dict(selectors: Selectors) -> dict:
+    first = ("attendance_button", "signature_canvas", "signature_save")
+    last = ("confirmation", "login_username", "login_password", "login_submit")
+    return {key: list(getattr(selectors, key)) for key in first + last}
+
+
+def _remaining_sections(config: Config) -> dict:
+    return {
+        "signature": _signature_to_dict(config.signature),
+        "notifications": _notifications_to_dict(config.notifications),
+        "schedule": _schedule_to_dict(config.schedule),
+        "updates": _attr_dict(config.updates, ("enabled", "channel")),
+        "analytics": _attr_dict(config.analytics, ("enabled", "endpoint")),
+        "selectors": _selectors_to_dict(config.selectors),
+    }
+
+
+def config_to_dict(config: Config, *, password=None, password_env=None) -> dict:
+    sections = {
+        "cesar": _cesar_to_dict(config.cesar, password, password_env),
+        "watcher": _watcher_to_dict(config.watcher),
+    }
+    sections.update(_remaining_sections(config))
+    return sections
+
+
+RETRY_WARNING = "ecriture de la configuration retentee (%s/4) : %s"
+
+
+def _config_payload(
+    config: Config, *, password: str | None, password_env: str | None
+) -> str:
+    return tomli_w.dumps(
+        config_to_dict(config, password=password, password_env=password_env)
+    )
+
+
+def _prepare_temp_path(target: Path) -> Path:
+    return target.with_name(f".{target.name}.{uuid.uuid4().hex}.tmp")
+
+
+def _write_secure_temp(temporary: Path, payload: str) -> None:
+    temporary.write_text(payload, encoding="utf-8")
+    temporary.chmod(0o600)
+
+
+def _make_writable(target: Path) -> None:
+    if not target.exists():
+        return
+    try:
+        target.chmod(stat.S_IWRITE | stat.S_IREAD)
+    except OSError:
+        pass
+
+
+def _try_replace(temporary: Path, target: Path) -> OSError | None:
+    _make_writable(target)
+    try:
+        temporary.replace(target)
+        return None
+    except OSError as exc:
+        return exc
+
+
+def _retry_replace(
+    temporary: Path, target: Path, attempts: int, delay: float
+) -> OSError | None:
+    last_error = None
+    for attempt in range(attempts):
+        last_error = _try_replace(temporary, target)
+        if last_error is None:
+            return None
+        logger.warning(RETRY_WARNING, attempt + 1, last_error)
+        time.sleep(delay * (attempt + 1))
+    return last_error
+
+
+def _replace_with_retries(
+    temporary: Path, target: Path, attempts: int = 4, delay: float = 0.15
+) -> Path:
+    last_error = _retry_replace(temporary, target, attempts, delay)
+    if last_error is not None:
+        raise last_error
+    return target
+
+
+def _discard_temp(temporary: Path) -> None:
+    try:
+        temporary.unlink()
+    except FileNotFoundError:
+        pass
+
+
+def _write_config_atomically(target: Path, payload: str) -> Path:
+    temporary = _prepare_temp_path(target)
+    try:
+        _write_secure_temp(temporary, payload)
+        return _replace_with_retries(temporary, target)
+    finally:
+        _discard_temp(temporary)
 
 
 def save_config(
