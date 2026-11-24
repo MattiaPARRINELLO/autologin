@@ -563,61 +563,129 @@
         z-index: 2147483647;
         pointer-events: none;
         opacity: 0;
-        transition: opacity 0.3s ease;
+        transition: opacity 0.4s ease;
         background:
-          repeating-linear-gradient(0deg, rgba(139, 92, 246, 0.05) 0 20px, transparent 20px 40px),
-          repeating-linear-gradient(90deg, rgba(139, 92, 246, 0.05) 0 20px, transparent 20px 40px);
-        animation: cm-bg-shift 6s linear infinite;
+          radial-gradient(1200px 600px at 10% 10%, rgba(124, 58, 237, 0.18), transparent 60%),
+          radial-gradient(900px 500px at 90% 90%, rgba(167, 139, 250, 0.14), transparent 60%),
+          repeating-linear-gradient(45deg, rgba(139, 92, 246, 0.04) 0 18px, transparent 18px 36px);
+        overflow: hidden;
       }
       #${OVERLAY_ID}.cm-visible { opacity: 1; }
-      @keyframes cm-bg-shift {
-        from { background-position: 0 0, 0 0; }
-        to { background-position: 40px 40px, 40px 40px; }
+
+      #${OVERLAY_ID} .cm-particles { position:absolute; inset:0; }
+      #${OVERLAY_ID} .cm-particle {
+        position: absolute;
+        font-size: 22px;
+        color: rgba(167, 139, 250, 0.18);
+        animation: cm-float 7s ease-in-out infinite;
+        user-select: none;
       }
+      @keyframes cm-float {
+        0%, 100% { transform: translate(0,0) rotate(0deg); opacity: .18; }
+        50% { transform: translate(12px,-18px) rotate(18deg); opacity: .32; }
+      }
+
       #${OVERLAY_ID} .cm-badge {
         position: absolute;
-        right: 18px;
-        bottom: 18px;
-        animation: cm-badge-float 1.8s ease-in-out infinite;
+        right: 22px;
+        bottom: 22px;
         display: flex;
         align-items: center;
-        gap: 10px;
-        padding: 10px 14px;
-        border-radius: 14px;
-        background: rgba(30, 20, 60, 0.78);
-        border: 1px solid rgba(139, 92, 246, 0.55);
-        color: #e9d5ff;
+        gap: 14px;
+        padding: 14px 18px;
+        border-radius: 18px;
+        background: linear-gradient(135deg, rgba(30,20,60,0.82), rgba(49,46,129,0.72));
+        border: 1px solid rgba(167, 139, 250, 0.5);
+        color: #f5f3ff;
         font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-        font-size: 13px;
-        font-weight: 600;
-        letter-spacing: 0.02em;
-        backdrop-filter: blur(6px);
-        box-shadow: 0 8px 24px rgba(88, 28, 135, 0.35);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        box-shadow:
+          0 12px 40px rgba(88, 28, 135, 0.45),
+          inset 0 1px 0 rgba(255,255,255,0.08);
+        animation: cm-badge-float 2.2s ease-in-out infinite;
+      }
+      @keyframes cm-badge-float {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-7px); }
+      }
+
+      #${OVERLAY_ID} .cm-board-wrap {
+        position: relative;
+        width: 40px;
+        height: 40px;
+        border-radius: 12px;
+        background: linear-gradient(135deg, #7c3aed, #a78bfa);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 0 18px rgba(124, 58, 237, 0.6);
+        animation: cm-glow 2s ease-in-out infinite;
+      }
+      @keyframes cm-glow {
+        0%, 100% { box-shadow: 0 0 18px rgba(124,58,237,.6); }
+        50% { box-shadow: 0 0 28px rgba(167,139,250,.85); }
       }
       #${OVERLAY_ID} .cm-board {
-        width: 26px;
-        height: 26px;
+        width: 22px;
+        height: 22px;
         border-radius: 6px;
         background-image:
-          linear-gradient(45deg, #a78bfa 25%, transparent 25%),
-          linear-gradient(-45deg, #a78bfa 25%, transparent 25%),
-          linear-gradient(45deg, transparent 75%, #a78bfa 75%),
-          linear-gradient(-45deg, transparent 75%, #a78bfa 75%);
-        background-size: 13px 13px;
-        background-position: 0 0, 0 6.5px, 6.5px -6.5px, -6.5px 0;
-        animation: cm-board-spin 4s linear infinite;
+          linear-gradient(45deg, #f5f3ff 25%, transparent 25%),
+          linear-gradient(-45deg, #f5f3ff 25%, transparent 25%),
+          linear-gradient(45deg, transparent 75%, #f5f3ff 75%),
+          linear-gradient(-45deg, transparent 75%, #f5f3ff 75%);
+        background-size: 11px 11px;
+        background-position: 0 0, 0 5.5px, 5.5px -5.5px, -5.5px 0;
+        animation: cm-board-spin 3.5s linear infinite;
       }
       @keyframes cm-board-spin {
         from { transform: rotate(0deg); }
         to { transform: rotate(360deg); }
       }
-      @keyframes cm-badge-float {
-        0%, 100% { transform: translateY(0); }
-        50% { transform: translateY(-6px); }
+      #${OVERLAY_ID} .cm-piece {
+        position: absolute;
+        top: -6px;
+        right: -6px;
+        font-size: 16px;
+        color: #f0abfc;
+        text-shadow: 0 0 8px rgba(240,171,252,.8);
+        animation: cm-piece-pulse 1.6s ease-in-out infinite;
       }
-      #${OVERLAY_ID} .cm-text { display: flex; flex-direction: column; line-height: 1.1; }
-      #${OVERLAY_ID} .cm-title { font-size: 13px; color: #f5f3ff; }
+      @keyframes cm-piece-pulse {
+        0%, 100% { transform: scale(1); }
+        50% { transform: scale(1.25); }
+      }
+
+      #${OVERLAY_ID} .cm-text { display: flex; flex-direction: column; line-height: 1.15; gap: 2px; }
+      #${OVERLAY_ID} .cm-title {
+        font-size: 15px;
+        font-weight: 700;
+        background: linear-gradient(90deg, #f5f3ff, #c4b5fd);
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+      }
       #${OVERLAY_ID} .cm-sub { font-size: 11px; color: #c4b5fd; font-weight: 400; }
+
+      #${OVERLAY_ID} .cm-progress {
+        width: 100%;
+        height: 3px;
+        border-radius: 2px;
+        background: rgba(255,255,255,0.1);
+        overflow: hidden;
+        margin-top: 6px;
+      }
+      #${OVERLAY_ID} .cm-progress-bar {
+        height: 100%;
+        width: 40%;
+        background: linear-gradient(90deg, transparent, #a78bfa, #f0abfc, transparent);
+        animation: cm-progress 1.4s ease-in-out infinite;
+      }
+      @keyframes cm-progress {
+        0% { transform: translateX(-100%); }
+        100% { transform: translateX(350%); }
+      }
     `;
     document.head.appendChild(style);
   }
@@ -627,26 +695,41 @@
     if (document.getElementById(OVERLAY_ID)) return;
     const overlay = document.createElement('div');
     overlay.id = OVERLAY_ID;
+    const pieces = ['♟','♞','♝','♜','♛'];
+    let particles = '';
+    for (let i = 0; i < 14; i++) {
+      const p = pieces[i % pieces.length];
+      const left = Math.round(Math.random() * 100);
+      const top = Math.round(Math.random() * 100);
+      const delay = (Math.random() * 5).toFixed(2);
+      const dur = (6 + Math.random() * 4).toFixed(2);
+      particles += `<span class="cm-particle" style="left:${left}%;top:${top}%;animation-delay:${delay}s;animation-duration:${dur}s">${p}</span>`;
+    }
     overlay.innerHTML = `
+      <div class="cm-particles">${particles}</div>
       <div class="cm-badge">
-        <div class="cm-board"></div>
+        <div class="cm-board-wrap">
+          <div class="cm-board"></div>
+          <span class="cm-piece">♛</span>
+        </div>
         <div class="cm-text">
           <span class="cm-title">CheckMate</span>
           <span class="cm-sub">Signature en cours…</span>
+          <div class="cm-progress"><div class="cm-progress-bar"></div></div>
         </div>
       </div>
     `;
     document.body.appendChild(overlay);
 
-    // Animation GSAP si disponible, sinon fallback CSS
     if (window.gsap) {
       try {
-        window.gsap.fromTo(overlay, { opacity: 0 }, { opacity: 1, duration: 0.3, ease: 'power2.out' });
+        window.gsap.fromTo(overlay, { opacity: 0, scale: 0.98 }, { opacity: 1, scale: 1, duration: 0.4, ease: 'power2.out' });
+        const badge = overlay.querySelector('.cm-badge');
+        if (badge) window.gsap.from(badge, { y: 20, opacity: 0, duration: 0.5, delay: 0.1, ease: 'back.out(1.4)' });
       } catch (e) {
         overlay.classList.add('cm-visible');
       }
     } else {
-      // déclencher la transition CSS
       requestAnimationFrame(() => overlay.classList.add('cm-visible'));
     }
   }
@@ -676,6 +759,7 @@
       try {
         window.gsap.to(overlay, {
           opacity: 0,
+          scale: 0.98,
           duration: 0.3,
           ease: 'power2.in',
           onComplete: () => { overlay.remove(); }
@@ -685,6 +769,7 @@
     }
     overlay.remove();
   }
+
 
   // =============================================
   // ÉCOUTEUR DE MESSAGES DU BACKGROUND
