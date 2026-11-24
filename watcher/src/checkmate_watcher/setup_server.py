@@ -63,15 +63,12 @@ DAY_LABELS = {
 }
 
 
-def _ordered_day_items() -> list[tuple[str, int]]:
-    return sorted(DAY_NAMES.items(), key=lambda item: item[1])
-
-
 def _days_html(days: tuple[int, ...]) -> str:
+    ordered = sorted(DAY_NAMES.items(), key=lambda item: item[1])
     return "\n".join(
         f'<label><input type="checkbox" value="{name}"'
         f"{' checked' if index in days else ''}>{DAY_LABELS[name]}</label>"
-        for name, index in _ordered_day_items()
+        for name, index in ordered
     )
 
 
@@ -157,7 +154,7 @@ class SetupSession:
     def _active_days(self) -> list[str]:
         return [
             name
-            for name, index in _ordered_day_items()
+            for name, index in sorted(DAY_NAMES.items(), key=lambda item: item[1])
             if index in self.config.schedule.days
         ]
 
