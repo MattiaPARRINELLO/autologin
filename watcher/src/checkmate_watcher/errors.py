@@ -77,12 +77,7 @@ def _match(text: str) -> tuple[str, str] | None:
     return None
 
 
-def describe_error(exc: BaseException) -> tuple[str, str]:
-    """Retourne la catégorie et le message lisible d'une exception."""
-    text = _first_line(exc)
-    hint = _match(text)
-    if hint is not None:
-        return hint
+def _describe_known_error(exc: BaseException, text: str) -> tuple[str, str]:
     if isinstance(exc, LoginError):
         return "connexion", f"La connexion à CESAR a échoué : {text}"
     if isinstance(exc, SignError):
@@ -92,3 +87,12 @@ def describe_error(exc: BaseException) -> tuple[str, str]:
     if isinstance(exc, TimeoutError):
         return "reseau", TIMEOUT_MESSAGE
     return "inconnue", f"Erreur inattendue : {text}"
+
+
+def describe_error(exc: BaseException) -> tuple[str, str]:
+    """Retourne la catégorie et le message lisible d'une exception."""
+    text = _first_line(exc)
+    hint = _match(text)
+    if hint is not None:
+        return hint
+    return _describe_known_error(exc, text)
