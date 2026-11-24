@@ -26,7 +26,7 @@ READY_SELECTORS = (
 )
 
 # En dessous de ce ratio sur un des deux axes, le trace n'a pas la forme d'une
-# signature : point (clic sans mouvement) ou ligne (canvas mesure pendant une
+# signature, point (clic sans mouvement) ou ligne (canvas mesure pendant une
 # animation, mouvements ignores par la librairie du site).
 MIN_INK_RATIO = 0.05
 
