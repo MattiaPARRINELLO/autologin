@@ -11,7 +11,6 @@ from checkmate_watcher.config import (
     NotificationConfig,
     Selectors,
     SignatureConfig,
-    UpdatesConfig,
     WatcherConfig,
 )
 from checkmate_watcher.signature import FittedPoint
@@ -29,20 +28,27 @@ class FakePage:
         await asyncio.sleep(self.wait_seconds)
 
 
-def make_session(page: FakePage) -> CesarSession:
-    config = Config(
-        cesar=CesarConfig(
-            base_url="https://cesar.example.fr",
-            username="eleve",
-            password="secret",
-        ),
-        watcher=WatcherConfig(),
-        signature=SignatureConfig(),
-        notifications=NotificationConfig(),
-        updates=UpdatesConfig(),
-        selectors=Selectors.from_dict({}),
+def _cesar_config() -> CesarConfig:
+    return CesarConfig(
+        base_url="https://cesar.example.fr",
+        username="eleve",
+        password="secret",
     )
-    session = CesarSession(config)
+
+
+def make_config(**sections) -> Config:
+    base = {
+        "cesar": _cesar_config(),
+        "watcher": WatcherConfig(),
+        "signature": SignatureConfig(),
+        "notifications": NotificationConfig(),
+        "selectors": Selectors.from_dict({}),
+    }
+    return Config(**{**base, **sections})
+
+
+def make_session(page: FakePage) -> CesarSession:
+    session = CesarSession(make_config())
     session.page = page
     return session
 
