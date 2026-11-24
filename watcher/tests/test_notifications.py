@@ -20,20 +20,19 @@ def test_applescript_echappe_les_guillemets():
     assert _applescript_string('a"b') == '"a\\"b"'
 
 
-def test_envoi_linux(monkeypatch):
+def _espionne_send(monkeypatch, nom="send_windows"):
     captured = {}
 
-    def fake_send(title, message, *, app_name, icon, urgency):
-        captured.update(
-            title=title,
-            message=message,
-            app_name=app_name,
-            icon=icon,
-            urgency=urgency,
-        )
+    def fake_send(title, message, *, app_name, **reste):
+        captured.update(title=title, message=message, app_name=app_name, **reste)
         return True
 
-    monkeypatch.setattr(notifications, "send_linux", fake_send)
+    monkeypatch.setattr(notifications, nom, fake_send)
+    return captured
+
+
+def test_envoi_linux(monkeypatch):
+    captured = _espionne_send(monkeypatch, "send_linux")
     notifier = Notifier(app_name="CheckMate", icon="info", platform="linux")
     assert notifier.send("titre", "message", urgency="normal") is True
     assert captured == {
@@ -46,14 +45,7 @@ def test_envoi_linux(monkeypatch):
 
 
 def test_envoi_windows(monkeypatch):
-    captured = {}
-    monkeypatch.setattr(
-        notifications,
-        "send_windows",
-        lambda title, message, *, app_name: (
-            captured.update(title=title, message=message, app_name=app_name) or True
-        ),
-    )
+    captured = _espionne_send(monkeypatch)
     notifier = Notifier(app_name="CheckMate", platform="win32")
     assert notifier.send("titre", "message") is True
     assert captured == {"title": "titre", "message": "message", "app_name": "CheckMate"}
@@ -65,20 +57,19 @@ def test_envoi_macos(monkeypatch):
     assert notifier.send("titre", "message") is True
 
 
-def test_confirmation_windows_utilise_tkinter(monkeypatch):
+def _fake_ask(monkeypatch, *, retour=True):
     captured = {}
 
-    def fake_ask(text, *, timeout, title, ok_label, cancel_label):
-        captured.update(
-            text=text,
-            timeout=timeout,
-            title=title,
-            ok_label=ok_label,
-            cancel_label=cancel_label,
-        )
-        return True
+    def fake_ask(text, **kwargs):
+        captured.update(text=text, **kwargs)
+        return retour
 
     monkeypatch.setattr(notifications, "ask_tkinter", fake_ask)
+    return captured
+
+
+def test_confirmation_windows_utilise_tkinter(monkeypatch):
+    captured = _fake_ask(monkeypatch)
     notifier = Notifier(app_name="CheckMate", platform="win32")
     assert notifier.ask("present ?", timeout=42) is True
     assert captured["timeout"] == 42
