@@ -10,6 +10,22 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 
+def _parse_number_map(value: object) -> dict[str, float]:
+    if not isinstance(value, dict):
+        return {}
+    return {
+        str(key): float(item)
+        for key, item in value.items()
+        if isinstance(item, (int, float))
+    }
+
+
+def _parse_meta_map(value: object) -> dict[str, str]:
+    if not isinstance(value, dict):
+        return {}
+    return {str(key): str(item) for key, item in value.items() if isinstance(item, str)}
+
+
 class StateStore:
     def __init__(self, path: Path, ttl: int = 3600) -> None:
         self.path = path
@@ -19,48 +35,41 @@ class StateStore:
         self._meta: dict[str, str] = {}
         self._load()
 
-    def _load(self) -> None:
+    def _read_payload(self) -> dict | None:
         if not self.path.is_file():
-            return
+            return None
         try:
             data = json.loads(self.path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as exc:
             logger.warning("etat illisible, reinitialisation : %s", exc)
-            return
-        signals = data.get("signals") if isinstance(data, dict) else None
-        if isinstance(signals, dict):
-            self._signals = {
-                str(key): float(value)
-                for key, value in signals.items()
-                if isinstance(value, (int, float))
-            }
-        windows = data.get("windows") if isinstance(data, dict) else None
-        if isinstance(windows, dict):
-            self._windows = {
-                str(key): float(value)
-                for key, value in windows.items()
-                if isinstance(value, (int, float))
-            }
-        meta = data.get("meta") if isinstance(data, dict) else None
-        if isinstance(meta, dict):
-            self._meta = {
-                str(key): str(value)
-                for key, value in meta.items()
-                if isinstance(value, str)
-            }
+            return None
+        return data if isinstance(data, dict) else None
 
-    def _save(self) -> None:
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        payload = {
+    def _load(self) -> None:
+        payload = self._read_payload()
+        if payload is None:
+            return
+        self._signals = _parse_number_map(payload.get("signals"))
+        self._windows = _parse_number_map(payload.get("windows"))
+        self._meta = _parse_meta_map(payload.get("meta"))
+
+    def _build_payload(self) -> dict:
+        return {
             "signals": self._signals,
             "windows": self._windows,
             "meta": self._meta,
         }
+
+    def _write_payload(self, payload: dict) -> None:
+        self.path.parent.mkdir(parents=True, exist_ok=True)
         tmp = self.path.with_suffix(".tmp")
         tmp.write_text(
             json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8"
         )
         tmp.replace(self.path)
+
+    def _save(self) -> None:
+        self._write_payload(self._build_payload())
 
     def prune(self, now: float | None = None) -> None:
         current = time.time() if now is None else now
