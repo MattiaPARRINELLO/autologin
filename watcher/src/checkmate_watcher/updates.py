@@ -61,6 +61,9 @@ class Release:
     prerelease: bool
     downloads: int = 0
     assets: tuple[Asset, ...] = field(default_factory=tuple)
+    migration_reason: str | None = None
+    required_reason: str | None = None
+    markers_declared: bool = False
 
     @property
     def version_text(self) -> str:
@@ -80,6 +83,21 @@ class Release:
 
 
 VERSION_PATTERN = re.compile(r"(\d+)\.(\d+)\.(\d+)(?:-(beta)(?:\.?(\d+))?)?")
+MARKER_PATTERN = re.compile(
+    r"^\s*CHECKMATE-(MIGRATION|REQUIRED)\s*:\s*(.+?)\s*$",
+    re.IGNORECASE | re.MULTILINE,
+)
+
+
+def _release_markers(body: object) -> tuple[str | None, str | None, bool]:
+    values = {"MIGRATION": None, "REQUIRED": None}
+    seen = set()
+    for match in MARKER_PATTERN.finditer(str(body or "")):
+        kind = match.group(1).upper()
+        reason = match.group(2).strip()
+        seen.add(kind)
+        values[kind] = None if reason == "0" else reason
+    return values["MIGRATION"], values["REQUIRED"], seen == {"MIGRATION", "REQUIRED"}
 
 
 def parse_version(text: str) -> Version | None:
@@ -110,6 +128,15 @@ def _release_downloads(assets):
     return sum(int(a.get("download_count") or 0) for a in assets if isinstance(a, dict))
 
 
+def _marker_fields(body) -> dict:
+    migration, required, declared = _release_markers(body)
+    return {
+        "migration_reason": migration,
+        "required_reason": required,
+        "markers_declared": declared,
+    }
+
+
 def _build_release(tag, version, data, assets):
     return Release(
         tag=tag,
@@ -119,6 +146,7 @@ def _build_release(tag, version, data, assets):
         prerelease=bool(data.get("prerelease")),
         downloads=_release_downloads(assets),
         assets=_release_assets(assets),
+        **_marker_fields(data.get("body")),
     )
 
 
@@ -132,18 +160,73 @@ def parse_release(data: dict) -> Release | None:
     return _build_release(tag, version, data, data.get("assets") or [])
 
 
+def _channel_candidates(releases: list[Release], channel: str) -> list[Release]:
+    accept_prerelease = str(channel).strip().lower() == BETA_CHANNEL
+    return [
+        release for release in releases if accept_prerelease or not release.prerelease
+    ]
+
+
 def select_latest(
     releases: list[Release],
     *,
     channel: str = STABLE_CHANNEL,
 ) -> Release | None:
-    accept_prerelease = str(channel).strip().lower() == BETA_CHANNEL
-    candidates = [
-        release for release in releases if accept_prerelease or not release.prerelease
-    ]
+    candidates = _channel_candidates(releases, channel)
     if not candidates:
         return None
     return max(candidates, key=lambda release: release.version)
+
+
+@dataclass(frozen=True)
+class UpdatePolicy:
+    current: Version | None
+    latest: Release | None
+    required: Release | None
+    migration: Release | None
+    channel: str
+
+    @property
+    def available(self) -> bool:
+        return (
+            self.current is not None
+            and self.latest is not None
+            and self.latest.version > self.current
+        )
+
+
+def _required_release(window):
+    return max(
+        (release for release in window if release.required_reason),
+        key=lambda release: release.version,
+        default=None,
+    )
+
+
+def _migration_release(window):
+    return min(
+        (release for release in window if release.migration_reason),
+        key=lambda release: release.version,
+        default=None,
+    )
+
+
+def _policy_for(current, channel, releases) -> UpdatePolicy:
+    candidates = _channel_candidates(releases, channel)
+    latest = max(candidates, key=lambda release: release.version, default=None)
+    window = [release for release in candidates if release.version > current]
+    required = _required_release(window)
+    migration = _migration_release(window)
+    return UpdatePolicy(current, latest, required, migration, channel)
+
+
+def update_policy(current, *, channel=STABLE_CHANNEL, releases=None):
+    """Resume la cible, la version minimale exigee et la migration a passer."""
+    current_version = parse_version(str(current))
+    if current_version is None:
+        return UpdatePolicy(None, None, None, None, channel)
+    available = releases if releases is not None else fetch_releases()
+    return _policy_for(current_version, channel, available)
 
 
 def _releases_request(timeout: int):
@@ -165,15 +248,8 @@ def fetch_releases(timeout: int = 10) -> list[Release]:
 
 # fmt: off
 def check_for_update(current: str = __version__, *, channel: str = STABLE_CHANNEL, releases: list[Release] | None = None) -> Release | None:
-    current_version = parse_version(current)
-    if current_version is None:
-        return None
-    if releases is None:
-        releases = fetch_releases()
-    latest = select_latest(releases, channel=channel)
-    if latest is None or not latest.version > current_version:
-        return None
-    return latest
+    policy = update_policy(current, channel=channel, releases=releases)
+    return policy.latest if policy.available else None
 # fmt: on
 
 

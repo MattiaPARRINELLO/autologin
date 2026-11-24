@@ -125,11 +125,24 @@ jobs:
           path: watcher/dist/*.tar.gz
           if-no-files-found: error
 
-  release:
-    needs: [channel, windows, linux]
+  markers:
     runs-on: ubuntu-latest
+    outputs:
+      manual: ${{ steps.check.outputs.manual }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Verifier les marqueurs obligatoires
+        id: check
+        run: bash scripts/check-release-markers.sh
+
+  release:
+    needs: [channel, windows, linux, markers]
+    runs-on: ubuntu-latest
+    environment: ${{ needs.markers.outputs.manual == 'true' && 'release-manual' || 'release-auto' }}
 
     steps:
+      - uses: actions/checkout@v7
+
       - name: Determiner le statut de la release
         id: meta
         run: |
@@ -167,3 +180,11 @@ jobs:
           prerelease: ${{ needs.channel.outputs.prerelease == 'true' }}
           make_latest: ${{ needs.channel.outputs.prerelease == 'false' }}
           files: release-assets/*
+
+      - name: Ajouter les marqueurs aux notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          body=$(gh release view "$GITHUB_REF_NAME" --json body -q .body)
+          { cat .github/release-markers.txt; printf '\n\n%s\n' "$body"; } > release-body.md
+          gh release edit "$GITHUB_REF_NAME" --notes-file release-body.md

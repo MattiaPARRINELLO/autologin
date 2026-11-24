@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+from dataclasses import replace
 
 import pytest
 
@@ -13,6 +14,7 @@ from checkmate_watcher.updates import (
     parse_version,
     platform_asset,
     select_latest,
+    update_policy,
 )
 
 
@@ -52,6 +54,41 @@ def _platform_assets() -> tuple:
         Asset("CheckMate-linux-0.4.2.tar.gz", "v"),
         Asset("SHA256SUMS.txt", "w"),
     )
+
+
+def _marked(tag: str, *, migration=None, required=None) -> Release:
+    return replace(
+        release(tag),
+        migration_reason=migration,
+        required_reason=required,
+        markers_declared=True,
+    )
+
+
+def test_parse_release_lit_les_marqueurs():
+    body = "CHECKMATE-MIGRATION: 0\nCHECKMATE-REQUIRED: 0"
+    parsed = parse_release({"tag_name": "watcher-v0.7.0", "body": body})
+    assert parsed is not None and parsed.markers_declared
+    assert parsed.migration_reason is None
+    assert parsed.required_reason is None
+
+
+def test_parse_release_conserve_les_raisons():
+    body = "CHECKMATE-MIGRATION: format v2\nCHECKMATE-REQUIRED: securite"
+    parsed = parse_release({"tag_name": "watcher-v0.7.0", "body": body})
+    assert parsed.migration_reason == "format v2"
+    assert parsed.required_reason == "securite"
+
+
+def test_update_policy_detecte_migration_et_obligation():
+    releases = [
+        _marked("watcher-v0.7.0-beta.1", migration="format v2"),
+        _marked("watcher-v0.7.0", required="securite"),
+    ]
+    policy = update_policy("0.6.6", channel="beta", releases=releases)
+    assert policy.available
+    assert policy.migration.tag == "watcher-v0.7.0-beta.1"
+    assert policy.required.tag == "watcher-v0.7.0"
 
 
 def test_parse_version():

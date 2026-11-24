@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from checkmate_watcher import self_update
-from checkmate_watcher.updates import UpdateError
+from checkmate_watcher.updates import Release, UpdateError, UpdatePolicy, Version
 
 
 def test_install_refuse_une_archive_absente(tmp_path):
@@ -82,11 +82,32 @@ def test_install_windows_utilise_les_options_silencieuses(tmp_path, monkeypatch)
     assert "/NORESTART" in argv
 
 
-def test_prepare_signale_deja_a_jour(monkeypatch):
-    class Config:
-        class updates:
-            channel = "beta"
+class _Config:
+    class updates:
+        channel = "beta"
 
-    monkeypatch.setattr(self_update, "check_for_update", lambda *a, **k: None)
+
+def _policy(latest=None, migration=None) -> UpdatePolicy:
+    return UpdatePolicy(Version(0, 6, 6), latest, None, migration, "beta")
+
+
+def test_prepare_signale_deja_a_jour(monkeypatch):
+    monkeypatch.setattr(self_update, "update_policy", lambda *a, **k: _policy())
     with pytest.raises(UpdateError, match="deja a jour"):
-        self_update.prepare(Config())
+        self_update.prepare(_Config())
+
+
+def test_prepare_refuse_une_migration_non_faite(monkeypatch):
+    release = Release(
+        "watcher-v0.7.0",
+        Version(0, 7, 0),
+        "",
+        "",
+        False,
+        migration_reason="format v2",
+        markers_declared=True,
+    )
+    policy = _policy(latest=release, migration=release)
+    monkeypatch.setattr(self_update, "update_policy", lambda *a, **k: policy)
+    with pytest.raises(UpdateError, match="migration obligatoire"):
+        self_update.prepare(_Config())
