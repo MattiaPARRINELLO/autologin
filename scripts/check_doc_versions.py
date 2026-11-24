@@ -23,8 +23,7 @@ DOCS = [
     ROOT / "PRIVACY.md",
     ROOT / "SUPPORT.md",
     ROOT / "watcher" / "README.md",
-    *sorted((ROOT / "watcher" / "docs").glob("*.md")),
-]
+] + sorted((ROOT / "watcher" / "docs").glob("*.md"))
 
 # Un nom d'artefact ne doit jamais coder une version : on ecrit `<version>`.
 ARTIFACT = re.compile(r"CheckMate-(?:Setup|linux)-\d+\.\d+\.\d+")
