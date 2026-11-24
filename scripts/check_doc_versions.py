@@ -45,25 +45,29 @@ def violations(path: Path) -> list[tuple[int, str, str]]:
     return found
 
 
-def main() -> int:
-    failures = 0
-    for path in DOCS:
-        for number, match, line in violations(path):
-            failures += 1
-            relative = path.relative_to(ROOT)
-            print(f"{relative}:{number}: version figee `{match}`", file=sys.stderr)
-            print(f"  {line}", file=sys.stderr)
+def report(results: list[tuple[Path, int, str, str]], doc_count: int) -> None:
+    for relative, number, match, line in results:
+        print(f"{relative}:{number}: version figee `{match}`", file=sys.stderr)
+        print(f"  {line}", file=sys.stderr)
 
-    if failures:
+    if results:
         print(
             "\nRemplace la version par `<version>` et renvoie vers "
             "`releases/latest` : le README doit rester valable a chaque release.",
             file=sys.stderr,
         )
-        return 1
+    else:
+        print(f"Documentation a jour : {doc_count} fichiers verifies.")
 
-    print(f"Documentation a jour : {len(DOCS)} fichiers verifies.")
-    return 0
+
+def main() -> int:
+    results: list[tuple[Path, int, str, str]] = []
+    for path in DOCS:
+        for number, match, line in violations(path):
+            results.append((path.relative_to(ROOT), number, match, line))
+
+    report(results, len(DOCS))
+    return 1 if results else 0
 
 
 if __name__ == "__main__":
