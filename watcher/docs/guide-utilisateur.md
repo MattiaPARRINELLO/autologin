@@ -61,9 +61,9 @@ GTK 3 et WebKit2 sont installés. Sinon, il s'ouvre dans le navigateur.
 1. **Mise en route** : ce que fait CheckMate et ce qui reste sur l'ordinateur.
 2. **Connexion CESAR** : identifiant et mot de passe, avec un test de connexion
    réel dans un navigateur invisible.
-3. **Signature** : dessin à la souris ou au doigt. Si tu utilisais l'extension,
-   clique sur "Exporter" dans sa section Signature, puis "Importer le JSON"
-   dans l'assistant.
+3. **Signature** : dessin à la souris ou au doigt. Tu peux aussi importer une
+   signature déjà existante au format JSON (liste de points x/y) via le bouton
+   "Importer le JSON".
 4. **Planning** : jours et créneaux surveillés. Par défaut, du lundi au vendredi,
    09:00-12:00 et 13:30-16:30.
 5. **Finition** : test de notification, démarrage automatique, récapitulatif.
