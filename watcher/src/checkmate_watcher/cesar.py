@@ -213,18 +213,20 @@ def is_success_confirmation(text: str) -> bool:
     return any(keyword in normalized for keyword in SUCCESS_KEYWORDS)
 
 
+def _signal_text(value: object) -> str:
+    return re.sub(r"\s+", " ", str(value or "")).strip()
+
+
+def _ink_ratio(ink: dict, low: str, high: str, size: str) -> float:
+    return (ink.get(high, -1) - ink.get(low, 0)) / max(1, ink.get(size, 1))
+
+
 def signal_key(payload: dict[str, str]) -> str:
     """Cle stable pour dedupliquer un emargement entre deux rafraichissements."""
-    action = (payload.get("action") or "").strip()
-    row = re.sub(r"\s+", " ", payload.get("row") or "").strip()
-    label = re.sub(r"\s+", " ", payload.get("label") or "").strip()
-    basis = "|".join(
-        [
-            date.today().isoformat(),
-            action or label,
-            row,
-        ]
-    )
+    action = _signal_text(payload.get("action"))
+    row = _signal_text(payload.get("row"))
+    label = _signal_text(payload.get("label"))
+    basis = "|".join([date.today().isoformat(), action or label, row])
     return hashlib.sha256(basis.encode("utf-8")).hexdigest()[:16]
 
 
@@ -619,20 +621,13 @@ class CesarSession:
 
     @staticmethod
     def _ink_is_incomplete(ink: dict | None) -> bool:
-        """Detecte un trace qui n'a pas la forme d'une signature.
-
-        Un point (clic sans mouvement) comme une ligne (un axe ecrase) sont
-        refuses : dans les deux cas le site enregistrerait autre chose que la
-        signature de l'utilisateur.
-        """
+        """Refuse un point ou une ligne a la place d'une signature."""
         if ink is None:
             return False
         if ink.get("count", 0) < 3:
             return True
-        width = max(1, ink.get("width", 1))
-        height = max(1, ink.get("height", 1))
-        extent_x = (ink.get("maxX", -1) - ink.get("minX", 0)) / width
-        extent_y = (ink.get("maxY", -1) - ink.get("minY", 0)) / height
+        extent_x = _ink_ratio(ink, "minX", "maxX", "width")
+        extent_y = _ink_ratio(ink, "minY", "maxY", "height")
         return min(extent_x, extent_y) < MIN_INK_RATIO
 
     async def _draw(self, box: dict, points: list[FittedPoint]) -> None:
