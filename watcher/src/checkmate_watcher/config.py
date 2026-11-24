@@ -444,175 +444,182 @@ def save_config(
     """Ecrit la configuration de facon atomique, lisible par l'utilisateur seul."""
     target = expand_path(str(path))
     target.parent.mkdir(parents=True, exist_ok=True)
-    payload = tomli_w.dumps(
-        config_to_dict(config, password=password, password_env=password_env)
-    )
-    temporary = target.with_name(f".{target.name}.{uuid.uuid4().hex}.tmp")
-    try:
-        temporary.write_text(payload, encoding="utf-8")
-        temporary.chmod(0o600)
-        last_error: OSError | None = None
-        for attempt in range(4):
-            if target.exists():
-                try:
-                    target.chmod(stat.S_IWRITE | stat.S_IREAD)
-                except OSError:
-                    pass
-            try:
-                temporary.replace(target)
-                return target
-            except OSError as exc:
-                last_error = exc
-                logger.warning(
-                    "ecriture de la configuration retentee (%s/4) : %s",
-                    attempt + 1,
-                    exc,
-                )
-                time.sleep(0.15 * (attempt + 1))
-        assert last_error is not None
-        raise last_error
-    finally:
-        try:
-            temporary.unlink()
-        except FileNotFoundError:
-            pass
+    payload = _config_payload(config, password=password, password_env=password_env)
+    return _write_config_atomically(target, payload)
 
 
-def load_config(path: str | Path, *, require_password: bool = True) -> Config:
-    config_path = Path(path)
+def _read_toml(config_path: Path) -> dict:
     if not config_path.is_file():
         raise ConfigError(f"fichier de configuration introuvable : {config_path}")
-
     with config_path.open("rb") as handle:
-        data = tomllib.load(handle)
+        return tomllib.load(handle)
 
-    cesar_table = data.get("cesar", {})
-    watcher_table = data.get("watcher", {})
-    signature_table = data.get("signature", {})
-    notification_table = data.get("notifications", {})
-    selectors_table = data.get("selectors", {})
-    schedule_table = data.get("schedule", {})
-    updates_table = data.get("updates", {})
 
-    if not isinstance(cesar_table, dict):
-        raise ConfigError("[cesar] doit etre une table TOML")
+def _table(data: dict, name: str) -> dict:
+    value = data.get(name, {})
+    if not isinstance(value, dict):
+        raise ConfigError(f"[{name}] doit etre une table TOML")
+    return value
 
-    username = _require(cesar_table, "username", "cesar")
-    keyring_service = str(cesar_table.get("keyring_service", DEFAULT_SERVICE))
 
-    cesar = CesarConfig(
-        base_url=_require(cesar_table, "base_url", "cesar").rstrip("/"),
-        username=username,
-        password=_resolve_password(
-            cesar_table, username, keyring_service, required=require_password
-        ),
-        keyring_service=keyring_service,
-        login_path=str(cesar_table.get("login_path", "/connexion")),
-        dashboard_path=str(cesar_table.get("dashboard_path", "/")),
+def _http(value: str, name: str, key: str) -> str:
+    if not value.startswith(("http://", "https://")):
+        raise ConfigError(f"[{name}] {key} doit commencer par http:// ou https://")
+    return value
+
+
+def _int(table: dict, key: str, default: int) -> int:
+    return int(table.get(key, default))
+
+
+def _bool(table: dict, key: str, default: bool) -> bool:
+    return bool(table.get(key, default))
+
+
+def _path(table: dict, key: str, default: Path) -> Path:
+    return expand_path(str(table.get(key, default)))
+
+
+def _opt_str(table: dict, key: str) -> str | None:
+    value = table.get(key)
+    return str(value) if value else None
+
+
+def _build_cesar(
+    table: dict, base_url: str, username: str, password: str, service: str
+) -> CesarConfig:
+    login_path = str(table.get("login_path", "/connexion"))
+    dashboard_path = str(table.get("dashboard_path", "/"))
+    return CesarConfig(
+        base_url, username, password, service, login_path, dashboard_path
     )
 
-    if not cesar.base_url.startswith(("http://", "https://")):
-        raise ConfigError("[cesar] base_url doit commencer par http:// ou https://")
 
-    watcher_defaults = WatcherConfig()
-    watcher = WatcherConfig(
-        poll_interval=int(
-            watcher_table.get("poll_interval", watcher_defaults.poll_interval)
-        ),
-        dedupe_ttl=int(watcher_table.get("dedupe_ttl", watcher_defaults.dedupe_ttl)),
-        confirm_timeout=int(
-            watcher_table.get("confirm_timeout", watcher_defaults.confirm_timeout)
-        ),
-        prompt_retry=int(
-            watcher_table.get("prompt_retry", watcher_defaults.prompt_retry)
-        ),
-        auto_sign=bool(watcher_table.get("auto_sign", watcher_defaults.auto_sign)),
-        auto_sign_delay=int(
-            watcher_table.get("auto_sign_delay", watcher_defaults.auto_sign_delay)
-        ),
-        headless=bool(watcher_table.get("headless", watcher_defaults.headless)),
-        visible_on_sign=bool(
-            watcher_table.get("visible_on_sign", watcher_defaults.visible_on_sign)
-        ),
-        executable_path=(
-            str(watcher_table["executable_path"])
-            if watcher_table.get("executable_path")
-            else None
-        ),
-        profile_dir=expand_path(
-            str(watcher_table.get("profile_dir", watcher_defaults.profile_dir))
-        ),
-        state_file=expand_path(
-            str(watcher_table.get("state_file", watcher_defaults.state_file))
-        ),
+def _load_cesar(data: dict, *, require_password: bool) -> CesarConfig:
+    table = _table(data, "cesar")
+    username = _require(table, "username", "cesar")
+    service = str(table.get("keyring_service", DEFAULT_SERVICE))
+    raw_base = _require(table, "base_url", "cesar").rstrip("/")
+    password = _resolve_password(table, username, service, require_password)
+    base_url = _http(raw_base, "cesar", "base_url")
+    return _build_cesar(table, base_url, username, password, service)
+
+
+def _watcher_timing(table: dict, defaults: WatcherConfig) -> dict:
+    return {
+        "poll_interval": _int(table, "poll_interval", defaults.poll_interval),
+        "dedupe_ttl": _int(table, "dedupe_ttl", defaults.dedupe_ttl),
+        "confirm_timeout": _int(table, "confirm_timeout", defaults.confirm_timeout),
+        "prompt_retry": _int(table, "prompt_retry", defaults.prompt_retry),
+        "auto_sign": _bool(table, "auto_sign", defaults.auto_sign),
+        "auto_sign_delay": _int(table, "auto_sign_delay", defaults.auto_sign_delay),
+    }
+
+
+def _watcher_flags(table: dict, defaults: WatcherConfig) -> dict:
+    return {
+        "headless": _bool(table, "headless", defaults.headless),
+        "visible_on_sign": _bool(table, "visible_on_sign", defaults.visible_on_sign),
+        "executable_path": _opt_str(table, "executable_path"),
+        "profile_dir": _path(table, "profile_dir", defaults.profile_dir),
+        "state_file": _path(table, "state_file", defaults.state_file),
+    }
+
+
+def _load_watcher(data: dict) -> WatcherConfig:
+    table = data.get("watcher", {})
+    defaults = WatcherConfig()
+    timing = _watcher_timing(table, defaults)
+    flags = _watcher_flags(table, defaults)
+    return WatcherConfig(**{**timing, **flags})
+
+
+def _load_signature(data: dict) -> SignatureConfig:
+    table = data.get("signature", {})
+    defaults = SignatureConfig()
+    return SignatureConfig(
+        file=_path(table, "file", defaults.file),
+        padding_ratio=float(table.get("padding_ratio", defaults.padding_ratio)),
     )
 
-    signature_defaults = SignatureConfig()
-    signature = SignatureConfig(
-        file=expand_path(str(signature_table.get("file", signature_defaults.file))),
-        padding_ratio=float(
-            signature_table.get("padding_ratio", signature_defaults.padding_ratio)
-        ),
+
+def _load_notifications(data: dict) -> NotificationConfig:
+    table = data.get("notifications", {})
+    defaults = NotificationConfig()
+    return NotificationConfig(
+        app_name=str(table.get("app_name", defaults.app_name)),
+        icon=str(table.get("icon", defaults.icon)),
+        enabled=_bool(table, "enabled", defaults.enabled),
     )
 
-    notification_defaults = NotificationConfig()
-    notifications = NotificationConfig(
-        app_name=str(
-            notification_table.get("app_name", notification_defaults.app_name)
-        ),
-        icon=str(notification_table.get("icon", notification_defaults.icon)),
-        enabled=bool(notification_table.get("enabled", notification_defaults.enabled)),
-    )
 
-    selectors = Selectors.from_dict(selectors_table)
-    updates_defaults = UpdatesConfig()
-    updates = UpdatesConfig(
-        enabled=bool(updates_table.get("enabled", updates_defaults.enabled)),
-        channel=parse_updates_channel(updates_table),
-    )
+def _load_selectors(data: dict) -> Selectors:
+    return Selectors.from_dict(data.get("selectors", {}))
 
-    analytics_table = data.get("analytics", {})
-    if not isinstance(analytics_table, dict):
-        raise ConfigError("[analytics] doit etre une table TOML")
-    analytics_defaults = AnalyticsConfig()
-    analytics = AnalyticsConfig(
-        enabled=bool(analytics_table.get("enabled", analytics_defaults.enabled)),
-        endpoint=str(analytics_table.get("endpoint", analytics_defaults.endpoint)),
-    )
-    if analytics.enabled and not analytics.endpoint.startswith(("http://", "https://")):
-        raise ConfigError("[analytics] endpoint doit commencer par http:// ou https://")
 
+def _load_updates(data: dict) -> UpdatesConfig:
+    table = data.get("updates", {})
+    defaults = UpdatesConfig()
+    enabled = _bool(table, "enabled", defaults.enabled)
+    return UpdatesConfig(enabled=enabled, channel=parse_updates_channel(table))
+
+
+def _load_analytics(data: dict) -> AnalyticsConfig:
+    table = _table(data, "analytics")
+    defaults = AnalyticsConfig()
+    enabled = _bool(table, "enabled", defaults.enabled)
+    endpoint = str(table.get("endpoint", defaults.endpoint))
+    if enabled:
+        _http(endpoint, "analytics", "endpoint")
+    return AnalyticsConfig(enabled=enabled, endpoint=endpoint)
+
+
+def _load_schedule(data: dict) -> Schedule:
+    table = data.get("schedule", {})
     try:
-        schedule = Schedule(
-            enabled=bool(schedule_table.get("enabled", False)),
-            days=parse_days(schedule_table.get("days", DEFAULT_DAYS)),
-            windows=parse_windows(schedule_table.get("windows", DEFAULT_WINDOWS)),
+        return Schedule(
+            enabled=bool(table.get("enabled", False)),
+            days=parse_days(table.get("days", DEFAULT_DAYS)),
+            windows=parse_windows(table.get("windows", DEFAULT_WINDOWS)),
         )
     except ScheduleError as exc:
         raise ConfigError(f"[schedule] {exc}") from exc
 
+
+def _validate_padding(signature: SignatureConfig) -> None:
+    ratio = signature.padding_ratio
+    if ratio < MIN_PADDING_RATIO or ratio > MAX_PADDING_RATIO:
+        raise ConfigError(
+            f"[signature] padding_ratio doit etre entre "
+            f"{MIN_PADDING_RATIO} et {MAX_PADDING_RATIO}"
+        )
+
+
+def _validate_limits(watcher: WatcherConfig, signature: SignatureConfig) -> None:
     if watcher.poll_interval < 10:
         raise ConfigError("[watcher] poll_interval doit etre >= 10 secondes")
     if watcher.confirm_timeout < 10:
         raise ConfigError("[watcher] confirm_timeout doit etre >= 10 secondes")
     if watcher.prompt_retry < 30:
         raise ConfigError("[watcher] prompt_retry doit etre >= 30 secondes")
-    if (
-        signature.padding_ratio < MIN_PADDING_RATIO
-        or signature.padding_ratio > MAX_PADDING_RATIO
-    ):
-        raise ConfigError(
-            f"[signature] padding_ratio doit etre entre "
-            f"{MIN_PADDING_RATIO} et {MAX_PADDING_RATIO}"
-        )
+    _validate_padding(signature)
 
-    return Config(
-        cesar=cesar,
-        watcher=watcher,
-        signature=signature,
-        notifications=notifications,
-        selectors=selectors,
-        schedule=schedule,
-        updates=updates,
-        analytics=analytics,
-    )
+
+def _load_parts(data: dict, require_password: bool) -> dict:
+    return {
+        "cesar": _load_cesar(data, require_password=require_password),
+        "watcher": _load_watcher(data),
+        "signature": _load_signature(data),
+        "notifications": _load_notifications(data),
+        "selectors": _load_selectors(data),
+        "updates": _load_updates(data),
+        "analytics": _load_analytics(data),
+    }
+
+
+def load_config(path: str | Path, *, require_password: bool = True) -> Config:
+    data = _read_toml(Path(path))
+    parts = _load_parts(data, require_password)
+    parts["schedule"] = _load_schedule(data)
+    _validate_limits(parts["watcher"], parts["signature"])
+    return Config(**parts)
