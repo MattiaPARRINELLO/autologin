@@ -546,6 +546,147 @@
   }
 
   // =============================================
+  // OVERLAY DE SIGNATURE — Branding CheckMate (violet + échiquier)
+  // =============================================
+
+  const OVERLAY_STYLE_ID = 'checkmate-signature-overlay-style';
+  const OVERLAY_ID = 'checkmate-signature-overlay';
+
+  function injecterStyleOverlay() {
+    if (document.getElementById(OVERLAY_STYLE_ID)) return;
+    const style = document.createElement('style');
+    style.id = OVERLAY_STYLE_ID;
+    style.textContent = `
+      #${OVERLAY_ID} {
+        position: fixed;
+        inset: 0;
+        z-index: 2147483647;
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+        background:
+          repeating-linear-gradient(0deg, rgba(139, 92, 246, 0.05) 0 20px, transparent 20px 40px),
+          repeating-linear-gradient(90deg, rgba(139, 92, 246, 0.05) 0 20px, transparent 20px 40px);
+        animation: cm-bg-shift 6s linear infinite;
+      }
+      #${OVERLAY_ID}.cm-visible { opacity: 1; }
+      @keyframes cm-bg-shift {
+        from { background-position: 0 0, 0 0; }
+        to { background-position: 40px 40px, 40px 40px; }
+      }
+      #${OVERLAY_ID} .cm-badge {
+        position: absolute;
+        right: 18px;
+        bottom: 18px;
+        animation: cm-badge-float 1.8s ease-in-out infinite;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 14px;
+        border-radius: 14px;
+        background: rgba(30, 20, 60, 0.78);
+        border: 1px solid rgba(139, 92, 246, 0.55);
+        color: #e9d5ff;
+        font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+        font-size: 13px;
+        font-weight: 600;
+        letter-spacing: 0.02em;
+        backdrop-filter: blur(6px);
+        box-shadow: 0 8px 24px rgba(88, 28, 135, 0.35);
+      }
+      #${OVERLAY_ID} .cm-board {
+        width: 26px;
+        height: 26px;
+        border-radius: 6px;
+        background-image:
+          linear-gradient(45deg, #a78bfa 25%, transparent 25%),
+          linear-gradient(-45deg, #a78bfa 25%, transparent 25%),
+          linear-gradient(45deg, transparent 75%, #a78bfa 75%),
+          linear-gradient(-45deg, transparent 75%, #a78bfa 75%);
+        background-size: 13px 13px;
+        background-position: 0 0, 0 6.5px, 6.5px -6.5px, -6.5px 0;
+        animation: cm-board-spin 4s linear infinite;
+      }
+      @keyframes cm-board-spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+      }
+      @keyframes cm-badge-float {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-6px); }
+      }
+      #${OVERLAY_ID} .cm-text { display: flex; flex-direction: column; line-height: 1.1; }
+      #${OVERLAY_ID} .cm-title { font-size: 13px; color: #f5f3ff; }
+      #${OVERLAY_ID} .cm-sub { font-size: 11px; color: #c4b5fd; font-weight: 400; }
+    `;
+    document.head.appendChild(style);
+  }
+
+  function afficherOverlaySignature() {
+    injecterStyleOverlay();
+    if (document.getElementById(OVERLAY_ID)) return;
+    const overlay = document.createElement('div');
+    overlay.id = OVERLAY_ID;
+    overlay.innerHTML = `
+      <div class="cm-badge">
+        <div class="cm-board"></div>
+        <div class="cm-text">
+          <span class="cm-title">CheckMate</span>
+          <span class="cm-sub">Signature en cours…</span>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    // Animation GSAP si disponible, sinon fallback CSS
+    if (window.gsap) {
+      try {
+        window.gsap.fromTo(overlay, { opacity: 0 }, { opacity: 1, duration: 0.3, ease: 'power2.out' });
+      } catch (e) {
+        overlay.classList.add('cm-visible');
+      }
+    } else {
+      // déclencher la transition CSS
+      requestAnimationFrame(() => overlay.classList.add('cm-visible'));
+    }
+  }
+
+  function percerTrouSignature() {
+    const overlay = document.getElementById(OVERLAY_ID);
+    if (!overlay) return;
+    const canvas = trouverPremierElement(SITE_SELECTORS.signatureCanvas);
+    if (!canvas) return;
+    const r = canvas.getBoundingClientRect();
+    const m = 24;
+    const x1 = Math.max(0, r.left - m);
+    const y1 = Math.max(0, r.top - m);
+    const x2 = Math.min(window.innerWidth, r.right + m);
+    const y2 = Math.min(window.innerHeight, r.bottom + m);
+    const W = window.innerWidth;
+    const H = window.innerHeight;
+    overlay.style.clipPath =
+      `polygon(evenodd, 0 0, ${W}px 0, ${W}px ${H}px, 0 ${H}px, ` +
+      `0 0, ${x1}px ${y1}px, ${x1}px ${y2}px, ${x2}px ${y2}px, ${x2}px ${y1}px, ${x1}px ${y1}px)`;
+  }
+
+  function masquerOverlaySignature() {
+    const overlay = document.getElementById(OVERLAY_ID);
+    if (!overlay) return;
+    if (window.gsap) {
+      try {
+        window.gsap.to(overlay, {
+          opacity: 0,
+          duration: 0.3,
+          ease: 'power2.in',
+          onComplete: () => { overlay.remove(); }
+        });
+        return;
+      } catch (e) { /* fallback */ }
+    }
+    overlay.remove();
+  }
+
+  // =============================================
   // ÉCOUTEUR DE MESSAGES DU BACKGROUND
   // =============================================
 
@@ -562,6 +703,7 @@
           };
 
           log('Message lancerSignature reçu — démarrage du flux');
+          afficherOverlaySignature();
 
           log(`Étape 1/8 — Recherche du bouton signature (${SITE_SELECTORS.signatureButton[0]}, timeout 30s)...`);
           let boutonSignature;
@@ -585,6 +727,7 @@
           log('Étape 3/8 — Attente du canvas de signature (timeout 15s)...');
           await attendreElement(canvasSelectors, 15000);
           log('Étape 3/8 — Canvas de signature détecté dans le DOM');
+          percerTrouSignature();
 
           log('Étape 4/8 — Récupération des données de signature depuis chrome.storage.local...');
           const result = await new Promise(resolve => {
@@ -654,6 +797,9 @@
           console.error(`[${t}][Signature] ERREUR FATALE: ${erreur.message}`);
           console.error(`[${t}][Signature] Stack:`, erreur.stack);
           sendResponse({ success: false, error: erreur.message });
+        } finally {
+          // S'assurer que l'overlay est retiré dans tous les cas
+          setTimeout(masquerOverlaySignature, 600);
         }
       })();
       return true; // Réponse asynchrone
