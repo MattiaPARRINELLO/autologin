@@ -35,8 +35,8 @@ Name: "desktopicon"; Description: "Creer un raccourci sur le Bureau"; GroupDescr
 Source: "..\dist\CheckMate\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs
 
 [Icons]
-Name: "{userprograms}\CheckMate"; Filename: "{app}\CheckMate.exe"; Parameters: "status"; Comment: "Ouvrir CheckMate"
-Name: "{userdesktop}\CheckMate"; Filename: "{app}\CheckMate.exe"; Parameters: "status"; Tasks: desktopicon
+Name: "{userprograms}\CheckMate"; Filename: "{app}\CheckMate.exe"; Parameters: "status"; Comment: "Ouvrir CheckMate"; AppUserModelID: "CheckMate.Watcher"; IconFilename: "{app}\CheckMate.exe"
+Name: "{userdesktop}\CheckMate"; Filename: "{app}\CheckMate.exe"; Parameters: "status"; Tasks: desktopicon; AppUserModelID: "CheckMate.Watcher"; IconFilename: "{app}\CheckMate.exe"
 
 [Run]
 Filename: "{app}\CheckMate.exe"; Parameters: "setup"; Description: "Configurer CheckMate"; Flags: nowait postinstall skipifsilent
