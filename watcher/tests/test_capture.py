@@ -58,40 +58,38 @@ def test_rewrite_css_urls_laisse_les_ressources_inconnues():
     assert capture.rewrite_css_urls(css, "https://cesar.fr/a.css", {}) == css
 
 
-def test_strip_har_secrets_retire_cookies_et_corps(tmp_path):
-    har = {
-        "log": {
-            "entries": [
-                {
-                    "request": {
-                        "url": "https://cesar.fr/api?token=abc",
-                        "headers": [
-                            {"name": "Cookie", "value": "session=secret"},
-                            {"name": "Accept", "value": "*/*"},
-                        ],
-                        "cookies": [{"name": "session", "value": "secret"}],
-                        "queryString": [{"name": "token", "value": "abc"}],
-                        "postData": {
-                            "mimeType": "application/x-www-form-urlencoded",
-                            "text": "_username=etudiant&_password=motdepasse",
-                        },
-                    },
-                    "response": {
-                        "url": "https://cesar.fr/api/page",
-                        "headers": [{"name": "Set-Cookie", "value": "session=secret"}],
-                        "content": {"text": "notes privees", "size": 12},
-                    },
-                }
-            ]
-        }
-    }
+HAR_REQUEST = {
+    "url": "https://cesar.fr/api?token=abc",
+    "headers": [
+        {"name": "Cookie", "value": "session=secret"},
+        {"name": "Accept", "value": "*/*"},
+    ],
+    "cookies": [{"name": "session", "value": "secret"}],
+    "queryString": [{"name": "token", "value": "abc"}],
+    "postData": {
+        "mimeType": "application/x-www-form-urlencoded",
+        "text": "_username=etudiant&_password=motdepasse",
+    },
+}
+
+HAR_RESPONSE = {
+    "url": "https://cesar.fr/api/page",
+    "headers": [{"name": "Set-Cookie", "value": "session=secret"}],
+    "content": {"text": "notes privees", "size": 12},
+}
+
+
+def _har_entree_nettoyee(tmp_path):
+    entries = [{"request": HAR_REQUEST, "response": HAR_RESPONSE}]
     path = tmp_path / "network.har"
-    path.write_text(json.dumps(har), encoding="utf-8")
-
+    path.write_text(json.dumps({"log": {"entries": entries}}), encoding="utf-8")
     capture.strip_har_secrets(path)
-
     cleaned = json.loads(path.read_text(encoding="utf-8"))
-    entry = cleaned["log"]["entries"][0]
+    return cleaned["log"]["entries"][0]
+
+
+def test_strip_har_secrets_retire_cookies_et_corps(tmp_path):
+    entry = _har_entree_nettoyee(tmp_path)
     assert entry["request"]["url"] == "https://cesar.fr/api"
     assert entry["request"]["headers"] == [{"name": "Accept", "value": "*/*"}]
     assert "cookies" not in entry["request"]
@@ -105,15 +103,17 @@ def test_strip_har_secrets_ignore_un_har_absent(tmp_path):
     capture.strip_har_secrets(tmp_path / "absent.har")
 
 
-def test_build_pages_associe_les_etats_du_tableau_de_bord():
-    files = {
+def _pages_tableau_de_bord() -> dict:
+    return {
         "connexion": "pages/connexion.html",
         "accueil": "pages/accueil.html",
         "accueil-signe": "pages/accueil-signe.html",
         "signature": "pages/signature.html",
     }
 
-    pages = capture.build_pages(files)
+
+def test_build_pages_associe_les_etats_du_tableau_de_bord():
+    pages = capture.build_pages(_pages_tableau_de_bord())
 
     assert pages["/connexion"] == "pages/connexion.html"
     assert pages["/"] == {
@@ -143,9 +143,8 @@ def test_asset_name_neutre_les_caracteres_suspects():
     assert name == "003-logo-20ecole.png"
 
 
-def test_sanitize_reecrit_pages_css_et_har(tmp_path):
+def _ecrire_pages(tmp_path):
     (tmp_path / "pages").mkdir()
-    (tmp_path / "assets").mkdir()
     (tmp_path / "pages" / "connexion.html").write_text(
         '<meta name="app-user" content=\'{"username":"etudiant"}\'>'
         '<form action="https://cesar.fr/login"></form>'
@@ -153,24 +152,33 @@ def test_sanitize_reecrit_pages_css_et_har(tmp_path):
         '<script src="/build/assets/app.js"></script>',
         encoding="utf-8",
     )
+
+
+def _ecrire_assets(tmp_path):
+    (tmp_path / "assets").mkdir()
     (tmp_path / "assets" / "000-app.css").write_text(
         "body{background:url(https://cesar.fr/fond.png)}", encoding="utf-8"
     )
+
+
+def _ecrire_capture_json(tmp_path):
+    assets = {
+        "https://cesar.fr/app.css": "assets/000-app.css",
+        "https://cesar.fr/fond.png": "assets/001-fond.png",
+        "https://cesar.fr/build/assets/app.js": "assets/002-app.js",
+    }
     (tmp_path / "capture.json").write_text(
-        json.dumps(
-            {
-                "assets": {
-                    "https://cesar.fr/app.css": "assets/000-app.css",
-                    "https://cesar.fr/fond.png": "assets/001-fond.png",
-                    "https://cesar.fr/build/assets/app.js": "assets/002-app.js",
-                }
-            }
-        ),
-        encoding="utf-8",
+        json.dumps({"assets": assets}), encoding="utf-8"
     )
 
-    capture.sanitize(tmp_path)
 
+def _ecrire_capture(tmp_path):
+    _ecrire_pages(tmp_path)
+    _ecrire_assets(tmp_path)
+    _ecrire_capture_json(tmp_path)
+
+
+def _assert_sanitize(tmp_path):
     html = (tmp_path / "pages" / "connexion.html").read_text(encoding="utf-8")
     css = (tmp_path / "assets" / "000-app.css").read_text(encoding="utf-8")
     assert 'href="/assets/000-app.css"' in html
@@ -178,6 +186,12 @@ def test_sanitize_reecrit_pages_css_et_har(tmp_path):
     assert "app-user" not in html
     assert 'src="/assets/002-app.js"' in html
     assert 'url("/assets/001-fond.png")' in css
+
+
+def test_sanitize_reecrit_pages_css_et_har(tmp_path):
+    _ecrire_capture(tmp_path)
+    capture.sanitize(tmp_path)
+    _assert_sanitize(tmp_path)
 
 
 def test_strip_sensitive_meta_retire_l_identite_et_le_jeton():
