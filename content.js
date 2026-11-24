@@ -552,7 +552,7 @@
   }
 
   // =============================================
-  // OVERLAY DE SIGNATURE — Grande scène CheckMate réactive au tracé
+  // OVERLAY DE SIGNATURE — Badge CheckMate réactif au tracé
   // =============================================
 
   const OVERLAY_STYLE_ID = 'checkmate-signature-overlay-style';
@@ -569,237 +569,172 @@
         z-index: 2147483647;
         pointer-events: none;
         opacity: 0;
-        transition: opacity 0.45s ease;
+        transition: opacity 0.4s ease;
         background:
-          radial-gradient(900px 520px at 50% 45%, rgba(91, 58, 170, 0.34), transparent 70%),
-          rgba(12, 9, 28, 0.86);
+          radial-gradient(1200px 600px at 10% 10%, rgba(124, 58, 237, 0.18), transparent 60%),
+          radial-gradient(900px 500px at 90% 90%, rgba(167, 139, 250, 0.14), transparent 60%),
+          repeating-linear-gradient(45deg, rgba(139, 92, 246, 0.04) 0 18px, transparent 18px 36px);
         overflow: hidden;
       }
       #${OVERLAY_ID}.cm-visible { opacity: 1; }
 
-      #${OVERLAY_ID} .cm-brand {
+      #${OVERLAY_ID} .cm-particles { position:absolute; inset:0; }
+      #${OVERLAY_ID} .cm-particle {
         position: absolute;
-        top: 30px;
-        left: 34px;
+        font-size: 22px;
+        color: rgba(167, 139, 250, 0.18);
+        animation: cm-float 7s ease-in-out infinite;
+        user-select: none;
+      }
+      @keyframes cm-float {
+        0%, 100% { transform: translate(0,0) rotate(0deg); opacity: .18; }
+        50% { transform: translate(12px,-18px) rotate(18deg); opacity: .32; }
+      }
+
+      #${OVERLAY_ID} .cm-badge {
+        position: absolute;
+        right: 22px;
+        bottom: 22px;
         display: flex;
-        flex-direction: column;
-        gap: 4px;
-        color: #f8f7ff;
-        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-        text-shadow: 0 2px 18px rgba(0,0,0,.28);
+        align-items: center;
+        gap: 14px;
+        padding: 14px 18px;
+        border-radius: 18px;
+        background: linear-gradient(135deg, rgba(30,20,60,0.82), rgba(49,46,129,0.72));
+        border: 1px solid rgba(167, 139, 250, 0.5);
+        color: #f5f3ff;
+        font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        box-shadow:
+          0 12px 40px rgba(88, 28, 135, 0.45),
+          inset 0 1px 0 rgba(255,255,255,0.08);
+        animation: cm-badge-float 2.2s ease-in-out infinite;
       }
-      #${OVERLAY_ID} .cm-brand-title {
-        font-size: clamp(25px, 3vw, 38px);
-        font-weight: 800;
-        letter-spacing: -0.045em;
-        line-height: 1;
-      }
-      #${OVERLAY_ID} .cm-brand-sub {
-        font-size: clamp(12px, 1.4vw, 15px);
-        color: #c4b5fd;
-        font-weight: 450;
+      @keyframes cm-badge-float {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-7px); }
       }
 
-      #${OVERLAY_ID} .cm-stage {
-        position: absolute;
-        left: 50%;
-        top: 51%;
-        width: min(820px, 88vw);
-        height: min(590px, 70vh);
-        transform: translate(-50%, -50%);
-        perspective: 1250px;
-      }
-      #${OVERLAY_ID} .cm-plane {
-        position: absolute;
-        inset: 0;
-        transform: rotateX(54deg) rotateZ(-14deg) scale(1.02);
-        transform-style: preserve-3d;
-        filter: drop-shadow(0 34px 35px rgba(0,0,0,.32));
-      }
-      #${OVERLAY_ID} .cm-board-large {
-        position: absolute;
-        inset: 0;
-        display: grid;
-        grid-template-columns: repeat(8, 1fr);
-        grid-template-rows: repeat(8, 1fr);
-        background: #2a1a52;
-        border-radius: 10px;
-        overflow: hidden;
-      }
-      #${OVERLAY_ID} .cm-cell { background: #2b1b52; }
-      #${OVERLAY_ID} .cm-cell.light { background: #3c256c; }
-      #${OVERLAY_ID} .cm-cell.lit { background: #7c4ddb; }
-      #${OVERLAY_ID} .cm-cell.current { background: #b69af7; }
-
-      #${OVERLAY_ID} .cm-piece-large,
-      #${OVERLAY_ID} .cm-decor-piece {
-        position: absolute;
+      #${OVERLAY_ID} .cm-board-wrap {
+        position: relative;
+        width: 46px;
+        height: 46px;
+        border-radius: 12px;
+        background: #4c1d95;
         display: flex;
         align-items: center;
         justify-content: center;
-        line-height: 1;
-        user-select: none;
-        transform-style: preserve-3d;
+        box-shadow: 0 0 18px rgba(124, 58, 237, 0.45);
       }
-      #${OVERLAY_ID} .cm-piece-large {
-        width: 12.5%;
-        height: 12.5%;
-        font-size: clamp(30px, 5.2vw, 68px);
+      #${OVERLAY_ID} .cm-board {
+        position: relative;
+        width: 34px;
+        height: 34px;
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        grid-template-rows: repeat(4, 1fr);
+        border-radius: 6px;
+        overflow: hidden;
+        background: #241443;
+      }
+      #${OVERLAY_ID} .cm-cell { background: #35205f; }
+      #${OVERLAY_ID} .cm-cell.light { background: #4b2c83; }
+      #${OVERLAY_ID} .cm-cell.lit { background: #c4b5fd; }
+      #${OVERLAY_ID} .cm-piece {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 25%;
+        height: 25%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 11px;
+        line-height: 1;
         color: #ffffff;
-        text-shadow: 0 8px 10px rgba(0,0,0,.48);
-        z-index: 4;
+        text-shadow: 0 1px 2px rgba(0,0,0,.55);
+        z-index: 2;
         will-change: transform;
       }
-      #${OVERLAY_ID} .cm-piece-large.done {
+      #${OVERLAY_ID} .cm-piece.done {
         color: #f5d0fe;
-        filter: drop-shadow(0 0 12px rgba(240,171,252,.8));
+        animation: cm-piece-pulse 1.2s ease-in-out infinite;
       }
-      #${OVERLAY_ID} .cm-decor-piece {
-        width: 12.5%;
-        height: 12.5%;
-        font-size: clamp(24px, 4vw, 52px);
-        color: rgba(196,181,253,.26);
-        text-shadow: 0 6px 8px rgba(0,0,0,.22);
-        z-index: 2;
+      @keyframes cm-piece-pulse {
+        0%, 100% { filter: brightness(1); }
+        50% { filter: brightness(1.6); }
       }
 
-      #${OVERLAY_ID} .cm-progress-panel {
-        position: absolute;
-        left: 50%;
-        bottom: 26px;
-        transform: translateX(-50%);
-        width: min(560px, 84vw);
-        padding: 16px 20px 14px;
-        border-radius: 14px;
-        background: rgba(36, 24, 76, 0.94);
-        box-shadow: 0 16px 45px rgba(0,0,0,.34);
-        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      }
-      #${OVERLAY_ID} .cm-progress-head {
-        display: flex;
-        align-items: baseline;
-        justify-content: space-between;
-        gap: 16px;
-        color: #f8f7ff;
-      }
-      #${OVERLAY_ID} .cm-progress-title {
+      #${OVERLAY_ID} .cm-text { display: flex; flex-direction: column; line-height: 1.15; gap: 2px; }
+      #${OVERLAY_ID} .cm-title {
         font-size: 15px;
-        font-weight: 650;
+        font-weight: 700;
+        background: linear-gradient(90deg, #f5f3ff, #c4b5fd);
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
       }
-      #${OVERLAY_ID} .cm-progress-value {
-        font-size: 13px;
-        color: #c4b5fd;
-        font-variant-numeric: tabular-nums;
-      }
-      #${OVERLAY_ID} .cm-progress-large {
-        height: 5px;
-        margin-top: 11px;
-        border-radius: 3px;
-        background: #432d73;
+      #${OVERLAY_ID} .cm-sub { font-size: 11px; color: #c4b5fd; font-weight: 400; }
+
+      #${OVERLAY_ID} .cm-progress {
+        width: 100%;
+        height: 3px;
+        border-radius: 2px;
+        background: rgba(255,255,255,0.1);
         overflow: hidden;
+        margin-top: 6px;
       }
-      #${OVERLAY_ID} .cm-progress-fill {
+      #${OVERLAY_ID} .cm-progress-bar {
         height: 100%;
         width: 0;
         background: #c4b5fd;
       }
-
-      #${OVERLAY_ID} .cm-hint {
-        position: absolute;
-        right: 34px;
-        bottom: 34px;
-        max-width: 230px;
-        color: #a99acb;
-        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-        font-size: 12px;
-        line-height: 1.45;
-        text-align: right;
-      }
-
-      @media (prefers-reduced-motion: reduce) {
-        #${OVERLAY_ID} *, #${OVERLAY_ID} *::before, #${OVERLAY_ID} *::after {
-          animation-duration: 0.01ms !important;
-          animation-iteration-count: 1 !important;
-          transition-duration: 0.01ms !important;
-        }
-      }
-
-      @media (max-width: 640px) {
-        #${OVERLAY_ID} .cm-brand { top: 20px; left: 20px; }
-        #${OVERLAY_ID} .cm-stage { width: 96vw; height: 58vh; top: 49%; }
-        #${OVERLAY_ID} .cm-plane { transform: rotateX(58deg) rotateZ(-10deg); }
-        #${OVERLAY_ID} .cm-progress-panel { bottom: 20px; width: 90vw; padding: 13px 16px 12px; }
-        #${OVERLAY_ID} .cm-hint { display: none; }
-      }
     `;
     document.head.appendChild(style);
   }
-
-  let derniereCase = -1;
-  const chemin = [
-    [0,0],[1,0],[2,0],[3,0],[4,0],[5,0],[6,0],[7,0],
-    [7,1],[7,2],[7,3],[7,4],[7,5],[7,6],[7,7],
-    [6,7],[5,7],[4,7],[3,7],[2,7],[1,7],[0,7],
-    [0,6],[0,5],[0,4],[0,3],[0,2],[0,1],
-    [1,1],[2,1],[3,1],[4,1],[5,1],[6,1],
-    [6,2],[6,3],[6,4],[6,5],[6,6],
-    [5,6],[4,6],[3,6],[2,6],[1,6],
-    [1,5],[1,4],[1,3],[1,2],
-    [2,2],[3,2],[4,2],[5,2],
-    [5,3],[5,4],[5,5],
-    [4,5],[3,5],[2,5],
-    [2,4],[2,3],
-    [3,3],[4,3],
-    [4,4],[3,4]
-  ];
 
   function afficherOverlaySignature() {
     injecterStyleOverlay();
     if (document.getElementById(OVERLAY_ID)) return;
     const overlay = document.createElement('div');
     overlay.id = OVERLAY_ID;
-
-    let cells = '';
-    for (let row = 0; row < 8; row++) {
-      for (let col = 0; col < 8; col++) {
-        cells += `<span class="cm-cell${(row + col) % 2 ? ' light' : ''}"></span>`;
-      }
+    const pieces = ['♟','♞','♝','♜','♛'];
+    let particles = '';
+    for (let i = 0; i < 14; i++) {
+      const p = pieces[i % pieces.length];
+      const left = Math.round(Math.random() * 100);
+      const top = Math.round(Math.random() * 100);
+      const delay = (Math.random() * 5).toFixed(2);
+      const dur = (6 + Math.random() * 4).toFixed(2);
+      particles += `<span class="cm-particle" style="left:${left}%;top:${top}%;animation-delay:${delay}s;animation-duration:${dur}s">${p}</span>`;
     }
-
-    const decor = [
-      { symbol:'♟', col:2, row:2 },
-      { symbol:'♝', col:6, row:1 },
-      { symbol:'♜', col:1, row:6 },
-      { symbol:'♟', col:5, row:6 }
-    ].map(p => `<span class="cm-decor-piece" style="left:${p.col * 12.5}%;top:${p.row * 12.5}%">${p.symbol}</span>`).join('');
-
+    let cells = '';
+    for (let i = 0; i < 16; i++) {
+      const row = Math.floor(i / 4);
+      const col = i % 4;
+      cells += `<span class="cm-cell${(row + col) % 2 ? ' light' : ''}"></span>`;
+    }
     overlay.innerHTML = `
-      <div class="cm-brand">
-        <span class="cm-brand-title">CheckMate</span>
-        <span class="cm-brand-sub">Votre signature est en cours</span>
-      </div>
-      <div class="cm-stage">
-        <div class="cm-plane">
-          <div class="cm-board-large">${cells}${decor}<span class="cm-piece-large">♞</span></div>
+      <div class="cm-particles">${particles}</div>
+      <div class="cm-badge">
+        <div class="cm-board-wrap">
+          <div class="cm-board">${cells}<span class="cm-piece">♞</span></div>
+        </div>
+        <div class="cm-text">
+          <span class="cm-title">CheckMate</span>
+          <span class="cm-sub">Signature en cours…</span>
+          <div class="cm-progress"><div class="cm-progress-bar"></div></div>
         </div>
       </div>
-      <div class="cm-progress-panel">
-        <div class="cm-progress-head">
-          <span class="cm-progress-title">Chaque point fait avancer une pièce</span>
-          <span class="cm-progress-value">0 %</span>
-        </div>
-        <div class="cm-progress-large"><div class="cm-progress-fill"></div></div>
-      </div>
-      <div class="cm-hint">La partie se joue autour de vous.<br>Votre signature reste visible au centre.</div>
     `;
     document.body.appendChild(overlay);
 
     if (window.gsap) {
       try {
-        window.gsap.fromTo(overlay, { opacity: 0 }, { opacity: 1, duration: 0.45, ease: 'power2.out' });
-        window.gsap.from('.cm-stage', { scale: 0.92, opacity: 0, duration: 0.8, ease: 'power3.out' });
-        window.gsap.from('.cm-brand', { y: -18, opacity: 0, duration: 0.55, delay: 0.12, ease: 'power2.out' });
-        window.gsap.from('.cm-progress-panel', { y: 24, opacity: 0, duration: 0.55, delay: 0.2, ease: 'power2.out' });
+        window.gsap.fromTo(overlay, { opacity: 0, scale: 0.98 }, { opacity: 1, scale: 1, duration: 0.4, ease: 'power2.out' });
+        const badge = overlay.querySelector('.cm-badge');
+        if (badge) window.gsap.from(badge, { y: 20, opacity: 0, duration: 0.5, delay: 0.1, ease: 'back.out(1.4)' });
       } catch (e) {
         overlay.classList.add('cm-visible');
       }
@@ -808,43 +743,51 @@
     }
   }
 
+  let derniereCase = -1;
+  const chemin = [
+    [0,3],[1,3],[2,3],[3,3],
+    [3,2],[2,2],[1,2],[0,2],
+    [0,1],[1,1],[2,1],[3,1],
+    [3,0],[2,0],[1,0],[0,0]
+  ];
+
   function animerProgression(progress) {
     const overlay = document.getElementById(OVERLAY_ID);
     if (!overlay) return;
     const p = Math.max(0, Math.min(1, progress));
-    const index = Math.min(chemin.length - 1, Math.floor(p * chemin.length));
-    const piece = overlay.querySelector('.cm-piece-large');
+    const index = Math.min(15, Math.floor(p * 16));
+    const piece = overlay.querySelector('.cm-piece');
     const cells = overlay.querySelectorAll('.cm-cell');
-    const bar = overlay.querySelector('.cm-progress-fill');
-    const value = overlay.querySelector('.cm-progress-value');
-    const title = overlay.querySelector('.cm-progress-title');
+    const boardWrap = overlay.querySelector('.cm-board-wrap');
+    const bar = overlay.querySelector('.cm-progress-bar');
+    const sub = overlay.querySelector('.cm-sub');
     if (bar) bar.style.width = `${p * 100}%`;
-    if (value) value.textContent = `${Math.round(p * 100)} %`;
+    if (sub) sub.textContent = p >= 1 ? 'Signature jouée' : `Signature en cours… ${Math.round(p * 100)} %`;
     if (!piece || !cells.length) return;
 
     if (index !== derniereCase) {
       derniereCase = index;
       const [col, row] = chemin[index];
       if (window.gsap) {
-        const duration = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 0.18;
-        window.gsap.to(piece, { x: `${col * 12.5}%`, y: `${row * 12.5}%`, duration, ease: 'power2.out' });
+        const duration = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 0.16;
+        window.gsap.to(piece, { x: col * 8.5, y: row * 8.5, duration, ease: 'power2.out' });
+        if (boardWrap) {
+          window.gsap.fromTo(boardWrap, { scale: 1 }, { scale: 1.08, duration: 0.12, yoyo: true, repeat: 1, ease: 'power1.inOut' });
+        }
       } else {
-        piece.style.left = `${col * 12.5}%`;
-        piece.style.top = `${row * 12.5}%`;
+        piece.style.transform = `translate(${col * 8.5}px, ${row * 8.5}px)`;
       }
-      cells.forEach((cell, i) => {
-        cell.classList.toggle('lit', i <= index);
-        cell.classList.toggle('current', i === index);
-      });
+      cells.forEach((cell, i) => cell.classList.toggle('lit', i <= index));
     }
 
     if (p >= 1 && !piece.classList.contains('done')) {
       piece.textContent = '♛';
       piece.classList.add('done');
-      if (title) title.textContent = 'Signature jouée';
       if (window.gsap) {
-        window.gsap.fromTo(piece, { scale: 1 }, { scale: 1.35, duration: 0.35, yoyo: true, repeat: 1, ease: 'power2.inOut' });
-        window.gsap.fromTo('.cm-progress-panel', { y: 0 }, { y: -4, duration: 0.2, yoyo: true, repeat: 1, ease: 'power1.inOut' });
+        const badge = overlay.querySelector('.cm-badge');
+        if (badge) {
+          window.gsap.fromTo(badge, { scale: 1 }, { scale: 1.05, duration: 0.22, yoyo: true, repeat: 1, ease: 'power2.inOut' });
+        }
       }
     }
   }
@@ -855,13 +798,15 @@
     const canvas = trouverPremierElement(SITE_SELECTORS.signatureCanvas);
     if (!canvas) return;
     const r = canvas.getBoundingClientRect();
-    const m = 28;
+    const m = 24;
     const x1 = Math.max(0, r.left - m);
     const y1 = Math.max(0, r.top - m);
     const x2 = Math.min(window.innerWidth, r.right + m);
     const y2 = Math.min(window.innerHeight, r.bottom + m);
+    const W = window.innerWidth;
+    const H = window.innerHeight;
     overlay.style.clipPath =
-      `polygon(evenodd, 0 0, ${window.innerWidth}px 0, ${window.innerWidth}px ${window.innerHeight}px, 0 ${window.innerHeight}px, ` +
+      `polygon(evenodd, 0 0, ${W}px 0, ${W}px ${H}px, 0 ${H}px, ` +
       `0 0, ${x1}px ${y1}px, ${x1}px ${y2}px, ${x2}px ${y2}px, ${x2}px ${y1}px, ${x1}px ${y1}px)`;
   }
 
@@ -872,9 +817,10 @@
       try {
         window.gsap.to(overlay, {
           opacity: 0,
+          scale: 0.98,
           duration: 0.3,
           ease: 'power2.in',
-          onComplete: () => overlay.remove()
+          onComplete: () => { overlay.remove(); }
         });
         return;
       } catch (e) { /* fallback */ }
