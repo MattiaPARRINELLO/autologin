@@ -1,18 +1,24 @@
 from __future__ import annotations
 
+import hashlib
+
 import pytest
 
 from checkmate_watcher.updates import (
+    Asset,
     Release,
     Version,
     check_for_update,
     parse_release,
     parse_version,
+    platform_asset,
     select_latest,
 )
 
 
-def release(tag: str, *, prerelease: bool = False) -> Release:
+def release(
+    tag: str, *, prerelease: bool = False, assets: tuple[Asset, ...] = ()
+) -> Release:
     version = parse_version(tag)
     assert version is not None
     return Release(
@@ -21,6 +27,28 @@ def release(tag: str, *, prerelease: bool = False) -> Release:
         url=f"https://example.com/{tag}",
         name=tag,
         prerelease=prerelease,
+        assets=assets,
+    )
+
+
+def _paquet(tmp_path, contenu=b"archive"):
+    path = tmp_path / "CheckMate-linux-0.4.2.tar.gz"
+    path.write_bytes(contenu)
+    return path
+
+
+def _sommes(tmp_path, contenu=b"archive"):
+    digest = hashlib.sha256(contenu).hexdigest()
+    path = tmp_path / "SHA256SUMS.txt"
+    path.write_text(f"{digest}  CheckMate-linux-0.4.2.tar.gz\n", encoding="utf-8")
+    return path
+
+
+def _platform_assets() -> tuple:
+    return (
+        Asset("CheckMate-Setup-0.4.2.exe", "u"),
+        Asset("CheckMate-linux-0.4.2.tar.gz", "v"),
+        Asset("SHA256SUMS.txt", "w"),
     )
 
 
@@ -61,19 +89,27 @@ def test_parse_release_compte_les_telechargements():
     assert parsed.downloads == 12
 
 
+def _payload(tag: str, name: str, *, prerelease: bool = False) -> dict:
+    return {
+        "tag_name": tag,
+        "html_url": "https://example.com/release",
+        "name": name,
+        "prerelease": prerelease,
+    }
+
+
+def _assert_release(tag: str, name: str, version: Version, *, prerelease=False):
+    parsed = parse_release(_payload(tag, name, prerelease=prerelease))
+    assert parsed is not None
+    assert parsed.version == version
+    assert parsed.prerelease is prerelease
+
+
 def test_parse_release_ignore_les_tags_legacy():
     assert parse_release({"tag_name": "v1.6.0"}) is None
-    parsed = parse_release(
-        {
-            "tag_name": "watcher-v0.2.0",
-            "html_url": "https://example.com/release",
-            "name": "CheckMate 0.2.0",
-            "prerelease": True,
-        }
+    _assert_release(
+        "watcher-v0.2.0", "CheckMate 0.2.0", Version(0, 2, 0), prerelease=True
     )
-    assert parsed is not None
-    assert parsed.version == Version(0, 2, 0)
-    assert parsed.prerelease is True
 
 
 def test_select_latest_avec_prereleases():
@@ -134,44 +170,24 @@ def test_une_beta_du_meme_numero_est_proposee_avant_la_stable():
     assert check_for_update("0.6.0", channel="beta", releases=releases) is None
 
 
+def _asset(name: str, url: str = "u", **extra: object) -> dict[str, object]:
+    return {"name": name, "browser_download_url": url, **extra}
+
+
 def test_parse_release_collecte_les_assets():
-    parsed = parse_release(
-        {
-            "tag_name": "watcher-v0.4.2",
-            "assets": [
-                {
-                    "name": "CheckMate-Setup-0.4.2.exe",
-                    "browser_download_url": "https://example.com/setup.exe",
-                    "size": 42,
-                },
-                {"name": "SHA256SUMS.txt", "browser_download_url": "u"},
-            ],
-        }
-    )
+    setup = _asset("CheckMate-Setup-0.4.2.exe", size=42)
+    sums = _asset("SHA256SUMS.txt")
+    parsed = parse_release({"tag_name": "watcher-v0.4.2", "assets": [setup, sums]})
     assert parsed is not None
     assert len(parsed.assets) == 2
-    setup = parsed.find_asset("CheckMate-Setup-", ".exe")
-    assert setup is not None
-    assert setup.size == 42
+    found = parsed.find_asset("CheckMate-Setup-", ".exe")
+    assert found is not None
+    assert found.size == 42
     assert parsed.asset("SHA256SUMS.txt") is not None
 
 
 def test_platform_asset():
-    from checkmate_watcher.updates import Asset, platform_asset
-
-    assets = (
-        Asset("CheckMate-Setup-0.4.2.exe", "u"),
-        Asset("CheckMate-linux-0.4.2.tar.gz", "v"),
-        Asset("SHA256SUMS.txt", "w"),
-    )
-    parsed = Release(
-        tag="watcher-v0.4.2",
-        version=Version(0, 4, 2),
-        url="",
-        name="",
-        prerelease=True,
-        assets=assets,
-    )
+    parsed = release("watcher-v0.4.2", prerelease=True, assets=_platform_assets())
     assert platform_asset(parsed, "win32").name.endswith(".exe")
     assert platform_asset(parsed, "linux").name.endswith(".tar.gz")
     assert platform_asset(parsed, "darwin") is None
@@ -207,53 +223,22 @@ def test_verify_checksum(tmp_path):
 
 
 def test_download_update(tmp_path):
-    import hashlib
+    from checkmate_watcher.updates import download_update
 
-    from checkmate_watcher.updates import Asset, download_update
-
-    payload = tmp_path / "CheckMate-linux-0.4.2.tar.gz"
-    payload.write_bytes(b"archive")
-    digest = hashlib.sha256(b"archive").hexdigest()
-    sums = tmp_path / "SHA256SUMS.txt"
-    sums.write_text(f"{digest}  CheckMate-linux-0.4.2.tar.gz\n", encoding="utf-8")
-    release = Release(
-        tag="watcher-v0.4.2",
-        version=Version(0, 4, 2),
-        url="",
-        name="",
-        prerelease=True,
-        assets=(
-            Asset("CheckMate-linux-0.4.2.tar.gz", payload.as_uri()),
-            Asset("SHA256SUMS.txt", sums.as_uri()),
-        ),
-    )
-    target_dir = tmp_path / "download"
-    archive = download_update(release, target_dir, platform="linux")
+    paquet = _paquet(tmp_path)
+    sommes = _sommes(tmp_path)
+    assets = tuple(Asset(f.name, f.as_uri()) for f in (paquet, sommes))
+    release_obj = release("watcher-v0.4.2", prerelease=True, assets=assets)
+    archive = download_update(release_obj, tmp_path / "download", platform="linux")
     assert archive.name == "CheckMate-linux-0.4.2.tar.gz"
     assert archive.read_bytes() == b"archive"
 
 
 def test_download_update_somme_invalide(tmp_path):
-    import hashlib
+    from checkmate_watcher.updates import UpdateError, download_update
 
-    from checkmate_watcher.updates import Asset, UpdateError, download_update
-
-    payload = tmp_path / "CheckMate-linux-0.4.2.tar.gz"
-    payload.write_bytes(b"archive")
-    sums = tmp_path / "SHA256SUMS.txt"
-    sums.write_text(
-        hashlib.sha256(b"autre").hexdigest() + "  CheckMate-linux-0.4.2.tar.gz\n"
-    )
-    release = Release(
-        tag="watcher-v0.4.2",
-        version=Version(0, 4, 2),
-        url="",
-        name="",
-        prerelease=True,
-        assets=(
-            Asset("CheckMate-linux-0.4.2.tar.gz", payload.as_uri()),
-            Asset("SHA256SUMS.txt", sums.as_uri()),
-        ),
-    )
+    paquet, sommes = _paquet(tmp_path), _sommes(tmp_path, b"autre")
+    assets = tuple(Asset(f.name, f.as_uri()) for f in (paquet, sommes))
+    release_obj = release("watcher-v0.4.2", prerelease=True, assets=assets)
     with pytest.raises(UpdateError):
-        download_update(release, tmp_path / "download", platform="linux")
+        download_update(release_obj, tmp_path / "download", platform="linux")
