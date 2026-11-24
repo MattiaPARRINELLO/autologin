@@ -20,8 +20,6 @@ you wrote it or have the right to submit it.
 
 - `watcher/`: the Python watcher, CLI and local dashboard. Actively maintained.
 - `emulator/`: the CESAR test server. Maintained as a testing tool.
-- Extension at the repository root (`manifest.json`, `background.js`,
-  `content.js`, `popup.*`): historical Chrome extension, frozen. No new features.
 - `ui/`: experimental Rust/egui dashboard. Not maintained for release; changes
   are welcome but it is not part of the shipped product.
 
