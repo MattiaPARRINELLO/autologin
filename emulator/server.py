@@ -650,6 +650,37 @@ class Handler(BaseHTTPRequestHandler):
         self.send_json({"error": "route inconnue"}, status=404)
 
 
+def _afficher_erreur_scenario(exc: ScenarioError) -> None:
+    print(f"Scenario invalide : {exc}", file=sys.stderr)
+
+
+def _afficher_port_occupe(args) -> None:
+    print(f"Port {args.port} deja utilise sur {args.host}.", file=sys.stderr)
+    print("Verifie qui l'occupe :", file=sys.stderr)
+    print(f"  ss -ltnp 'sport = :{args.port}'", file=sys.stderr)
+    print("Ou prends un autre port :", file=sys.stderr)
+    print(f"  python3 emulator/server.py --port {args.port + 1}", file=sys.stderr)
+    print("Ou laisse le systeme en choisir un :", file=sys.stderr)
+    print("  python3 emulator/server.py --port 0", file=sys.stderr)
+
+
+def _afficher_demarrage(base: str, scenario, args) -> None:
+    print(f"Emulateur CESAR demarre sur {base}", flush=True)
+    if scenario is not None:
+        print(f"  scenario  : {scenario.name} ({scenario.root})", flush=True)
+    print(
+        f"  connexion : {base}/connexion ({args.username} / {args.password})",
+        flush=True,
+    )
+    print(f"  admin     : {base}/admin", flush=True)
+    print(f"  etat      : {base}/api/state", flush=True)
+    print(f'  watcher   : base_url = "{base}"', flush=True)
+
+
+def _afficher_arret(started: float) -> None:
+    print(f"\nArret apres {int(time.time() - started)}s")
+
+
 def main() -> int:
     global EMULATOR, SCENARIO
 
@@ -703,7 +734,7 @@ def main() -> int:
         try:
             SCENARIO = load_scenario(args.scenario, args.attendance_close_delay_ms)
         except ScenarioError as exc:
-            print(f"Scenario invalide : {exc}", file=sys.stderr)
+            _afficher_erreur_scenario(exc)
             return 2
 
     EMULATOR = Emulator(
@@ -721,34 +752,17 @@ def main() -> int:
         server = ThreadingHTTPServer((args.host, args.port), Handler)
     except OSError as exc:
         if exc.errno == errno.EADDRINUSE:
-            print(f"Port {args.port} deja utilise sur {args.host}.", file=sys.stderr)
-            print("Verifie qui l'occupe :", file=sys.stderr)
-            print(f"  ss -ltnp 'sport = :{args.port}'", file=sys.stderr)
-            print("Ou prends un autre port :", file=sys.stderr)
-            print(
-                f"  python3 emulator/server.py --port {args.port + 1}", file=sys.stderr
-            )
-            print("Ou laisse le systeme en choisir un :", file=sys.stderr)
-            print("  python3 emulator/server.py --port 0", file=sys.stderr)
+            _afficher_port_occupe(args)
             return 1
         raise
 
     base = f"http://{args.host}:{server.server_address[1]}"
-    print(f"Emulateur CESAR demarre sur {base}", flush=True)
-    if SCENARIO is not None:
-        print(f"  scenario  : {SCENARIO.name} ({SCENARIO.root})", flush=True)
-    print(
-        f"  connexion : {base}/connexion ({args.username} / {args.password})",
-        flush=True,
-    )
-    print(f"  admin     : {base}/admin", flush=True)
-    print(f"  etat      : {base}/api/state", flush=True)
-    print(f'  watcher   : base_url = "{base}"', flush=True)
+    _afficher_demarrage(base, SCENARIO, args)
     started = time.time()
     try:
         server.serve_forever()
     except KeyboardInterrupt:
-        print(f"\nArret apres {int(time.time() - started)}s")
+        _afficher_arret(started)
     finally:
         server.server_close()
     return 0
