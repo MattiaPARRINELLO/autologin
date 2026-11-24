@@ -94,6 +94,10 @@ STATUS_HTML = """<!doctype html>
   .message:not(:empty)::before { content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: currentColor; margin-right: 8px; vertical-align: 1px; }
   .message.ok { color: var(--accent); }
   .message.err { color: var(--err); }
+  .channel { margin-top: 24px; padding-top: 18px; border-top: 1px solid var(--line); }
+  .channel-toggle { display: flex; align-items: center; gap: 10px; font-size: 14px; cursor: pointer; }
+  .channel-toggle input { width: 18px; height: 18px; accent-color: var(--accent); }
+  .channel-warning { margin: 8px 0 0 28px; font-size: 12px; color: var(--warn); max-width: 62ch; }
   footer { display: flex; justify-content: space-between; gap: 16px; margin-top: 16px; font-size: 12px; color: var(--muted); }
   @media (max-width: 720px) {
     .shell { padding: 20px 14px 32px; }
@@ -166,6 +170,16 @@ STATUS_HTML = """<!doctype html>
       <button type="button" class="secondary" data-action="open-logs">Ouvrir les logs</button>
       <button type="button" class="ghost" data-action="quit">Quitter CheckMate</button>
     </div>
+    <section class="channel">
+      <label class="channel-toggle">
+        <input type="checkbox" id="betaChannel">
+        <span>Recevoir les mises à jour beta</span>
+      </label>
+      <p class="channel-warning">
+        Les betas sortent souvent. La stabilité du projet n'est pas garantie,
+        même si elle progresse avant la version 1.0.
+      </p>
+    </section>
     <div class="message" id="message" aria-live="polite"></div>
   </main>
 
@@ -233,6 +247,7 @@ function render(snapshot) {
   document.getElementById("version").textContent =
     "Version " + snapshot.version + " - canal " + snapshot.channel +
     " - build " + snapshot.build;
+  document.getElementById("betaChannel").checked = snapshot.channel === "beta";
 
   const slots = document.getElementById("slots");
   slots.innerHTML = "";
@@ -318,6 +333,25 @@ async function runAction(action) {
 
 document.querySelectorAll("[data-action]").forEach((button) => {
   button.addEventListener("click", () => runAction(button.dataset.action));
+});
+
+document.getElementById("betaChannel").addEventListener("change", async (event) => {
+  const enabled = event.target.checked;
+  if (enabled && !window.confirm(
+    "Activer le canal beta ? Les mises a jour arrivent souvent et la stabilite n'est pas garantie."
+  )) {
+    event.target.checked = false;
+    return;
+  }
+  const channel = enabled ? "beta" : "stable";
+  try {
+    const result = await api("/api/action", { action: "set-channel", channel });
+    setMessage(result.message || "Canal mis a jour.", "ok");
+    refresh();
+  } catch (error) {
+    event.target.checked = !enabled;
+    setMessage(error.message, "err");
+  }
 });
 
 refresh();

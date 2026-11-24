@@ -13,6 +13,7 @@ from pathlib import Path
 
 import tomli_w
 
+from . import __version__
 from .analytics import DEFAULT_ENDPOINT as DEFAULT_ANALYTICS_ENDPOINT
 from .credentials import DEFAULT_SERVICE
 from .credentials import get_password as get_keyring_password
@@ -136,10 +137,14 @@ class SignatureConfig:
     padding_ratio: float = 0.9
 
 
+def _default_channel() -> str:
+    return BETA_CHANNEL if "-beta" in __version__ else STABLE_CHANNEL
+
+
 @dataclass(frozen=True)
 class UpdatesConfig:
     enabled: bool = True
-    channel: str = STABLE_CHANNEL
+    channel: str = field(default_factory=_default_channel)
 
 
 @dataclass(frozen=True)
@@ -170,7 +175,7 @@ def parse_updates_channel(table: dict) -> str:
     raw = table.get("channel")
     if raw is None:
         legacy = _legacy_channel(table)
-        return STABLE_CHANNEL if legacy is None else legacy
+        return _default_channel() if legacy is None else legacy
     return _validate_channel(_normalize_channel(raw))
 
 
@@ -615,6 +620,18 @@ def _load_parts(data: dict, require_password: bool) -> dict:
         "updates": _load_updates(data),
         "analytics": _load_analytics(data),
     }
+
+
+def save_updates_channel(path: str | Path, channel: str) -> Config:
+    """Change le canal de mise a jour sans toucher aux secrets du fichier."""
+    target = expand_path(str(path))
+    data = tomllib.loads(target.read_text(encoding="utf-8"))
+    updates = data.setdefault("updates", {})
+    if not isinstance(updates, dict):
+        raise ConfigError("[updates] doit etre une table TOML")
+    updates["channel"] = _validate_channel(_normalize_channel(channel))
+    _write_config_atomically(target, tomli_w.dumps(data))
+    return load_config(target, require_password=False)
 
 
 def load_config(path: str | Path, *, require_password: bool = True) -> Config:
