@@ -31,6 +31,7 @@ class _Context:
     schedule: Schedule
     situation: Situation
     blocked: dict | None
+    migration: dict | None
 
 
 def _iso(moment: datetime) -> str:
@@ -127,12 +128,12 @@ def _restart_required(config_path: Path, started_at: datetime) -> bool:
         return False
 
 
-def _build_context(config, state, started_at, config_path, now, blocked) -> _Context:
+def _build_context(config, state, started_at, config_path, now, blocked, migration):
     moment = now or datetime.now()
     schedule = config.schedule
     args = (config, state, started_at, config_path, moment, schedule)
     situation = schedule.situation(moment, state.window_done)
-    return _Context(*args, situation, blocked)
+    return _Context(*args, situation, blocked, migration)
 
 
 def _render(ctx: _Context) -> dict:
@@ -142,6 +143,7 @@ def _render(ctx: _Context) -> dict:
         **_state(ctx),
         "restart_required": _restart_required(ctx.config_path, ctx.started_at),
         "blocked": ctx.blocked,
+        "migration": ctx.migration,
         "log_file": str(default_log_file()),
     }
 
@@ -153,6 +155,9 @@ def build_snapshot(
     config_path: Path,
     now: datetime | None = None,
     blocked: dict | None = None,
+    migration: dict | None = None,
 ) -> dict:
-    context = _build_context(config, state, started_at, config_path, now, blocked)
+    context = _build_context(
+        config, state, started_at, config_path, now, blocked, migration
+    )
     return _render(context)

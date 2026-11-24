@@ -82,6 +82,22 @@ def _channel_message(channel: str) -> str:
     return "Canal stable active : mises a jour moins frequentes."
 
 
+def _update_payload(release, reason) -> dict:
+    return {
+        "tag": release.tag,
+        "version": release.version_text,
+        "reason": reason,
+    }
+
+
+def _blocked_payload(release) -> dict:
+    return _update_payload(release, release.required_reason)
+
+
+def _migration_payload(release) -> dict:
+    return _update_payload(release, release.migration_reason)
+
+
 def runtime_path() -> Path:
     return data_dir() / RUNTIME_NAME
 
@@ -181,7 +197,6 @@ class StatusSession:
         self.config_path = config_path
         self.state = state
         self.started_at = started_at
-        self.blocked: dict | None = None
 
     def _init_token(self) -> None:
         self.token = secrets.token_urlsafe(24)
@@ -190,6 +205,8 @@ class StatusSession:
         self.stop_event = threading.Event()
         self.port = 0
         self.url = ""
+        self.blocked: dict | None = None
+        self.migration: dict | None = None
 
     def snapshot(self) -> dict:
         return build_snapshot(
@@ -198,14 +215,16 @@ class StatusSession:
             self.started_at,
             self.config_path,
             blocked=self.blocked,
+            migration=self.migration,
         )
 
-    def set_blocked(self, release) -> None:
-        self.blocked = {
-            "tag": release.tag,
-            "version": release.version_text,
-            "reason": release.required_reason,
-        }
+    def set_blocked(self, release, migration=None) -> None:
+        self.blocked = _blocked_payload(release)
+        if migration is not None:
+            self.migration = _migration_payload(migration)
+
+    def set_migration(self, release) -> None:
+        self.migration = _migration_payload(release)
 
     def _create_notifier(self) -> Notifier:
         return Notifier.from_config(self.config)

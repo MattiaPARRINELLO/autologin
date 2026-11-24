@@ -97,17 +97,35 @@ def test_prepare_signale_deja_a_jour(monkeypatch):
         self_update.prepare(_Config())
 
 
-def test_prepare_refuse_une_migration_non_faite(monkeypatch):
-    release = Release(
-        "watcher-v0.7.0",
-        Version(0, 7, 0),
+def _capture_download(monkeypatch, tmp_path) -> list:
+    seen = []
+    monkeypatch.setattr(self_update, "default_update_dir", lambda: tmp_path)
+    monkeypatch.setattr(
+        self_update,
+        "download_update",
+        lambda release, directory: seen.append(release) or tmp_path / "a.tgz",
+    )
+    return seen
+
+
+def _release(tag, version, *, migration=None) -> Release:
+    return Release(
+        tag,
+        version,
         "",
         "",
         False,
-        migration_reason="format v2",
+        migration_reason=migration,
         markers_declared=True,
     )
-    policy = _policy(latest=release, migration=release)
+
+
+def test_prepare_installe_d_abord_la_migration(monkeypatch, tmp_path):
+    migration = _release("watcher-v0.7.0", Version(0, 7, 0), migration="format v2")
+    latest = _release("watcher-v0.8.0", Version(0, 8, 0))
+    policy = _policy(latest=latest, migration=migration)
     monkeypatch.setattr(self_update, "update_policy", lambda *a, **k: policy)
-    with pytest.raises(UpdateError, match="migration obligatoire"):
-        self_update.prepare(_Config())
+    seen = _capture_download(monkeypatch, tmp_path)
+    release, _archive = self_update.prepare(_Config())
+    assert release is migration
+    assert seen == [migration]

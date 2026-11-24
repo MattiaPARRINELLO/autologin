@@ -89,6 +89,7 @@ def test_update_policy_detecte_migration_et_obligation():
     assert policy.available
     assert policy.migration.tag == "watcher-v0.7.0-beta.1"
     assert policy.required.tag == "watcher-v0.7.0"
+    assert policy.install_target is policy.migration
 
 
 def test_parse_version():

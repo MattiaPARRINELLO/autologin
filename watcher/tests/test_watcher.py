@@ -51,18 +51,19 @@ def _required_policy() -> UpdatePolicy:
 def test_version_obligatoire_detectee(monkeypatch):
     policy = _required_policy()
     monkeypatch.setattr(watcher, "_load_policy", _loader(policy))
-    assert asyncio.run(watcher._required_update(_Config())) is policy
+    assert asyncio.run(watcher._startup_policy(_Config())) is policy
 
 
-def test_sans_version_obligatoire_aucun_blocage(monkeypatch):
+def test_sans_version_obligatoire_la_politique_reste_disponible(monkeypatch):
     policy = UpdatePolicy(Version(0, 7, 0), None, None, None, "stable")
     monkeypatch.setattr(watcher, "_load_policy", _loader(policy))
-    assert asyncio.run(watcher._required_update(_Config())) is None
+    result = asyncio.run(watcher._startup_policy(_Config()))
+    assert result is policy and result.required is None
 
 
 def test_verification_desactivee_ne_bloque_pas(monkeypatch):
     monkeypatch.setattr(watcher, "_load_policy", _loader(_required_policy()))
-    assert asyncio.run(watcher._required_update(_Config(enabled=False))) is None
+    assert asyncio.run(watcher._startup_policy(_Config(enabled=False))) is None
 
 
 def test_erreur_reseau_ne_bloque_pas(monkeypatch):
@@ -70,7 +71,7 @@ def test_erreur_reseau_ne_bloque_pas(monkeypatch):
         raise RuntimeError("reseau")
 
     monkeypatch.setattr(watcher, "_load_policy", boom)
-    assert asyncio.run(watcher._required_update(_Config())) is None
+    assert asyncio.run(watcher._startup_policy(_Config())) is None
 
 
 def test_pas_de_pause_hors_planning(tmp_path):

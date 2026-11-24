@@ -162,16 +162,15 @@ async def _load_policy(config: Config):
     return await asyncio.wait_for(request, timeout=10)
 
 
-async def _required_update(config: Config):
-    """Rend la politique courante si une version minimale impose un blocage."""
+async def _startup_policy(config: Config):
+    """Rend la politique de mise a jour, ou None si elle est indisponible."""
     if not config.updates.enabled:
         return None
     try:
-        policy = await _load_policy(config)
+        return await _load_policy(config)
     except Exception as exc:
         logger.debug("verification de version minimale impossible : %s", exc)
         return None
-    return policy if policy.required is not None else None
 
 
 def _required_message(release) -> str:
@@ -194,16 +193,23 @@ async def _notify_required(config, state, release) -> None:
     state.set_meta("required_blocked_tag", release.tag)
 
 
-async def _handle_required(config, state, status_session, stop_event, release, once):
+async def _handle_required(
+    config, state, status_session, stop_event, release, migration, once
+):
     logger.error("mise a jour obligatoire : %s", release.tag)
-    logger.error("raison : %s", release.required_reason)
     if once:
         return BLOCKED_EXIT_CODE
-    status_session.set_blocked(release)
+    status_session.set_blocked(release, migration)
     await _notify_required(config, state, release)
     while not stop_event.is_set():
         await asyncio.sleep(BLOCKED_POLL_SECONDS)
     return 0
+
+
+def _announce_migration(status_session, policy) -> None:
+    if status_session is None or policy is None or policy.migration is None:
+        return
+    status_session.set_migration(policy.migration)
 
 
 async def sign_with_visibility(
@@ -340,11 +346,18 @@ async def run_loop(
     stop_event = status_session.stop_event if status_session else None
 
     try:
-        required = await _required_update(config)
-        if required is not None:
+        policy = await _startup_policy(config)
+        if policy is not None and policy.required is not None:
             return await _handle_required(
-                config, state, status_session, stop_event, required.required, once
+                config,
+                state,
+                status_session,
+                stop_event,
+                policy.required,
+                policy.migration,
+                once,
             )
+        _announce_migration(status_session, policy)
         await _check_update(config, state)
         session = CesarSession(config)
         poll_headless = (

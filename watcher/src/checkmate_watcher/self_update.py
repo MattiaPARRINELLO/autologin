@@ -168,23 +168,14 @@ def _transient_unit_active(unit: str, attempts: int = 5) -> bool:
 
 
 def prepare(config) -> tuple[Release, Path]:
-    """Verifie, telecharge et controle la mise a jour. Rend (version, archive)."""
+    """Telecharge la migration a passer en priorite, sinon la derniere version."""
     policy = update_policy(__version__, channel=config.updates.channel)
-    if not policy.available:
+    release = policy.install_target
+    if release is None:
         raise UpdateError(f"CheckMate {__version__} est deja a jour")
-    if policy.migration is not None:
-        raise UpdateError(_migration_message(policy.migration))
-    release = policy.latest
     directory = default_update_dir() / release.version_text
     archive = download_update(release, directory)
     return release, archive
-
-
-def _migration_message(release: Release) -> str:
-    return (
-        f"migration obligatoire par {release.tag} ({release.migration_reason}) : "
-        "installe d'abord cette version avant de continuer"
-    )
 
 
 def update_now(config) -> str:

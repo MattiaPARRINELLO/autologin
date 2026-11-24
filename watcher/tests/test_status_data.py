@@ -45,8 +45,23 @@ def test_snapshot_bloque_par_une_version_obligatoire(tmp_path):
         blocked=blocked,
     )
     assert snapshot["blocked"] == blocked
+    assert snapshot["migration"] is None
     assert snapshot["mode"] == "blocked"
     assert snapshot["label"] == "Mise a jour obligatoire"
+
+
+def test_snapshot_signale_une_migration_intermediaire(tmp_path):
+    migration = {"tag": "watcher-v0.7.5", "version": "0.7.5", "reason": "format v2"}
+    snapshot = build_snapshot(
+        make_config(tmp_path),
+        make_state(tmp_path),
+        datetime(2026, 11, 16, 9, 55),
+        tmp_path / "config.toml",
+        now=datetime(2026, 11, 16, 10, 0),
+        migration=migration,
+    )
+    assert snapshot["migration"] == migration
+    assert snapshot["blocked"] is None
 
 
 def test_snapshot_surveillance_active(tmp_path):

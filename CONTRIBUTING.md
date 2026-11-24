@@ -317,7 +317,9 @@ CHECKMATE-REQUIRED: 0
 
 - `CHECKMATE-MIGRATION` : la release migre des donnees ou un format de facon
   irreversible. Mettre `0` si aucune migration. Sinon, une raison courte.
-  Sauter cette version lors d'une mise a jour n'est pas supporte.
+  La mise a jour installe d'abord la plus ancienne migration non faite, puis
+  reprend normalement apres redemarrage ; sauter cette version reste non
+  supporte.
 - `CHECKMATE-REQUIRED` : version minimale obligatoire. Mettre `0` si aucune
   contrainte. Sinon, une raison courte qui sera affichee a l'utilisateur.
   Une version locale inferieure a la derniere release `REQUIRED` est bloquee
