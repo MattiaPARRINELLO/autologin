@@ -30,7 +30,7 @@ def available() -> bool:
     if not os.environ.get("DBUS_SESSION_BUS_ADDRESS"):
         return False
     try:
-        import dbus_next  # noqa: F401
+        import dbus_next
     except Exception:  # dependance optionnelle hors Linux
         return False
     return True

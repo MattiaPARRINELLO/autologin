@@ -42,7 +42,7 @@ def _require(namespace: str, versions: tuple[str, ...]) -> bool:
 def _linux_ready() -> bool:
     """Verifie GTK 3 et WebKit2, les deux moteurs du backend pywebview."""
     try:
-        import gi  # noqa: F401
+        import gi
     except Exception:  # PyGObject absent
         return False
     return _require("Gtk", ("3.0",)) and _require("WebKit2", ("4.1", "4.0"))
