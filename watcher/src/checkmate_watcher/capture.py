@@ -205,7 +205,7 @@ class CaptureSession:
             return
         try:
             body = await response.body()
-        except Exception:  # noqa: BLE001
+        except Exception:
             return
         relative = f"{ASSETS_DIR}/{asset_name(response.url, len(self.assets))}"
         (self.root / relative).write_bytes(body)

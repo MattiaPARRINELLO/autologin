@@ -292,7 +292,7 @@ async def command_capture(config: Config) -> int:
                 timeout=300_000,
             )
             raw = await page.evaluate("window.__signatureCapture.points")
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             await browser.close()
             print(f"Capture annulee : {exc}")
             return 1
@@ -492,7 +492,7 @@ def command_stats(config: Config) -> int:
     print(f"  Erreurs           : {state.counter('stats.errors')}")
     try:
         releases = fetch_releases()
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         print(f"  Telechargements   : indisponibles ({exc})")
         return 0
     downloads = sum(release.downloads for release in releases)
@@ -509,7 +509,7 @@ def command_check_update(config: Config) -> int:
             __version__,
             channel=config.updates.channel,
         )
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         print(f"verification impossible : {exc}")
         return 1
     if release is None:
@@ -526,7 +526,7 @@ def command_update(config: Config, *, check_only: bool, assume_yes: bool) -> int
             __version__,
             channel=config.updates.channel,
         )
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         print(f"verification impossible : {exc}")
         return 1
     if release is None:

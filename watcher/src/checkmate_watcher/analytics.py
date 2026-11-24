@@ -125,7 +125,7 @@ def record(config, event: str) -> None:
         return
     try:
         _send(config, event)
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         logger.debug("statistique ignoree : %s", exc)
 
 

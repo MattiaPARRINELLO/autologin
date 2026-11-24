@@ -118,7 +118,7 @@ def status_alive(runtime: dict, timeout: float = 1.5) -> bool:
         )
         with urllib.request.urlopen(request, timeout=timeout) as response:
             return response.status == 200
-    except Exception:  # noqa: BLE001
+    except Exception:
         return False
 
 

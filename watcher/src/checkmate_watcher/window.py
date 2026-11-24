@@ -43,7 +43,7 @@ def _linux_ready() -> bool:
     """Verifie GTK 3 et WebKit2, les deux moteurs du backend pywebview."""
     try:
         import gi  # noqa: F401
-    except Exception:  # noqa: BLE001 - PyGObject absent
+    except Exception:  # PyGObject absent
         return False
     return _require("Gtk", ("3.0",)) and _require("WebKit2", ("4.1", "4.0"))
 
@@ -102,7 +102,7 @@ def show(url: str, *, close_event: threading.Event | None = None) -> bool:
             # Force GTK : evite la sonde Qt de pywebview et ses traces au demarrage.
             options["gui"] = "gtk"
         backend.start(**options)
-    except Exception as error:  # noqa: BLE001 - moteur web absent ou casse
+    except Exception as error:  # moteur web absent ou casse
         logger.info("fenetre native indisponible : %s", error)
         return False
     return True

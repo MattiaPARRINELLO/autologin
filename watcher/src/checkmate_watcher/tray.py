@@ -9,7 +9,7 @@ import threading
 try:
     import pystray
     from PIL import Image, ImageDraw
-except Exception:  # noqa: BLE001 - optionnel selon la plateforme
+except Exception:  # optionnel selon la plateforme
     pystray = None
     Image = None
     ImageDraw = None
@@ -157,7 +157,7 @@ class TrayController:
             message = result.get("message") if isinstance(result, dict) else None
             if message:
                 self._notify(message)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.warning("action de l'icone echouee : %s", exc)
             self._notify(str(exc))
 
