@@ -84,18 +84,25 @@ def _install_windows(archive: Path) -> None:
         raise UpdateError(f"lancement de l'installeur impossible : {exc}") from exc
 
 
+def _fill_update_script(handle, archive, cleanup):
+    with os.fdopen(handle, "w", encoding="utf-8") as file:
+        script = LINUX_SCRIPT.format(
+            archive=_quote(str(archive)),
+            cleanup=_quote(str(cleanup)),
+            unit=UNIT_NAME,
+        )
+        file.write(script)
+
+
 def _write_update_script(archive, cleanup):
-    # fmt: off
     handle, path = tempfile.mkstemp(prefix="checkmate-update-", suffix=".sh")
     try:
-        with os.fdopen(handle, "w", encoding="utf-8") as file:
-            file.write(LINUX_SCRIPT.format(archive=_quote(str(archive)), cleanup=_quote(str(cleanup)), unit=UNIT_NAME))
+        _fill_update_script(handle, archive, cleanup)
         os.chmod(path, 0o700)
         return path
     except OSError:
         Path(path).unlink(missing_ok=True)
         raise
-    # fmt: on
 
 
 def _install_linux(archive: Path, cleanup: Path) -> None:
