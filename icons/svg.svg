@@ -1,7 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" fill="#ffffff">
-  <!-- CheckMate — Roi d'échecs -->
-  <path d="M 256 32 L 256 80 M 232 56 L 280 56" stroke="#ffffff" stroke-width="30" stroke-linecap="round" fill="none"/>
-  <path d="M 256 80 C 220 80, 192 108, 192 140 C 192 168, 210 192, 236 200 L 200 320 L 160 320 L 140 380 L 372 380 L 352 320 L 312 320 L 276 200 C 302 192, 320 168, 320 140 C 320 108, 292 80, 256 80 Z"/>
-  <rect x="120" y="400" width="272" height="36" rx="8"/>
-  <rect x="104" y="448" width="304" height="36" rx="8"/>
-</svg>
