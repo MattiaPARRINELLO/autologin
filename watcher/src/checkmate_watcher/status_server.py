@@ -224,7 +224,7 @@ class StatusSession:
         folder.mkdir(parents=True, exist_ok=True)
         try:
             if sys.platform.startswith("win"):
-                os.startfile(folder)  # type: ignore[attr-defined]
+                getattr(os, "startfile")(folder)
             elif sys.platform == "darwin":
                 subprocess.Popen(["open", str(folder)])
             else:

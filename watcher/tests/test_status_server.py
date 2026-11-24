@@ -60,7 +60,7 @@ def test_tableau_de_bord(tmp_path):
         assert snapshot["channel"] == "stable"
         assert "counters" in snapshot
 
-        session.test_notification = lambda: {"ok": True, "message": "test"}  # type: ignore[method-assign]
+        setattr(session, "test_notification", lambda: {"ok": True, "message": "test"})
         status, result = call(
             base,
             "/api/action",
