@@ -105,6 +105,33 @@ menu des applications. Les logs se trouvent dans
 `~/.local/state/checkmate-watcher/log/checkmate-watcher.log` sous Linux, et dans
 `%LOCALAPPDATA%\checkmate-watcher\logs` sous Windows.
 
+## CheckMate demande une mise à jour obligatoire
+
+Un bandeau rouge « Mise à jour obligatoire » signifie qu'une version minimale a
+été publiée pour corriger un problème de sécurité ou de compatibilité. La
+surveillance reste arrêtée jusqu'à l'installation. Utilise le bouton du tableau
+de bord ou lance :
+
+```bash
+checkmate-watcher update --yes
+```
+
+Le motif du blocage est affiché dans le bandeau. Si GitHub est injoignable,
+CheckMate ne se bloque pas : réessaie quand la connexion revient.
+
+## Une migration intermédiaire est demandée
+
+Un bandeau orange « Migration intermédiaire requise » indique une version à
+installer avant la cible finale. Installe la version affichée, laisse CheckMate
+redémarrer, puis répète l'opération si une autre étape est proposée. Ne saute
+pas ces étapes avec une archive plus récente.
+
+Comme une migration peut être irréversible, sauvegarde tes données avant
+l'installation :
+
+- Linux : `~/.config/checkmate-watcher` et `~/.local/share/checkmate-watcher` ;
+- Windows : `%LOCALAPPDATA%\checkmate-watcher`.
+
 ## L'icône de notification est un carré plein
 
 Sous Linux, CheckMate publie une icône StatusNotifierItem avec un vrai pixmap de

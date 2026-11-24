@@ -136,15 +136,65 @@ systemctl --user restart checkmate-watcher
 CheckMate vérifie les nouvelles versions au démarrage et affiche une
 notification avec le lien de téléchargement, une seule fois par version.
 
-Pour vérifier manuellement :
+### Vérifier et installer
+
+Depuis le tableau de bord, clique sur "Vérifier les mises à jour", puis sur
+"Installer X.Y.Z". En terminal :
 
 ```bash
 checkmate-watcher check-update
+checkmate-watcher update --yes
 ```
 
-L'installation est encore manuelle : télécharge le nouvel installeur depuis les
-releases. L'OTA complet sera activé après la mise en place de la signature de
-code.
+CheckMate télécharge le paquet, vérifie sa somme SHA256 et l'installe en
+arrière-plan. La configuration et la signature sont conservées.
+
+### Choisir le canal stable ou beta
+
+Par défaut, le canal suit la version installée : une version stable utilise le
+canal stable, une version beta utilise le canal beta. Une valeur explicite dans
+la configuration reste prioritaire. Le tableau de bord affiche le canal à côté
+de la version.
+
+Pour recevoir les betas, coche "Recevoir les mises à jour beta" ou configure :
+
+```toml
+[updates]
+channel = "beta"
+```
+
+Pour revenir aux versions stables, décoche la case ou remets
+`channel = "stable"`. Si tu es déjà sur une beta, tu restes sur cette version :
+les prochaines betas ne sont plus proposées, mais CheckMate ne retourne jamais
+automatiquement à une version stable plus ancienne. La prochaine version stable
+plus récente te sera proposée.
+
+L'ancienne clé `include_prerelease = true` reste acceptée et équivaut à
+`channel = "beta"` si `channel` est absent.
+
+### Mise à jour obligatoire
+
+Si une release impose une version minimale, CheckMate ne démarre pas la
+surveillance et ne signe rien. Le tableau de bord affiche un bandeau rouge
+avec la raison et un bouton pour installer la version exigée. L'icône passe en
+« attention requise ». En terminal, `checkmate-watcher run --once` sort avec le
+code 3.
+
+Le tableau de bord reste disponible pour installer la mise à jour, consulter
+les logs ou quitter. Si GitHub est injoignable, le contrôle échoue ouvert :
+CheckMate ne se bloque pas à cause d'une panne réseau.
+
+### Migration intermédiaire
+
+Certaines versions doivent être installées dans l'ordre pour migrer un format
+de données. Dans ce cas, le tableau de bord affiche un bandeau orange
+"Migration intermédiaire requise" avec la raison et la version à installer en
+premier.
+
+Clique sur "Installer X.Y.Z" pour appliquer cette migration. Après le
+redémarrage, CheckMate indique l'étape suivante si nécessaire. Plusieurs
+migrations peuvent donc s'enchaîner une par une. Le retour arrière sous une
+version qui a migré les données n'est pas garanti.
 
 ## Vérifier l'installation
 
@@ -181,40 +231,7 @@ rm -rf ~/.local/share/checkmate-watcher
 rm -rf ~/.config/checkmate-watcher
 ```
 
-## Mettre à jour
-
-Le tableau de bord propose la mise à jour : "Vérifier les mises à jour", puis
-"Installer X.Y.Z". CheckMate télécharge le paquet, vérifie sa somme SHA256 et
-l'installe en arrière-plan. La configuration et la signature sont conservées.
-
-En terminal :
-
-```bash
-checkmate-watcher update --check
-checkmate-watcher update --yes
-```
-
-### Choisir le canal stable ou beta
-
-Par défaut, ton installation suit les versions stables : une beta ne t'est
-jamais proposée. Le tableau de bord affiche le canal à côté de la version.
-
-Pour recevoir les betas, ajoute `channel = "beta"` dans la section `[updates]`
-de ta configuration :
-
-```toml
-[updates]
-channel = "beta"
-```
-
-Le bouton "Installer X.Y.Z" installe la version proposée pour ton canal, sans
-autre choix à faire. Pour revenir aux versions stables, remets
-`channel = "stable"` ou supprime la clé (c'est la valeur par défaut).
-
-L'ancienne clé `include_prerelease = true` reste acceptée et équivaut à
-`channel = "beta"` si `channel` est absent.
-
-### Désactiver les statistiques anonymes
+## Statistiques anonymes
 
 CheckMate compte les installations et les signatures avec un identifiant
 aléatoire, sans aucune donnée CESAR. Pour couper ces envois :
