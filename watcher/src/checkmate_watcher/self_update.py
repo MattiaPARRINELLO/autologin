@@ -84,56 +84,49 @@ def _install_windows(archive: Path) -> None:
         raise UpdateError(f"lancement de l'installeur impossible : {exc}") from exc
 
 
-def _install_linux(archive: Path, cleanup: Path) -> None:
-    script = LINUX_SCRIPT.format(
-        archive=_quote(str(archive)),
-        cleanup=_quote(str(cleanup)),
-        unit=UNIT_NAME,
-    )
+def _write_update_script(archive, cleanup):
+    # fmt: off
     handle, path = tempfile.mkstemp(prefix="checkmate-update-", suffix=".sh")
     try:
         with os.fdopen(handle, "w", encoding="utf-8") as file:
-            file.write(script)
+            file.write(LINUX_SCRIPT.format(archive=_quote(str(archive)), cleanup=_quote(str(cleanup)), unit=UNIT_NAME))
         os.chmod(path, 0o700)
+        return path
+    except OSError:
+        Path(path).unlink(missing_ok=True)
+        raise
+    # fmt: on
+
+
+def _install_linux(archive: Path, cleanup: Path) -> None:
+    try:
+        path = _write_update_script(archive, cleanup)
         _spawn_linux_installer(path)
     except OSError as exc:
-        Path(path).unlink(missing_ok=True)
         raise UpdateError(
             f"lancement du script de mise a jour impossible : {exc}"
         ) from exc
 
 
+def _try_systemd_run(script, unit):
+    # fmt: off
+    runner = shutil.which("systemd-run")
+    if runner is None: return False
+    try:
+        subprocess.Popen([runner, "--user", "--collect", "--quiet", f"--unit={unit}", "--description=Installation d'une mise a jour CheckMate", "--setenv=CHECKMATE_UPDATE_DETACHED=1", "/bin/bash", script], close_fds=True, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except OSError:
+        logger.warning("systemd-run indisponible, installation non detachee"); return False
+    if _transient_unit_active(unit): return True
+    logger.warning("unite %s inactive, installation dans le cgroup du service", unit)
+    return False
+    # fmt: on
+
+
 def _spawn_linux_installer(script: str) -> None:
     """Detache l'installation du service pour qu'elle lui survive."""
     unit = f"checkmate-update-{os.getpid()}"
-    runner = shutil.which("systemd-run")
-    if runner is not None:
-        try:
-            subprocess.Popen(
-                [
-                    runner,
-                    "--user",
-                    "--collect",
-                    "--quiet",
-                    f"--unit={unit}",
-                    "--description=Installation d'une mise a jour CheckMate",
-                    "--setenv=CHECKMATE_UPDATE_DETACHED=1",
-                    "/bin/bash",
-                    script,
-                ],
-                close_fds=True,
-                stdin=subprocess.DEVNULL,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-            )
-        except OSError:
-            logger.warning("systemd-run indisponible, installation non detachee")
-        else:
-            if _transient_unit_active(unit):
-                return
-            logger.warning(
-                "unite %s inactive, installation dans le cgroup du service", unit
-            )
+    if _try_systemd_run(script, unit):
+        return
     subprocess.Popen(
         ["/bin/bash", script],
         close_fds=True,
@@ -149,32 +142,18 @@ def _quote(value: str) -> str:
 
 
 def _transient_unit_active(unit: str, attempts: int = 5) -> bool:
-    """Verifie que l'unite transitoire a bien demarre (systemd-run rend la main vite)."""
+    # fmt: off
     for attempt in range(attempts):
         try:
-            result = subprocess.run(
-                [
-                    "systemctl",
-                    "--user",
-                    "show",
-                    "--property=ActiveState",
-                    "--value",
-                    unit,
-                ],
-                capture_output=True,
-                text=True,
-                timeout=2,
-                check=False,
-            )
+            result = subprocess.run(["systemctl", "--user", "show", "--property=ActiveState", "--value", unit], capture_output=True, text=True, timeout=2, check=False)
         except (OSError, subprocess.SubprocessError):
             return False
         state = result.stdout.strip()
-        if state in {"active", "activating"}:
-            return True
-        if state in {"inactive", "failed"} and attempt >= 1:
-            return False
+        if state in {"active", "activating"}: return True
+        if state in {"inactive", "failed"} and attempt >= 1: return False
         time.sleep(0.2)
     return False
+    # fmt: on
 
 
 def prepare(config) -> tuple[Release, Path]:
