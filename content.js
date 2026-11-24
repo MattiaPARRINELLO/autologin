@@ -253,6 +253,9 @@
       const SOURCE_WIDTH_DEFAULT = 320;
       const SOURCE_HEIGHT_DEFAULT = 150;
       const rect = await attendreCanvasStable(canvasCible);
+      // La modale peut encore se déplacer après sa première apparition : recalculer
+      // le trou une fois le canvas stabilisé pour ne jamais masquer la signature.
+      percerTrouSignature();
 
       // IMPORTANT : utiliser les dimensions CSS d'affichage (rect), pas la résolution
       // interne du canvas (canvasCible.width). Les coordonnées d'événements (clientX,
@@ -346,8 +349,11 @@
           dispatchPointerEvent(canvasCible, 'pointerup', eventOptions);
           dispatchTouchEvent(canvasCible, 'touchend', clientX, clientY, true);
         }
+
+        animerProgression((i + 1) / signatureData.length);
       }
 
+      animerProgression(1);
       console.log('[Signature] Replay terminé avec succès');
       return true;
 
@@ -546,6 +552,283 @@
   }
 
   // =============================================
+  // OVERLAY DE SIGNATURE — Badge CheckMate réactif au tracé
+  // =============================================
+
+  const OVERLAY_STYLE_ID = 'checkmate-signature-overlay-style';
+  const OVERLAY_ID = 'checkmate-signature-overlay';
+
+  function injecterStyleOverlay() {
+    if (document.getElementById(OVERLAY_STYLE_ID)) return;
+    const style = document.createElement('style');
+    style.id = OVERLAY_STYLE_ID;
+    style.textContent = `
+      #${OVERLAY_ID} {
+        position: fixed;
+        inset: 0;
+        z-index: 2147483647;
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity 0.4s ease;
+        background:
+          radial-gradient(1200px 600px at 10% 10%, rgba(124, 58, 237, 0.18), transparent 60%),
+          radial-gradient(900px 500px at 90% 90%, rgba(167, 139, 250, 0.14), transparent 60%),
+          repeating-linear-gradient(45deg, rgba(139, 92, 246, 0.04) 0 18px, transparent 18px 36px);
+        overflow: hidden;
+      }
+      #${OVERLAY_ID}.cm-visible { opacity: 1; }
+
+      #${OVERLAY_ID} .cm-particles { position:absolute; inset:0; }
+      #${OVERLAY_ID} .cm-particle {
+        position: absolute;
+        font-size: 22px;
+        color: rgba(167, 139, 250, 0.18);
+        animation: cm-float 7s ease-in-out infinite;
+        user-select: none;
+      }
+      @keyframes cm-float {
+        0%, 100% { transform: translate(0,0) rotate(0deg); opacity: .18; }
+        50% { transform: translate(12px,-18px) rotate(18deg); opacity: .32; }
+      }
+
+      #${OVERLAY_ID} .cm-badge {
+        position: absolute;
+        right: 22px;
+        bottom: 22px;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 14px 18px;
+        border-radius: 18px;
+        background: linear-gradient(135deg, rgba(30,20,60,0.82), rgba(49,46,129,0.72));
+        border: 1px solid rgba(167, 139, 250, 0.5);
+        color: #f5f3ff;
+        font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        box-shadow:
+          0 12px 40px rgba(88, 28, 135, 0.45),
+          inset 0 1px 0 rgba(255,255,255,0.08);
+        animation: cm-badge-float 2.2s ease-in-out infinite;
+      }
+      @keyframes cm-badge-float {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-7px); }
+      }
+
+      #${OVERLAY_ID} .cm-board-wrap {
+        position: relative;
+        width: 46px;
+        height: 46px;
+        border-radius: 12px;
+        background: #4c1d95;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 0 18px rgba(124, 58, 237, 0.45);
+      }
+      #${OVERLAY_ID} .cm-board {
+        position: relative;
+        width: 34px;
+        height: 34px;
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        grid-template-rows: repeat(4, 1fr);
+        border-radius: 6px;
+        overflow: hidden;
+        background: #241443;
+      }
+      #${OVERLAY_ID} .cm-cell { background: #35205f; }
+      #${OVERLAY_ID} .cm-cell.light { background: #4b2c83; }
+      #${OVERLAY_ID} .cm-cell.lit { background: #c4b5fd; }
+      #${OVERLAY_ID} .cm-piece {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 25%;
+        height: 25%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 11px;
+        line-height: 1;
+        color: #ffffff;
+        text-shadow: 0 1px 2px rgba(0,0,0,.55);
+        z-index: 2;
+        will-change: transform;
+      }
+      #${OVERLAY_ID} .cm-piece.done {
+        color: #f5d0fe;
+        animation: cm-piece-pulse 1.2s ease-in-out infinite;
+      }
+      @keyframes cm-piece-pulse {
+        0%, 100% { filter: brightness(1); }
+        50% { filter: brightness(1.6); }
+      }
+
+      #${OVERLAY_ID} .cm-text { display: flex; flex-direction: column; line-height: 1.15; gap: 2px; }
+      #${OVERLAY_ID} .cm-title {
+        font-size: 15px;
+        font-weight: 700;
+        background: linear-gradient(90deg, #f5f3ff, #c4b5fd);
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+      }
+      #${OVERLAY_ID} .cm-sub { font-size: 11px; color: #c4b5fd; font-weight: 400; }
+
+      #${OVERLAY_ID} .cm-progress {
+        width: 100%;
+        height: 3px;
+        border-radius: 2px;
+        background: rgba(255,255,255,0.1);
+        overflow: hidden;
+        margin-top: 6px;
+      }
+      #${OVERLAY_ID} .cm-progress-bar {
+        height: 100%;
+        width: 0;
+        background: #c4b5fd;
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  function afficherOverlaySignature() {
+    injecterStyleOverlay();
+    if (document.getElementById(OVERLAY_ID)) return;
+    const overlay = document.createElement('div');
+    overlay.id = OVERLAY_ID;
+    const pieces = ['♟','♞','♝','♜','♛'];
+    let particles = '';
+    for (let i = 0; i < 14; i++) {
+      const p = pieces[i % pieces.length];
+      const left = Math.round(Math.random() * 100);
+      const top = Math.round(Math.random() * 100);
+      const delay = (Math.random() * 5).toFixed(2);
+      const dur = (6 + Math.random() * 4).toFixed(2);
+      particles += `<span class="cm-particle" style="left:${left}%;top:${top}%;animation-delay:${delay}s;animation-duration:${dur}s">${p}</span>`;
+    }
+    let cells = '';
+    for (let i = 0; i < 16; i++) {
+      const row = Math.floor(i / 4);
+      const col = i % 4;
+      cells += `<span class="cm-cell${(row + col) % 2 ? ' light' : ''}"></span>`;
+    }
+    overlay.innerHTML = `
+      <div class="cm-particles">${particles}</div>
+      <div class="cm-badge">
+        <div class="cm-board-wrap">
+          <div class="cm-board">${cells}<span class="cm-piece">♞</span></div>
+        </div>
+        <div class="cm-text">
+          <span class="cm-title">CheckMate</span>
+          <span class="cm-sub">Signature en cours…</span>
+          <div class="cm-progress"><div class="cm-progress-bar"></div></div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    if (window.gsap) {
+      try {
+        window.gsap.fromTo(overlay, { opacity: 0, scale: 0.98 }, { opacity: 1, scale: 1, duration: 0.4, ease: 'power2.out' });
+        const badge = overlay.querySelector('.cm-badge');
+        if (badge) window.gsap.from(badge, { y: 20, opacity: 0, duration: 0.5, delay: 0.1, ease: 'back.out(1.4)' });
+      } catch (e) {
+        overlay.classList.add('cm-visible');
+      }
+    } else {
+      requestAnimationFrame(() => overlay.classList.add('cm-visible'));
+    }
+  }
+
+  let derniereCase = -1;
+  const chemin = [
+    [0,3],[1,3],[2,3],[3,3],
+    [3,2],[2,2],[1,2],[0,2],
+    [0,1],[1,1],[2,1],[3,1],
+    [3,0],[2,0],[1,0],[0,0]
+  ];
+
+  function animerProgression(progress) {
+    const overlay = document.getElementById(OVERLAY_ID);
+    if (!overlay) return;
+    const p = Math.max(0, Math.min(1, progress));
+    const index = Math.min(15, Math.floor(p * 16));
+    const piece = overlay.querySelector('.cm-piece');
+    const cells = overlay.querySelectorAll('.cm-cell');
+    const boardWrap = overlay.querySelector('.cm-board-wrap');
+    const bar = overlay.querySelector('.cm-progress-bar');
+    const sub = overlay.querySelector('.cm-sub');
+    if (bar) bar.style.width = `${p * 100}%`;
+    if (sub) sub.textContent = p >= 1 ? 'Signature jouée' : `Signature en cours… ${Math.round(p * 100)} %`;
+    if (!piece || !cells.length) return;
+
+    if (index !== derniereCase) {
+      derniereCase = index;
+      const [col, row] = chemin[index];
+      if (window.gsap) {
+        const duration = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 0.16;
+        window.gsap.to(piece, { x: col * 8.5, y: row * 8.5, duration, ease: 'power2.out' });
+        if (boardWrap) {
+          window.gsap.fromTo(boardWrap, { scale: 1 }, { scale: 1.08, duration: 0.12, yoyo: true, repeat: 1, ease: 'power1.inOut' });
+        }
+      } else {
+        piece.style.transform = `translate(${col * 8.5}px, ${row * 8.5}px)`;
+      }
+      cells.forEach((cell, i) => cell.classList.toggle('lit', i <= index));
+    }
+
+    if (p >= 1 && !piece.classList.contains('done')) {
+      piece.textContent = '♛';
+      piece.classList.add('done');
+      if (window.gsap) {
+        const badge = overlay.querySelector('.cm-badge');
+        if (badge) {
+          window.gsap.fromTo(badge, { scale: 1 }, { scale: 1.05, duration: 0.22, yoyo: true, repeat: 1, ease: 'power2.inOut' });
+        }
+      }
+    }
+  }
+
+  function percerTrouSignature() {
+    const overlay = document.getElementById(OVERLAY_ID);
+    if (!overlay) return;
+    const canvas = trouverPremierElement(SITE_SELECTORS.signatureCanvas);
+    if (!canvas) return;
+    const r = canvas.getBoundingClientRect();
+    const m = 24;
+    const x1 = Math.max(0, r.left - m);
+    const y1 = Math.max(0, r.top - m);
+    const x2 = Math.min(window.innerWidth, r.right + m);
+    const y2 = Math.min(window.innerHeight, r.bottom + m);
+    const W = window.innerWidth;
+    const H = window.innerHeight;
+    overlay.style.clipPath =
+      `polygon(evenodd, 0 0, ${W}px 0, ${W}px ${H}px, 0 ${H}px, ` +
+      `0 0, ${x1}px ${y1}px, ${x1}px ${y2}px, ${x2}px ${y2}px, ${x2}px ${y1}px, ${x1}px ${y1}px)`;
+  }
+
+  function masquerOverlaySignature() {
+    const overlay = document.getElementById(OVERLAY_ID);
+    if (!overlay) return;
+    if (window.gsap) {
+      try {
+        window.gsap.to(overlay, {
+          opacity: 0,
+          scale: 0.98,
+          duration: 0.3,
+          ease: 'power2.in',
+          onComplete: () => { overlay.remove(); }
+        });
+        return;
+      } catch (e) { /* fallback */ }
+    }
+    overlay.remove();
+  }
+
+  // =============================================
   // ÉCOUTEUR DE MESSAGES DU BACKGROUND
   // =============================================
 
@@ -562,6 +845,7 @@
           };
 
           log('Message lancerSignature reçu — démarrage du flux');
+          afficherOverlaySignature();
 
           log(`Étape 1/8 — Recherche du bouton signature (${SITE_SELECTORS.signatureButton[0]}, timeout 30s)...`);
           let boutonSignature;
@@ -585,6 +869,7 @@
           log('Étape 3/8 — Attente du canvas de signature (timeout 15s)...');
           await attendreElement(canvasSelectors, 15000);
           log('Étape 3/8 — Canvas de signature détecté dans le DOM');
+          percerTrouSignature();
 
           log('Étape 4/8 — Récupération des données de signature depuis chrome.storage.local...');
           const result = await new Promise(resolve => {
@@ -654,6 +939,9 @@
           console.error(`[${t}][Signature] ERREUR FATALE: ${erreur.message}`);
           console.error(`[${t}][Signature] Stack:`, erreur.stack);
           sendResponse({ success: false, error: erreur.message });
+        } finally {
+          // S'assurer que l'overlay est retiré dans tous les cas
+          setTimeout(masquerOverlaySignature, 600);
         }
       })();
       return true; // Réponse asynchrone
