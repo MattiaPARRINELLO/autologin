@@ -44,9 +44,9 @@ active.
 | `window.py` | fenetre native pywebview, avec repli navigateur |
 | `tray.py`, `sni.py` | icone de notification : `pystray` et StatusNotifierItem Linux |
 | `autostart.py` | service systemd utilisateur ou tache planifiee Windows |
-| `updates.py` | lecture des releases GitHub, choix du canal et verification du SHA256 |
+| `updates.py` | lecture des releases GitHub, marqueurs de release, canal, version minimale et migration |
 | `analytics.py` | compteurs d'usage anonymes : installation et signature |
-| `self_update.py` | installation d'une mise a jour par un processus detache |
+| `self_update.py` | installation de la cible de mise a jour par un processus detache |
 | `support.py` | archive de diagnostic sans mot de passe ni signature |
 | `paths.py`, `logging_setup.py` | emplacements portables et journalisation avec rotation |
 | `release_channel.py` | classification d'un tag (`stable` ou `beta`) utilisee par la release |
@@ -58,7 +58,9 @@ run_loop() [watcher.py]
   |
   |-- chargement config + signature
   |-- demarrage tableau de bord + icone (sauf --once)
-  |-- verification de mise a jour (si activee)
+  |-- verification de la politique de mise a jour (si activee)
+  |     REQUIRED au-dessus de la version locale -> mode bloque, run --once code 3
+  |     sinon -> annoncer la migration eventuelle et poursuivre
   |
   |-- planning : hors plage ou creneau deja signe ?
   |     oui -> attendre la prochaine ouverture (tranches de 5 s)
@@ -128,10 +130,50 @@ navigateur si le moteur natif manque.
 
 ## Mises a jour
 
-`updates.py` interroge les releases GitHub, filtre selon `updates.channel`
-(`stable` ou `beta`) et verifie le SHA256 de l'archive. `self_update.py` delegue
-l'installation a un processus detache, car le binaire ne peut pas se remplacer
-pendant qu'il tourne : installeur Inno sous Windows, script shell sous Linux.
+`updates.py` interroge les releases GitHub et filtre les candidates selon
+`updates.channel` (`stable` ou `beta`). Le canal explicite de la configuration
+reste prioritaire ; sans valeur explicite, il suit la version installee.
+
+Chaque release peut porter deux marqueurs dans son corps, ajoutes en tete par le
+workflow de release :
+
+```
+CHECKMATE-MIGRATION: 0
+CHECKMATE-REQUIRED: 0
+```
+
+`0` signifie non applicable. Sinon, la valeur est une raison courte conservee
+dans `Release.migration_reason` ou `Release.required_reason`.
+
+`update_policy()` produit un `UpdatePolicy` qui contient :
+
+- `latest` : la version la plus recente du canal courant ;
+- `required` : la release `REQUIRED` la plus recente au-dessus de la version
+  locale ;
+- `migration` : la premiere release `MIGRATION` au-dessus de la version locale ;
+- `available` : vrai si `latest` est plus recente que la version locale ;
+- `install_target` : `migration` si une etape intermediaire existe, sinon
+  `latest` si une mise a jour est disponible.
+
+Au demarrage, `watcher.py` evalue cette politique avant d'ouvrir CESAR. Si
+`required` existe, la surveillance ne demarre pas : notification, icone en
+attention requise, tableau de bord en mode bloque et code de sortie 3 pour
+`run --once`. L'installation et l'arret restent accessibles depuis le tableau de
+bord. Une erreur reseau ou une verification desactivee laisse l'application
+fonctionner.
+
+`self_update.prepare()` telecharge `install_target`, verifie le SHA256, puis
+`self_update.py` delegue l'installation a un processus detache : installeur Inno
+sous Windows, script shell sous Linux. Une migration est donc installee avant la
+cible finale. Apres redemarrage, elle sort de la fenetre de mise a jour et
+l'etape suivante peut etre proposee.
+
+Cote publication, `.github/release-markers.txt` porte les deux valeurs de la
+prochaine release. Le workflow refuse un marqueur absent ou vide. Un marqueur
+non nul passe par l'environnement GitHub `release-manual`, qui exige une
+approbation humaine. Les valeurs `0`/`0` passent par `release-auto`. La
+configuration exacte des environnements est documentee dans
+[`CONTRIBUTING.md`](../../CONTRIBUTING.md#environnements-github-de-publication).
 
 ## Frontiere de securite
 
