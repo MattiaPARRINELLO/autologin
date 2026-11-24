@@ -575,9 +575,9 @@ def command_uninstall_autostart() -> int:
 def _ensure_console_streams() -> None:
     """En mode fenetre (PyInstaller windowed), stdout et stderr valent None."""
     if sys.stdout is None:
-        sys.stdout = open(os.devnull, "w", encoding="utf-8")  # noqa: SIM115
+        sys.stdout = open(os.devnull, "w", encoding="utf-8")
     if sys.stderr is None:
-        sys.stderr = open(os.devnull, "w", encoding="utf-8")  # noqa: SIM115
+        sys.stderr = open(os.devnull, "w", encoding="utf-8")
 
 
 def main(argv: list[str] | None = None) -> int:
