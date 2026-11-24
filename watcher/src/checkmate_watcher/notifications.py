@@ -389,7 +389,7 @@ class Notifier:
     # fmt: off
     def ask(self, text, *, timeout=180, title=None, ok_label="Je suis present", cancel_label="Absent"):
         window_title = title or self.app_name
-        kwargs = dict(timeout=timeout, title=window_title, ok_label=ok_label, cancel_label=cancel_label)
+        kwargs = {"timeout": timeout, "title": window_title, "ok_label": ok_label, "cancel_label": cancel_label}
         if self.platform.startswith("linux"):
             try:
                 return ask_zenity(text, **kwargs)
