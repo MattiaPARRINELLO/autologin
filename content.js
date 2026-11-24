@@ -253,6 +253,9 @@
       const SOURCE_WIDTH_DEFAULT = 320;
       const SOURCE_HEIGHT_DEFAULT = 150;
       const rect = await attendreCanvasStable(canvasCible);
+      // La modale peut encore se déplacer après sa première apparition : recalculer
+      // le trou une fois le canvas stabilisé pour ne jamais masquer la signature.
+      percerTrouSignature();
 
       // IMPORTANT : utiliser les dimensions CSS d'affichage (rect), pas la résolution
       // interne du canvas (canvasCible.width). Les coordonnées d'événements (clientX,
