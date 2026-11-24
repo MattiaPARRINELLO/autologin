@@ -281,6 +281,11 @@ notification du bureau, avec une fenêtre de confirmation.
 tester. Windows peut envoyer le toast sans l'afficher. L'assistant te demande de
 confirmer que tu l'as bien vu avant de terminer la configuration.
 
+Sur Windows, la notification s'affiche sous le nom "CheckMate" (pas "Windows
+PowerShell"). Si tu ne la vois pas, vérifie deux réglages : le mode "Ne pas
+déranger" et l'interrupteur "CheckMate" dans Paramètres > Système >
+Notifications.
+
 La confirmation est volontaire. CheckMate ne signe pas dans ton dos. Si tu
 veux tester, l'assistant propose un bouton "Tester la notification".
 
