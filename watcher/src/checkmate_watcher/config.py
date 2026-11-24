@@ -68,6 +68,16 @@ DEFAULT_SELECTORS: dict[str, tuple[str, ...]] = {
 }
 
 
+def _normalize_selector_list(key: str, raw: object) -> tuple[str, ...]:
+    if isinstance(raw, str):
+        raw = (raw,)
+    if not raw or not all(isinstance(item, str) and item for item in raw):
+        raise ConfigError(
+            f"selecteurs.{key} doit etre une liste de selecteurs CSS non vides"
+        )
+    return tuple(raw)
+
+
 @dataclass(frozen=True)
 class Selectors:
     attendance_button: tuple[str, ...]
@@ -80,16 +90,10 @@ class Selectors:
 
     @classmethod
     def from_dict(cls, data: dict) -> Selectors:
-        values = {}
-        for key, default in DEFAULT_SELECTORS.items():
-            raw = data.get(key, default)
-            if isinstance(raw, str):
-                raw = (raw,)
-            if not raw or not all(isinstance(item, str) and item for item in raw):
-                raise ConfigError(
-                    f"selecteurs.{key} doit etre une liste de selecteurs CSS non vides"
-                )
-            values[key] = tuple(raw)
+        values = {
+            key: _normalize_selector_list(key, data.get(key, default))
+            for key, default in DEFAULT_SELECTORS.items()
+        }
         return cls(**values)
 
 
