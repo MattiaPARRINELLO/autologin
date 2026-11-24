@@ -72,9 +72,7 @@ def test_disabled_by_config(sent):
     assert sent == []
 
 
-def test_payload_has_no_identity(monkeypatch, tmp_path: Path):
-    captured: list[dict] = []
-
+def _response():
     class _Response:
         def __enter__(self):
             return self
@@ -82,39 +80,45 @@ def test_payload_has_no_identity(monkeypatch, tmp_path: Path):
         def __exit__(self, *args):
             return False
 
+    return _Response()
+
+
+def _unique_install_id(path=None):
+    return analytics.secrets.token_hex(16)
+
+
+def _capture_urlopen(captured: list[dict]):
     def fake_urlopen(request, timeout=0):
-        captured.append(
-            {
-                "url": request.full_url,
-                "body": request.data,
-                "headers": dict(request.header_items()),
-            }
-        )
-        return _Response()
+        headers = {name.lower(): value for name, value in request.header_items()}
+        parts = {"url": request.full_url, "body": request.data, "headers": headers}
+        captured.append(parts)
+        return _response()
 
-    monkeypatch.setattr(analytics.urllib.request, "urlopen", fake_urlopen)
-    monkeypatch.setattr(
-        analytics,
-        "install_id",
-        lambda path=None: analytics.secrets.token_hex(16),
-    )
+    return fake_urlopen
 
+
+def test_payload_has_no_identity(monkeypatch):
+    captured: list[dict] = []
+    urlopen = _capture_urlopen(captured)
+    monkeypatch.setattr(analytics.urllib.request, "urlopen", urlopen)
+    monkeypatch.setattr(analytics, "install_id", _unique_install_id)
     analytics._post(analytics.DEFAULT_ENDPOINT, {"install": "abc", "event": "install"})
-
     assert captured[0]["url"] == analytics.DEFAULT_ENDPOINT
     assert b"install" in captured[0]["body"]
-    assert analytics.INGEST_HEADER.lower() in {
-        name.lower() for name in captured[0]["headers"]
-    }
+    assert analytics.INGEST_HEADER.lower() in captured[0]["headers"]
+
+
+def _cesar() -> CesarConfig:
+    return CesarConfig(
+        base_url="https://cesar.example.fr",
+        username="eleve",
+        password="secret",
+    )
 
 
 def analytics_config(enabled: bool = True):
     return Config(
-        cesar=CesarConfig(
-            base_url="https://cesar.example.fr",
-            username="eleve",
-            password="secret",
-        ),
+        cesar=_cesar(),
         watcher=WatcherConfig(),
         signature=SignatureConfig(),
         notifications=NotificationConfig(),
