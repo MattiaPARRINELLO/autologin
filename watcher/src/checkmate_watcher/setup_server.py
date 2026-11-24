@@ -410,6 +410,30 @@ def create_server(session: SetupSession) -> ThreadingHTTPServer:
     return _create_server(session, _Handler)
 
 
+def _afficher_config_invalide(exc: Exception) -> None:
+    print(f"Configuration invalide : {exc}")
+
+
+def _afficher_url(url: str) -> None:
+    print("Configuration CheckMate", flush=True)
+    print(
+        f"Ouvre cette adresse si le navigateur ne s'ouvre pas : {url}",
+        flush=True,
+    )
+
+
+def _afficher_fenetre_fermee() -> None:
+    print("Fenetre fermee avant la fin de la configuration.")
+
+
+def _afficher_configuration_terminee() -> None:
+    print("Configuration terminee.")
+
+
+def _afficher_configuration_interrompue() -> None:
+    print("Configuration interrompue (delai depasse).")
+
+
 def run_setup(
     config_path: Path,
     *,
@@ -420,7 +444,7 @@ def run_setup(
         config = load_config(config_path, require_password=False)
     except ConfigError as exc:
         if config_path.is_file():
-            print(f"Configuration invalide : {exc}")
+            _afficher_config_invalide(exc)
             return 2
         config = default_config()
 
@@ -432,15 +456,11 @@ def run_setup(
 
     port = server.server_address[1]
     url = f"http://127.0.0.1:{port}/?token={token}"
-    print("Configuration CheckMate", flush=True)
-    print(
-        f"Ouvre cette adresse si le navigateur ne s'ouvre pas : {url}",
-        flush=True,
-    )
+    _afficher_url(url)
     if open_browser:
         native = open_url(url, close_event=session.finished)
         if native and not session.finished.is_set():
-            print("Fenetre fermee avant la fin de la configuration.")
+            _afficher_fenetre_fermee()
             server.shutdown()
             server.server_close()
             return 1
@@ -452,7 +472,7 @@ def run_setup(
         server.server_close()
 
     if session.finished.is_set():
-        print("Configuration terminee.")
+        _afficher_configuration_terminee()
         return 0
-    print("Configuration interrompue (delai depasse).")
+    _afficher_configuration_interrompue()
     return 1
