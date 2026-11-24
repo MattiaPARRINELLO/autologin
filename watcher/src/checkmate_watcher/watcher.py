@@ -24,7 +24,7 @@ from .signature import load_signature
 from .state import StateStore
 from .status_server import StatusSession, start_status_server, stop_status_server
 from .tray import TrayController
-from .updates import check_for_update
+from .updates import check_for_update, update_policy
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +32,8 @@ MAX_CONSECUTIVE_ERRORS = 3
 
 MAX_WAIT_CHUNK = 300.0
 HEARTBEAT_SECONDS = 300.0
+BLOCKED_EXIT_CODE = 3
+BLOCKED_POLL_SECONDS = 2.0
 
 
 class StopRequested(Exception):
@@ -151,6 +153,57 @@ async def _check_update(config: Config, state: StateStore) -> None:
         urgency="normal",
     )
     state.set_meta("update_notified", release.tag)
+
+
+async def _load_policy(config: Config):
+    request = asyncio.to_thread(
+        update_policy, __version__, channel=config.updates.channel
+    )
+    return await asyncio.wait_for(request, timeout=10)
+
+
+async def _required_update(config: Config):
+    """Rend la politique courante si une version minimale impose un blocage."""
+    if not config.updates.enabled:
+        return None
+    try:
+        policy = await _load_policy(config)
+    except Exception as exc:
+        logger.debug("verification de version minimale impossible : %s", exc)
+        return None
+    return policy if policy.required is not None else None
+
+
+def _required_message(release) -> str:
+    return (
+        f"CheckMate {release.version_text} ou plus est requis : "
+        f"{release.required_reason}\n{release.url}"
+    )
+
+
+async def _notify_required(config, state, release) -> None:
+    if state.get_meta("required_blocked_tag") == release.tag:
+        return
+    await _send(
+        config,
+        "Mise a jour obligatoire",
+        _required_message(release),
+        icon="dialog-warning",
+        urgency="critical",
+    )
+    state.set_meta("required_blocked_tag", release.tag)
+
+
+async def _handle_required(config, state, status_session, stop_event, release, once):
+    logger.error("mise a jour obligatoire : %s", release.tag)
+    logger.error("raison : %s", release.required_reason)
+    if once:
+        return BLOCKED_EXIT_CODE
+    status_session.set_blocked(release)
+    await _notify_required(config, state, release)
+    while not stop_event.is_set():
+        await asyncio.sleep(BLOCKED_POLL_SECONDS)
+    return 0
 
 
 async def sign_with_visibility(
@@ -287,6 +340,11 @@ async def run_loop(
     stop_event = status_session.stop_event if status_session else None
 
     try:
+        required = await _required_update(config)
+        if required is not None:
+            return await _handle_required(
+                config, state, status_session, stop_event, required.required, once
+            )
         await _check_update(config, state)
         session = CesarSession(config)
         poll_headless = (

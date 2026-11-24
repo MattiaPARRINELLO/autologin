@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime
 
+from checkmate_watcher import watcher
 from checkmate_watcher.schedule import Schedule, parse_windows
 from checkmate_watcher.state import StateStore
+from checkmate_watcher.updates import Release, UpdatePolicy, Version
 from checkmate_watcher.watcher import _pause_reason, _record_success
 
 SCHEDULE = Schedule(
@@ -12,6 +15,62 @@ SCHEDULE = Schedule(
     windows=parse_windows(["09:00-12:00"]),
 )
 LUNDI_10H = datetime(2026, 11, 16, 10, 0)
+
+
+class _Updates:
+    def __init__(self, enabled: bool) -> None:
+        self.enabled = enabled
+        self.channel = "stable"
+
+
+class _Config:
+    def __init__(self, enabled: bool = True) -> None:
+        self.updates = _Updates(enabled)
+
+
+def _loader(policy):
+    async def load(config):
+        return policy
+
+    return load
+
+
+def _required_policy() -> UpdatePolicy:
+    release = Release(
+        "watcher-v0.8.0",
+        Version(0, 8, 0),
+        "https://example.com",
+        "obligatoire",
+        False,
+        required_reason="faille de signature",
+        markers_declared=True,
+    )
+    return UpdatePolicy(Version(0, 7, 0), release, release, None, "stable")
+
+
+def test_version_obligatoire_detectee(monkeypatch):
+    policy = _required_policy()
+    monkeypatch.setattr(watcher, "_load_policy", _loader(policy))
+    assert asyncio.run(watcher._required_update(_Config())) is policy
+
+
+def test_sans_version_obligatoire_aucun_blocage(monkeypatch):
+    policy = UpdatePolicy(Version(0, 7, 0), None, None, None, "stable")
+    monkeypatch.setattr(watcher, "_load_policy", _loader(policy))
+    assert asyncio.run(watcher._required_update(_Config())) is None
+
+
+def test_verification_desactivee_ne_bloque_pas(monkeypatch):
+    monkeypatch.setattr(watcher, "_load_policy", _loader(_required_policy()))
+    assert asyncio.run(watcher._required_update(_Config(enabled=False))) is None
+
+
+def test_erreur_reseau_ne_bloque_pas(monkeypatch):
+    async def boom(config):
+        raise RuntimeError("reseau")
+
+    monkeypatch.setattr(watcher, "_load_policy", boom)
+    assert asyncio.run(watcher._required_update(_Config())) is None
 
 
 def test_pas_de_pause_hors_planning(tmp_path):
