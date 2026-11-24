@@ -303,12 +303,21 @@ def strip_har_secrets(path: Path) -> None:
     path.write_text(json.dumps(har, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
-def scrub_message(message: dict) -> None:
-    message["headers"] = [
+def _visible_headers(message: dict) -> list:
+    return [
         header
         for header in message.get("headers", [])
         if header.get("name", "").lower() not in SECRET_HEADERS
     ]
+
+
+def _visible_content(message: dict) -> dict:
+    content = message.get("content", {})
+    return {key: value for key, value in content.items() if key in SECRET_CONTENT_KEYS}
+
+
+def scrub_message(message: dict) -> None:
+    message["headers"] = _visible_headers(message)
     message.pop("cookies", None)
     message.pop("queryString", None)
     # Le corps d'une requete contient le formulaire de connexion :
@@ -316,28 +325,31 @@ def scrub_message(message: dict) -> None:
     message.pop("postData", None)
     message["url"] = message.get("url", "").split("?", 1)[0]
     if "content" in message:
-        message["content"] = {
-            key: value
-            for key, value in message["content"].items()
-            if key in SECRET_CONTENT_KEYS
-        }
+        message["content"] = _visible_content(message)
 
 
 def write_scenario(root: Path, name: str) -> Path:
-    files = page_files(root)
-    manifest = {
-        "name": name,
-        "pages": build_pages(files),
-        "harness": HARNESS_NAME,
-        "assets": ASSETS_DIR,
-    }
+    manifest = _scenario_manifest(root, name)
     (root / "scenario.json").write_text(
         json.dumps(manifest, indent=2) + "\n", encoding="utf-8"
     )
+    _write_harness(root)
+    return root
+
+
+def _scenario_manifest(root: Path, name: str) -> dict:
+    return {
+        "name": name,
+        "pages": build_pages(page_files(root)),
+        "harness": HARNESS_NAME,
+        "assets": ASSETS_DIR,
+    }
+
+
+def _write_harness(root: Path) -> None:
     harness = root / HARNESS_NAME
     if not harness.exists():
         harness.write_text(HARNESS_TEMPLATE, encoding="utf-8")
-    return root
 
 
 def page_files(root: Path) -> dict[str, str]:
@@ -388,18 +400,15 @@ async def run_capture(args: argparse.Namespace) -> None:
     print(f"  python emulator/server.py --scenario {args.output}")
 
 
-def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        description=(
-            "Capture un parcours CESAR reel et produit un scenario local "
-            "assaini, servable par emulator/server.py --scenario"
-        )
-    )
+def _add_connection_argument(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--base-url",
         default="https://cesar.example.fr",
         help="racine du site a capturer",
     )
+
+
+def _add_output_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--output",
         type=Path,
@@ -407,6 +416,9 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         help="dossier de sortie (ignore par git)",
     )
     parser.add_argument("--name", default=None, help="nom du scenario produit")
+
+
+def _add_mask_argument(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--mask",
         action="append",
@@ -416,7 +428,23 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
             "capturees (nom, identifiant, cours), repetable"
         ),
     )
-    return parser.parse_args(argv)
+
+
+def _build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        description=(
+            "Capture un parcours CESAR reel et produit un scenario local "
+            "assaini, servable par emulator/server.py --scenario"
+        )
+    )
+    _add_connection_argument(parser)
+    _add_output_arguments(parser)
+    _add_mask_argument(parser)
+    return parser
+
+
+def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
+    return _build_parser().parse_args(argv)
 
 
 def _afficher_interruption_capture() -> None:
