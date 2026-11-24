@@ -12,7 +12,7 @@ from checkmate_watcher.schedule import (
     parse_window,
     parse_windows,
 )
-from checkmate_watcher.state import StateStore
+from checkmate_watcher.state import StateStore, _parse_number_map
 
 WINDOWS = parse_windows(["09:00-12:00", "13:30-16:30"])
 SCHEDULE = Schedule(enabled=True, days=(0, 1, 2, 3, 4), windows=WINDOWS)
@@ -131,3 +131,8 @@ windows = ["09:00-12:00", "11:00-13:00"]
     )
     with pytest.raises(ConfigError):
         load_config(path)
+
+
+def test_parse_number_map_filtre_les_valeurs_non_numeriques():
+    value = {"a": 1, "b": 2.5, "c": "x", 7: 3}
+    assert _parse_number_map(value) == {"a": 1.0, "b": 2.5, "7": 3.0}
