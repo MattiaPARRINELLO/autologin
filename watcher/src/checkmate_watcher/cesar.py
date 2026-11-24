@@ -470,8 +470,30 @@ class CesarSession:
         hidden = await self._wait_for_hidden(self.selectors.attendance_button, 15000)
         elapsed = time.monotonic() - started
         if not hidden:
-            raise SignError(
-                "bouton d'emargement toujours visible 15 s apres la signature"
+            # Sur le vrai CESAR, apres l'enregistrement un nouveau popup s'ouvre
+            # et ferme l'ancien sans retirer le bouton d'emargement du DOM. On
+            # rafraichit alors la page : si l'emargement a bien ete pris en
+            # compte, le bouton n'est plus present.
+            logger.info(
+                "bouton toujours visible %.1f s apres la signature, "
+                "rafraichissement de la page pour verifier...",
+                elapsed,
+            )
+            reload = getattr(self.page, "reload", None)
+            if reload is not None:
+                try:
+                    await reload(wait_until="domcontentloaded")
+                except Exception:
+                    logger.debug("rafraichissement impossible", exc_info=True)
+            if self.page is not None:
+                await self.page.wait_for_timeout(500)
+            still_visible = await self._first_visible(self.selectors.attendance_button)
+            if still_visible is not None:
+                raise SignError(
+                    "bouton d'emargement toujours visible 15 s apres la signature"
+                )
+            logger.info(
+                "bouton disparu apres rafraichissement, emargement pris en compte"
             )
         logger.info(
             "bouton d'emargement disparu apres %.1f s (confirmation : %s)",
