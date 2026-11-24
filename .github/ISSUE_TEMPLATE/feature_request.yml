@@ -7,7 +7,7 @@ body:
       value: |
         Merci de décrire le besoin avant la solution. Les propositions doivent
         rester dans le périmètre du projet : surveillance de l'émargement CESAR,
-        application de bureau, extension navigateur et outillage de release.
+        application de bureau et outillage de release.
   - type: textarea
     id: besoin
     attributes:
