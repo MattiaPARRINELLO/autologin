@@ -235,7 +235,11 @@ def _mask(value: str) -> str:
     return "*" * min(len(value), 8) + f" ({len(value)} caracteres)"
 
 
-def command_check_config(config: Config) -> int:
+def _afficher_check_config(
+    config: Config,
+    signature_status: tuple[str, object],
+    tools_status: list[tuple[str, str | None]],
+) -> None:
     print(f"CheckMate {__version__} (build {BUILD})")
     print("Configuration chargee")
     print(f"  CESAR          : {config.cesar.base_url}")
@@ -253,19 +257,30 @@ def command_check_config(config: Config) -> int:
     print(f"  Signature      : {config.signature.file}")
     print(f"  Logs           : {default_log_file()}")
 
-    if config.signature.file.is_file():
-        try:
-            points = load_signature(config.signature.file)
-        except SignatureError as exc:
-            print(f"  Signature      : INVALIDE ({exc})")
-        else:
-            print(f"  Signature      : OK ({len(points)} points)")
+    status, detail = signature_status
+    if status == "ok":
+        print(f"  Signature      : OK ({detail} points)")
+    elif status == "invalid":
+        print(f"  Signature      : INVALIDE ({detail})")
     else:
         print("  Signature      : ABSENTE, lance 'capture'")
 
-    for tool in ("notify-send", "zenity"):
-        found = shutil.which(tool)
+    for tool, found in tools_status:
         print(f"  Outil {tool:<10}: {found or 'INTROUVABLE'}")
+
+
+def command_check_config(config: Config) -> int:
+    if config.signature.file.is_file():
+        try:
+            points = load_signature(config.signature.file)
+            signature_status = ("ok", len(points))
+        except SignatureError as exc:
+            signature_status = ("invalid", exc)
+    else:
+        signature_status = ("absent", None)
+
+    tools_status = [(tool, shutil.which(tool)) for tool in ("notify-send", "zenity")]
+    _afficher_check_config(config, signature_status, tools_status)
     return 0
 
 
@@ -309,6 +324,11 @@ async def command_capture(config: Config) -> int:
     return 0
 
 
+def _afficher_test_notification(sent: bool, answer: object) -> None:
+    print("notification envoyee" if sent else "notification impossible")
+    print(f"reponse : {answer}")
+
+
 def command_test_notification(config: Config) -> int:
     notifier = Notifier.from_config(config)
     sent = notifier.send(
@@ -316,29 +336,46 @@ def command_test_notification(config: Config) -> int:
         "Ceci est une notification de test.",
         urgency="normal",
     )
-    print("notification envoyee" if sent else "notification impossible")
     answer = notifier.ask(
         "Ceci est une confirmation de test. Clique sur un bouton.",
         timeout=60,
         title=config.notifications.app_name,
     )
-    print(f"reponse : {answer}")
+    _afficher_test_notification(sent, answer)
     return 0 if sent else 1
+
+
+def _afficher_set_password(etape: str, service: str = "") -> None:
+    if etape == "vide":
+        print("mot de passe vide, rien n'a ete enregistre")
+    elif etape == "pas_trousseau":
+        print("trousseau systeme indisponible : utilise password_env ou password")
+    elif etape == "echec":
+        print("enregistrement dans le trousseau impossible")
+    else:
+        print(f"mot de passe enregistre dans le trousseau ({service})")
 
 
 def command_set_password(config: Config) -> int:
     password = getpass.getpass("Mot de passe CESAR : ")
     if not password:
-        print("mot de passe vide, rien n'a ete enregistre")
+        _afficher_set_password("vide")
         return 1
     if not keyring_available():
-        print("trousseau systeme indisponible : utilise password_env ou password")
+        _afficher_set_password("pas_trousseau")
         return 1
     if not set_password(config.cesar.keyring_service, config.cesar.username, password):
-        print("enregistrement dans le trousseau impossible")
+        _afficher_set_password("echec")
         return 1
-    print(f"mot de passe enregistre dans le trousseau ({config.cesar.keyring_service})")
+    _afficher_set_password("ok", config.cesar.keyring_service)
     return 0
+
+
+def _afficher_self_test(checks: list[tuple[str, bool, str]]) -> None:
+    print("Bilan CheckMate")
+    for name, ok, detail in checks:
+        marker = "OK  " if ok else "FAIL"
+        print(f"  [{marker}] {name:<16} {detail}")
 
 
 def command_self_test(config: Config, *, notify: bool = False) -> int:
@@ -407,15 +444,14 @@ def command_self_test(config: Config, *, notify: bool = False) -> int:
         )
         checks.append(("notification", sent, "envoyee" if sent else "echec"))
 
-    print("Bilan CheckMate")
-    failures = 0
-    for name, ok, detail in checks:
-        if not ok:
-            failures += 1
-        marker = "OK  " if ok else "FAIL"
-        print(f"  [{marker}] {name:<16} {detail}")
-
+    failures = sum(1 for _name, ok, _detail in checks if not ok)
+    _afficher_self_test(checks)
     return 0 if failures == 0 else 1
+
+
+def _afficher_support_bundle(target: Path) -> None:
+    print(f"archive creee : {target}")
+    print("elle ne contient ni mot de passe ni signature")
 
 
 def command_support_bundle(
@@ -426,14 +462,28 @@ def command_support_bundle(
         config_path,
         Path(output).expanduser() if output else None,
     )
-    print(f"archive creee : {target}")
-    print("elle ne contient ni mot de passe ni signature")
+    _afficher_support_bundle(target)
     return 0
+
+
+def _afficher_import_signature(
+    *,
+    manquant: bool = False,
+    erreur: object = None,
+    points: int | None = None,
+    fichier: Path | None = None,
+) -> None:
+    if manquant:
+        print("indique un fichier avec --file")
+    elif erreur is not None:
+        print(f"import impossible : {erreur}")
+    else:
+        print(f"signature importee ({points} points) dans {fichier}")
 
 
 def command_import_signature(config: Config, file_path: str | None) -> int:
     if not file_path:
-        print("indique un fichier avec --file")
+        _afficher_import_signature(manquant=True)
         return 1
     path = Path(file_path).expanduser()
     try:
@@ -441,11 +491,15 @@ def command_import_signature(config: Config, file_path: str | None) -> int:
         data = json.loads(raw)
         points = parse_points(data)
     except (OSError, json.JSONDecodeError, SignatureError) as exc:
-        print(f"import impossible : {exc}")
+        _afficher_import_signature(erreur=exc)
         return 1
     save_signature(config.signature.file, points)
-    print(f"signature importee ({len(points)} points) dans {config.signature.file}")
+    _afficher_import_signature(points=len(points), fichier=config.signature.file)
     return 0
+
+
+def _afficher_status_demarrage_echec() -> None:
+    print("CheckMate n'a pas demarre. Consulte les logs.")
 
 
 def command_status(config: Config, config_path: Path) -> int:
@@ -478,97 +532,196 @@ def command_status(config: Config, config_path: Path) -> int:
             open_url(str(runtime["url"]))
             return 0
         time.sleep(0.5)
-    print("CheckMate n'a pas demarre. Consulte les logs.")
+    _afficher_status_demarrage_echec()
     return 1
+
+
+def _afficher_stats(
+    starts: int,
+    detections: int,
+    signed: int,
+    errors: int,
+    downloads: int | None,
+    latest_tag: str | None,
+    erreur: object = None,
+) -> None:
+    print(f"CheckMate {__version__} (build {BUILD})")
+    print("Statistiques locales")
+    print(f"  Demarrages        : {starts}")
+    print(f"  Detections        : {detections}")
+    print(f"  Signatures        : {signed}")
+    print(f"  Erreurs           : {errors}")
+    if erreur is not None:
+        print(f"  Telechargements   : indisponibles ({erreur})")
+        return
+    print(f"  Telechargements   : {downloads} (artefacts GitHub)")
+    if latest_tag is not None:
+        print(f"  Derniere version  : {latest_tag}")
 
 
 def command_stats(config: Config) -> int:
     state = StateStore(config.watcher.state_file)
-    print(f"CheckMate {__version__} (build {BUILD})")
-    print("Statistiques locales")
-    print(f"  Demarrages        : {state.counter('stats.starts')}")
-    print(f"  Detections        : {state.counter('stats.detections')}")
-    print(f"  Signatures        : {state.counter('stats.signed')}")
-    print(f"  Erreurs           : {state.counter('stats.errors')}")
+    starts = state.counter("stats.starts")
+    detections = state.counter("stats.detections")
+    signed = state.counter("stats.signed")
+    errors = state.counter("stats.errors")
+    downloads: int | None = None
+    latest_tag: str | None = None
+    erreur: object = None
     try:
         releases = fetch_releases()
+        downloads = sum(release.downloads for release in releases)
+        if releases:
+            latest = max(releases, key=lambda release: release.version)
+            latest_tag = latest.tag
     except Exception as exc:
-        print(f"  Telechargements   : indisponibles ({exc})")
-        return 0
-    downloads = sum(release.downloads for release in releases)
-    print(f"  Telechargements   : {downloads} (artefacts GitHub)")
-    if releases:
-        latest = max(releases, key=lambda release: release.version)
-        print(f"  Derniere version  : {latest.tag}")
+        erreur = exc
+    _afficher_stats(starts, detections, signed, errors, downloads, latest_tag, erreur)
     return 0
+
+
+def _afficher_check_update(
+    channel: str,
+    release_tag: str | None,
+    release_url: str | None,
+    erreur: object = None,
+) -> None:
+    if erreur is not None:
+        print(f"verification impossible : {erreur}")
+        return
+    if release_tag is None:
+        print(f"CheckMate {__version__} est a jour (canal {channel})")
+        return
+    print(f"Mise a jour disponible : {release_tag} (canal {channel})")
+    if release_url is not None:
+        print(release_url)
 
 
 def command_check_update(config: Config) -> int:
+    erreur: object = None
+    release_tag: str | None = None
+    release_url: str | None = None
     try:
         release = check_for_update(
             __version__,
             channel=config.updates.channel,
         )
+        if release is not None:
+            release_tag = release.tag
+            release_url = release.url
     except Exception as exc:
-        print(f"verification impossible : {exc}")
-        return 1
-    if release is None:
-        print(f"CheckMate {__version__} est a jour (canal {config.updates.channel})")
-        return 0
-    print(f"Mise a jour disponible : {release.tag} (canal {config.updates.channel})")
-    print(release.url)
-    return 0
+        erreur = exc
+    _afficher_check_update(config.updates.channel, release_tag, release_url, erreur)
+    return 1 if erreur is not None else 0
+
+
+def _afficher_update_verification_impossible(erreur: object) -> None:
+    print(f"verification impossible : {erreur}")
+
+
+def _afficher_update_a_jour(channel: str) -> None:
+    print(f"CheckMate {__version__} est a jour (canal {channel})")
+
+
+def _afficher_update_disponible(tag: str, channel: str) -> None:
+    print(f"Mise a jour disponible : {tag} (canal {channel})")
+
+
+def _afficher_update_url(url: str) -> None:
+    print(url)
+
+
+def _afficher_update_annule() -> None:
+    print("Annule")
+
+
+def _afficher_update_telechargement() -> None:
+    print("Telechargement et verification de la somme...")
+
+
+def _afficher_update_echec(erreur: object) -> None:
+    print(f"mise a jour impossible : {erreur}")
+
+
+def _afficher_update_installation(version: object) -> None:
+    print(f"Installation de {version} en cours. CheckMate redemarre.")
+
+
+def _afficher_demander_confirmation(reponse: list[str]) -> None:
+    try:
+        reponse.append(input("Installer maintenant ? [o/N] ").strip().lower())
+    except EOFError:
+        reponse.append("")
 
 
 def command_update(config: Config, *, check_only: bool, assume_yes: bool) -> int:
+    erreur: object = None
+    release = None
     try:
         release = check_for_update(
             __version__,
             channel=config.updates.channel,
         )
     except Exception as exc:
-        print(f"verification impossible : {exc}")
+        erreur = exc
+    if erreur is not None:
+        _afficher_update_verification_impossible(erreur)
         return 1
     if release is None:
-        print(f"CheckMate {__version__} est a jour (canal {config.updates.channel})")
+        _afficher_update_a_jour(config.updates.channel)
         return 0
-    print(f"Mise a jour disponible : {release.tag} (canal {config.updates.channel})")
+    _afficher_update_disponible(release.tag, config.updates.channel)
     if check_only:
-        print(release.url)
+        _afficher_update_url(release.url)
         return 0
     if not assume_yes:
-        try:
-            answer = input("Installer maintenant ? [o/N] ").strip().lower()
-        except EOFError:
-            answer = ""
+        reponse: list[str] = []
+        _afficher_demander_confirmation(reponse)
+        answer = reponse[0] if reponse else ""
         if answer not in {"o", "oui", "y", "yes"}:
-            print("Annule")
+            _afficher_update_annule()
             return 1
-    print("Telechargement et verification de la somme...")
+    _afficher_update_telechargement()
     try:
         version = update_now(config)
     except UpdateError as exc:
-        print(f"mise a jour impossible : {exc}")
+        _afficher_update_echec(exc)
         return 1
-    print(f"Installation de {version} en cours. CheckMate redemarre.")
+    _afficher_update_installation(version)
     return 0
+
+
+def _afficher_autostart_install_echec() -> None:
+    print("installation du demarrage automatique impossible")
+
+
+def _afficher_autostart_installe(executable: object, config_path: Path) -> None:
+    print(f"demarrage automatique installe : {executable} --config {config_path} run")
+
+
+def _afficher_autostart_uninstall_echec() -> None:
+    print("desinstallation du demarrage automatique impossible")
+
+
+def _afficher_autostart_desactive() -> None:
+    print("demarrage automatique desactive")
 
 
 def command_install_autostart(config_path: Path) -> int:
     executable = current_executable()
     config_path = config_path.expanduser().resolve()
     if not enable_autostart(executable, config_path):
-        print("installation du demarrage automatique impossible")
+        _afficher_autostart_install_echec()
         return 1
-    print(f"demarrage automatique installe : {executable} --config {config_path} run")
+    _afficher_autostart_installe(executable, config_path)
     return 0
 
 
 def command_uninstall_autostart() -> int:
     if not disable_autostart():
-        print("desinstallation du demarrage automatique impossible")
+        _afficher_autostart_uninstall_echec()
         return 1
-    print("demarrage automatique desactive")
+    _afficher_autostart_desactive()
     return 0
 
 
@@ -578,6 +731,22 @@ def _ensure_console_streams() -> None:
         sys.stdout = open(os.devnull, "w", encoding="utf-8")
     if sys.stderr is None:
         sys.stderr = open(os.devnull, "w", encoding="utf-8")
+
+
+def _afficher_reset_etat_reinitialise(path: Path) -> None:
+    print(f"Etat reinitialise : {path}")
+
+
+def _afficher_reset_aucun_etat(path: Path) -> None:
+    print(f"Aucun etat a supprimer : {path}")
+
+
+def _afficher_main_config_invalide(exc: object) -> None:
+    logger.error("configuration invalide : %s", exc)
+
+
+def _afficher_main_arret_demande() -> None:
+    logger.info("arret demande")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -595,7 +764,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         config = load_config(Path(args.config), require_password=needs_password)
     except ConfigError as exc:
-        logger.error("configuration invalide : %s", exc)
+        _afficher_main_config_invalide(exc)
         return 2
 
     if args.command == "set-password":
@@ -628,9 +797,9 @@ def main(argv: list[str] | None = None) -> int:
         path = config.watcher.state_file
         if path.is_file():
             path.unlink()
-            print(f"Etat reinitialise : {path}")
+            _afficher_reset_etat_reinitialise(path)
         else:
-            print(f"Aucun etat a supprimer : {path}")
+            _afficher_reset_aucun_etat(path)
         return 0
     if args.command == "capture":
         return asyncio.run(command_capture(config))
@@ -646,7 +815,7 @@ def main(argv: list[str] | None = None) -> int:
             )
         )
     except KeyboardInterrupt:
-        logger.info("arret demande")
+        _afficher_main_arret_demande()
         return 130
 
 
