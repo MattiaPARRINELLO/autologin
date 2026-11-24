@@ -17,6 +17,24 @@ UNIT_NAME = "checkmate-watcher.service"
 RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
 RUN_VALUE = "CheckMate"
 
+_UNIT_TEMPLATE = (
+    "[Unit]\n"
+    "Description=CheckMate watcher (surveillance emargement CESAR)\n"
+    "After=graphical-session.target\n"
+    "PartOf=graphical-session.target\n"
+    "\n"
+    "[Service]\n"
+    "Type=simple\n"
+    "WorkingDirectory=%h\n"
+    "EnvironmentFile=-{env_file}\n"
+    "ExecStart={command}\n"
+    "Restart=always\n"
+    "RestartSec=10\n"
+    "\n"
+    "[Install]\n"
+    "WantedBy=graphical-session.target\n"
+)
+
 
 def _run(command: list[str], timeout: int = 30) -> subprocess.CompletedProcess:
     return subprocess.run(
@@ -32,50 +50,43 @@ def _quote(value: str) -> str:
     return f'"{value}"' if " " in value else value
 
 
+def _linux_command(executable: Path, config_path: Path) -> str:
+    parts = [_quote(str(executable)), "--config", _quote(str(config_path)), "run"]
+    return " ".join(parts)
+
+
 def _linux_unit(executable: Path, config_path: Path) -> str:
-    command = " ".join(
-        [
-            _quote(str(executable)),
-            "--config",
-            _quote(str(config_path)),
-            "run",
-        ]
-    )
-    return (
-        "[Unit]\n"
-        "Description=CheckMate watcher (surveillance emargement CESAR)\n"
-        "After=graphical-session.target\n"
-        "PartOf=graphical-session.target\n"
-        "\n"
-        "[Service]\n"
-        "Type=simple\n"
-        "WorkingDirectory=%h\n"
-        f"EnvironmentFile=-{default_env_path()}\n"
-        f"ExecStart={command}\n"
-        "Restart=always\n"
-        "RestartSec=10\n"
-        "\n"
-        "[Install]\n"
-        "WantedBy=graphical-session.target\n"
-    )
+    command = _linux_command(executable, config_path)
+    return _UNIT_TEMPLATE.format(command=command, env_file=default_env_path())
 
 
-def _enable_linux(executable: Path, config_path: Path) -> bool:
-    systemctl = shutil.which("systemctl")
-    if not systemctl:
-        logger.error("systemctl introuvable, demarrage automatique impossible")
-        return False
+def _systemctl() -> str | None:
+    return shutil.which("systemctl")
 
+
+def _install_linux_unit(executable: Path, config_path: Path) -> Path:
     unit_path = Path.home() / ".config/systemd/user" / UNIT_NAME
     unit_path.parent.mkdir(parents=True, exist_ok=True)
     unit_path.write_text(_linux_unit(executable, config_path), encoding="utf-8")
+    return unit_path
 
+
+def _activate_linux_unit(systemctl: str) -> bool:
     _run([systemctl, "--user", "daemon-reload"])
     result = _run([systemctl, "--user", "enable", "--now", UNIT_NAME])
     if result.returncode != 0:
         logger.error("activation systemd echouee : %s", result.stderr.strip())
         return False
     return True
+
+
+def _enable_linux(executable: Path, config_path: Path) -> bool:
+    systemctl = _systemctl()
+    if not systemctl:
+        logger.error("systemctl introuvable, demarrage automatique impossible")
+        return False
+    _install_linux_unit(executable, config_path)
+    return _activate_linux_unit(systemctl)
 
 
 def _winreg():
@@ -96,23 +107,18 @@ def _remove_legacy_windows_task() -> None:
     _run([schtasks, "/Delete", "/F", "/TN", TASK_NAME])
 
 
+def _write_run_value(command: str) -> None:
+    winreg = _winreg()
+    with winreg.CreateKeyEx(
+        winreg.HKEY_CURRENT_USER, RUN_KEY, 0, winreg.KEY_SET_VALUE
+    ) as key:
+        winreg.SetValueEx(key, RUN_VALUE, 0, winreg.REG_SZ, command)
+
+
 def _enable_windows(executable: Path, config_path: Path) -> bool:
     _remove_legacy_windows_task()
     try:
-        winreg = _winreg()
-        with winreg.CreateKeyEx(
-            winreg.HKEY_CURRENT_USER,
-            RUN_KEY,
-            0,
-            winreg.KEY_SET_VALUE,
-        ) as key:
-            winreg.SetValueEx(
-                key,
-                RUN_VALUE,
-                0,
-                winreg.REG_SZ,
-                _windows_command(executable, config_path),
-            )
+        _write_run_value(_windows_command(executable, config_path))
     except OSError as exc:
         logger.error("ecriture du demarrage automatique impossible : %s", exc)
         return False
@@ -136,23 +142,30 @@ def _disable_linux() -> bool:
     return result.returncode == 0
 
 
-def _disable_windows() -> bool:
-    _remove_legacy_windows_task()
+def _delete_run_value(winreg) -> None:
+    with winreg.OpenKey(
+        winreg.HKEY_CURRENT_USER,
+        RUN_KEY,
+        0,
+        winreg.KEY_SET_VALUE,
+    ) as key:
+        winreg.DeleteValue(key, RUN_VALUE)
+
+
+def _remove_run_entry() -> bool:
     try:
-        winreg = _winreg()
-        with winreg.OpenKey(
-            winreg.HKEY_CURRENT_USER,
-            RUN_KEY,
-            0,
-            winreg.KEY_SET_VALUE,
-        ) as key:
-            winreg.DeleteValue(key, RUN_VALUE)
+        _delete_run_value(_winreg())
     except FileNotFoundError:
         return True
     except OSError as exc:
         logger.error("suppression du demarrage automatique impossible : %s", exc)
         return False
     return True
+
+
+def _disable_windows() -> bool:
+    _remove_legacy_windows_task()
+    return _remove_run_entry()
 
 
 def disable_autostart() -> bool:
@@ -171,19 +184,22 @@ def _status_linux() -> bool:
     return result.returncode == 0 and result.stdout.strip() == "enabled"
 
 
+def _run_value_exists(winreg) -> bool:
+    with winreg.OpenKey(
+        winreg.HKEY_CURRENT_USER,
+        RUN_KEY,
+        0,
+        winreg.KEY_READ,
+    ) as key:
+        winreg.QueryValueEx(key, RUN_VALUE)
+    return True
+
+
 def _status_windows() -> bool:
     try:
-        winreg = _winreg()
-        with winreg.OpenKey(
-            winreg.HKEY_CURRENT_USER,
-            RUN_KEY,
-            0,
-            winreg.KEY_READ,
-        ) as key:
-            winreg.QueryValueEx(key, RUN_VALUE)
+        return _run_value_exists(_winreg())
     except OSError:
         return False
-    return True
 
 
 def autostart_enabled() -> bool:
@@ -194,20 +210,23 @@ def autostart_enabled() -> bool:
     return False
 
 
+def _restart_linux() -> bool:
+    systemctl = _systemctl()
+    if not systemctl:
+        return False
+    result = _run([systemctl, "--user", "restart", UNIT_NAME])
+    return result.returncode == 0
+
+
 def restart_autostart() -> bool:
     """Relance le service apres un changement de configuration.
 
-    Sur Windows, l'entree du registre prend effet a la prochaine ouverture de
-    session ; il n'y a pas de service a redemarrer.
+    Sur Windows, l'entree du registre prend effet a la prochaine session.
     """
     if sys.platform.startswith("win"):
         return True
     if sys.platform == "linux":
-        systemctl = shutil.which("systemctl")
-        if not systemctl:
-            return False
-        result = _run([systemctl, "--user", "restart", UNIT_NAME])
-        return result.returncode == 0
+        return _restart_linux()
     return False
 
 

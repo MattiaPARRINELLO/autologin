@@ -49,6 +49,40 @@ def _platform_name() -> str:
     return "other"
 
 
+def _read_install_id(target: Path) -> str | None:
+    """Valeur existante valide, sinon None."""
+    try:
+        existing = target.read_text(encoding="utf-8").strip()
+    except OSError:
+        return None
+    if 8 <= len(existing) and len(existing) <= 64:
+        return existing
+    return None
+
+
+def _write_install_id(target: Path, value: str) -> None:
+    """Ecrit la valeur, sans jamais lever d'exception."""
+    try:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(value + "\n", encoding="utf-8")
+        try:
+            target.chmod(0o600)
+        except OSError:
+            pass
+    except OSError as exc:
+        logger.debug("identifiant d'installation non ecrit : %s", exc)
+
+
+def _resolve_install_id(target: Path) -> str:
+    """Lit l'identifiant existant ou en cree un nouveau."""
+    existing = _read_install_id(target)
+    if existing is not None:
+        return existing
+    value = secrets.token_hex(16)
+    _write_install_id(target, value)
+    return value
+
+
 def install_id(path: Path | None = None) -> str:
     """Identifiant aleatoire stable, cree au premier lancement."""
     global _install_id
@@ -56,25 +90,8 @@ def install_id(path: Path | None = None) -> str:
         if _install_id is not None:
             return _install_id
         target = path or (data_dir() / "install-id")
-        try:
-            existing = target.read_text(encoding="utf-8").strip()
-            if 8 <= len(existing) and len(existing) <= 64:
-                _install_id = existing
-                return existing
-        except OSError:
-            pass
-        value = secrets.token_hex(16)
-        try:
-            target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_text(value + "\n", encoding="utf-8")
-            try:
-                target.chmod(0o600)
-            except OSError:
-                pass
-        except OSError as exc:
-            logger.debug("identifiant d'installation non ecrit : %s", exc)
-        _install_id = value
-        return value
+        _install_id = _resolve_install_id(target)
+        return _install_id
 
 
 def _enabled(config) -> bool:
@@ -83,18 +100,25 @@ def _enabled(config) -> bool:
     return bool(getattr(config.analytics, "enabled", True))
 
 
-def _post(endpoint: str, payload: dict) -> None:
-    body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
-    request = urllib.request.Request(
-        endpoint,
-        data=body,
-        method="POST",
-        headers={
-            "Content-Type": "application/json",
-            "User-Agent": f"checkmate-watcher/{__version__}",
-            INGEST_HEADER: REQUEST_TAG,
-        },
+def _encode_payload(payload: dict) -> bytes:
+    return json.dumps(payload, ensure_ascii=False).encode("utf-8")
+
+
+def _headers() -> dict[str, str]:
+    return {
+        "Content-Type": "application/json",
+        "User-Agent": f"checkmate-watcher/{__version__}",
+        INGEST_HEADER: REQUEST_TAG,
+    }
+
+
+def _build_request(endpoint: str, body: bytes) -> urllib.request.Request:
+    return urllib.request.Request(
+        endpoint, data=body, method="POST", headers=_headers()
     )
+
+
+def _deliver(request: urllib.request.Request) -> None:
     try:
         with urllib.request.urlopen(request, timeout=TIMEOUT_SECONDS):
             pass
@@ -102,22 +126,36 @@ def _post(endpoint: str, payload: dict) -> None:
         logger.debug("statistique non envoyee : %s", exc)
 
 
-def _send(config, event: str) -> None:
-    """Envoi en tache de fond, sans jamais bloquer ni lever d'exception."""
-    endpoint = getattr(config.analytics, "endpoint", DEFAULT_ENDPOINT)
-    payload = {
+def _post(endpoint: str, payload: dict) -> None:
+    _deliver(_build_request(endpoint, _encode_payload(payload)))
+
+
+def _endpoint(config) -> str:
+    return getattr(config.analytics, "endpoint", DEFAULT_ENDPOINT)
+
+
+def _payload(event: str) -> dict:
+    return {
         "install": install_id(),
         "event": event,
         "version": __version__,
         "os": _platform_name(),
     }
-    thread = threading.Thread(
+
+
+def _spawn(endpoint: str, payload: dict) -> None:
+    threading.Thread(
         target=_post,
         args=(endpoint, payload),
         name="checkmate-analytics",
         daemon=True,
-    )
-    thread.start()
+    ).start()
+
+
+def _send(config, event: str) -> None:
+    """Envoi en tache de fond, sans jamais bloquer ni lever d'exception."""
+    endpoint = _endpoint(config)
+    _spawn(endpoint, _payload(event))
 
 
 def record(config, event: str) -> None:
