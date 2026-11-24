@@ -162,42 +162,45 @@ CAPTURE_HTML = """
 """
 
 
-def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
-        prog="checkmate-watcher",
-        description="Surveille CESAR Emineo et propose de signer l'emargement.",
-    )
-    parser.add_argument(
-        "command",
-        nargs="?",
-        default="run",
-        choices=[
-            "run",
-            "capture",
-            "test-notification",
-            "check-config",
-            "reset-state",
-            "self-test",
-            "set-password",
-            "install-autostart",
-            "uninstall-autostart",
-            "setup",
-            "support-bundle",
-            "import-signature",
-            "check-update",
-            "update",
-            "stats",
-            "status",
-        ],
-    )
+HELP_NO_BROWSER = "setup : ne pas ouvrir le navigateur automatiquement"
+HELP_NOTIFY = "self-test : envoie aussi une notification reelle"
+
+COMMANDS = (
+    "run",
+    "capture",
+    "test-notification",
+    "check-config",
+    "reset-state",
+    "self-test",
+    "set-password",
+    "install-autostart",
+    "uninstall-autostart",
+    "setup",
+    "support-bundle",
+    "import-signature",
+    "check-update",
+    "update",
+    "stats",
+    "status",
+)
+
+
+def _add_common_args(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("command", nargs="?", default="run", choices=COMMANDS)
     parser.add_argument(
         "--config", default=DEFAULT_CONFIG, help="chemin du fichier TOML"
     )
+
+
+def _add_run_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--once", action="store_true", help="un seul cycle puis sortie")
     parser.add_argument(
         "--dry-run", action="store_true", help="detecte sans notifier ni signer"
     )
     parser.add_argument("--auto", action="store_true", help="signe sans confirmation")
+
+
+def _add_update_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--yes",
         action="store_true",
@@ -208,24 +211,34 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="update : verifier seulement, sans installer",
     )
+
+
+def _add_command_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--output", help="support-bundle : chemin de l'archive")
     parser.add_argument("--file", help="import-signature : fichier JSON")
-    parser.add_argument(
-        "--no-browser",
-        action="store_true",
-        help="setup : ne pas ouvrir le navigateur automatiquement",
-    )
-    parser.add_argument(
-        "--notify",
-        action="store_true",
-        help="self-test : envoie aussi une notification reelle",
-    )
+    parser.add_argument("--no-browser", action="store_true", help=HELP_NO_BROWSER)
+    parser.add_argument("--notify", action="store_true", help=HELP_NOTIFY)
+
+
+def _add_meta_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--verbose", "-v", action="store_true")
     parser.add_argument(
         "--version",
         action="version",
         version=f"%(prog)s {__version__} (build {BUILD})",
     )
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="checkmate-watcher",
+        description="Surveille CESAR Emineo et propose de signer l'emargement.",
+    )
+    _add_common_args(parser)
+    _add_run_args(parser)
+    _add_update_args(parser)
+    _add_command_args(parser)
+    _add_meta_args(parser)
     return parser
 
 
@@ -235,16 +248,15 @@ def _mask(value: str) -> str:
     return "*" * min(len(value), 8) + f" ({len(value)} caracteres)"
 
 
-def _afficher_check_config(
-    config: Config,
-    signature_status: tuple[str, object],
-    tools_status: list[tuple[str, str | None]],
-) -> None:
+def _afficher_identite(config: Config) -> None:
     print(f"CheckMate {__version__} (build {BUILD})")
     print("Configuration chargee")
     print(f"  CESAR          : {config.cesar.base_url}")
     print(f"  Utilisateur    : {config.cesar.username}")
     print(f"  Mot de passe   : {_mask(config.cesar.password)}")
+
+
+def _afficher_watcher(config: Config) -> None:
     print(f"  Intervalle     : {config.watcher.poll_interval}s")
     print(f"  Deduplication  : {config.watcher.dedupe_ttl}s")
     print(f"  Confirmation   : {config.watcher.confirm_timeout}s")
@@ -252,35 +264,56 @@ def _afficher_check_config(
     print(f"  Auto-signature : {config.watcher.auto_sign}")
     print(f"  Visible a la signature : {config.watcher.visible_on_sign}")
     print(f"  Plages         : {config.schedule.describe()}")
+
+
+def _afficher_chemins(config: Config) -> None:
     print(f"  Profil         : {config.watcher.profile_dir}")
     print(f"  Etat           : {config.watcher.state_file}")
     print(f"  Signature      : {config.signature.file}")
     print(f"  Logs           : {default_log_file()}")
 
-    status, detail = signature_status
+
+def _afficher_signature(statut: tuple[str, object]) -> None:
+    status, detail = statut
     if status == "ok":
         print(f"  Signature      : OK ({detail} points)")
-    elif status == "invalid":
+        return
+    if status == "invalid":
         print(f"  Signature      : INVALIDE ({detail})")
-    else:
-        print("  Signature      : ABSENTE, lance 'capture'")
+        return
+    print("  Signature      : ABSENTE, lance 'capture'")
 
-    for tool, found in tools_status:
+
+def _afficher_outils(outils: list[tuple[str, str | None]]) -> None:
+    for tool, found in outils:
         print(f"  Outil {tool:<10}: {found or 'INTROUVABLE'}")
 
 
-def command_check_config(config: Config) -> int:
-    if config.signature.file.is_file():
-        try:
-            points = load_signature(config.signature.file)
-            signature_status = ("ok", len(points))
-        except SignatureError as exc:
-            signature_status = ("invalid", exc)
-    else:
-        signature_status = ("absent", None)
+def _afficher_check_config(
+    config: Config,
+    signature_status: tuple[str, object],
+    tools_status: list[tuple[str, str | None]],
+) -> None:
+    _afficher_identite(config)
+    _afficher_watcher(config)
+    _afficher_chemins(config)
+    _afficher_signature(signature_status)
+    _afficher_outils(tools_status)
 
+
+def _statut_signature(fichier: Path) -> tuple[str, object]:
+    if not fichier.is_file():
+        return ("absent", None)
+    try:
+        return ("ok", len(load_signature(fichier)))
+    except SignatureError as exc:
+        return ("invalid", exc)
+
+
+def command_check_config(config: Config) -> int:
+    statut = _statut_signature(config.signature.file)
     tools_status = [(tool, shutil.which(tool)) for tool in ("notify-send", "zenity")]
-    _afficher_check_config(config, signature_status, tools_status)
+    _afficher_check_config(config, statut, tools_status)
     return 0
 
 
@@ -329,18 +362,26 @@ def _afficher_test_notification(sent: bool, answer: object) -> None:
     print(f"reponse : {answer}")
 
 
-def command_test_notification(config: Config) -> int:
-    notifier = Notifier.from_config(config)
-    sent = notifier.send(
+def _envoyer_test(notifier: Notifier) -> bool:
+    return notifier.send(
         "CheckMate",
         "Ceci est une notification de test.",
         urgency="normal",
     )
-    answer = notifier.ask(
+
+
+def _demander_test(notifier: Notifier, config: Config) -> object:
+    return notifier.ask(
         "Ceci est une confirmation de test. Clique sur un bouton.",
         timeout=60,
         title=config.notifications.app_name,
     )
+
+
+def command_test_notification(config: Config) -> int:
+    notifier = Notifier.from_config(config)
+    sent = _envoyer_test(notifier)
+    answer = _demander_test(notifier, config)
     _afficher_test_notification(sent, answer)
     return 0 if sent else 1
 
@@ -356,19 +397,21 @@ def _afficher_set_password(etape: str, service: str = "") -> None:
         print(f"mot de passe enregistre dans le trousseau ({service})")
 
 
-def command_set_password(config: Config) -> int:
-    password = getpass.getpass("Mot de passe CESAR : ")
+def _enregistrer_set_password(config: Config, password: str) -> int:
+    cesar = config.cesar
+    etape = "ok"
     if not password:
-        _afficher_set_password("vide")
-        return 1
-    if not keyring_available():
-        _afficher_set_password("pas_trousseau")
-        return 1
-    if not set_password(config.cesar.keyring_service, config.cesar.username, password):
-        _afficher_set_password("echec")
-        return 1
-    _afficher_set_password("ok", config.cesar.keyring_service)
-    return 0
+        etape = "vide"
+    elif not keyring_available():
+        etape = "pas_trousseau"
+    elif not set_password(cesar.keyring_service, cesar.username, password):
+        etape = "echec"
+    _afficher_set_password(etape, cesar.keyring_service)
+    return 0 if etape == "ok" else 1
+
+
+def command_set_password(config: Config) -> int:
+    return _enregistrer_set_password(config, getpass.getpass("Mot de passe CESAR : "))
 
 
 def _afficher_self_test(checks: list[tuple[str, bool, str]]) -> None:
@@ -466,32 +509,39 @@ def command_support_bundle(
     return 0
 
 
-def _afficher_import_signature(
+def _message_import(
     *,
     manquant: bool = False,
     erreur: object = None,
     points: int | None = None,
     fichier: Path | None = None,
-) -> None:
+) -> str:
     if manquant:
-        print("indique un fichier avec --file")
-    elif erreur is not None:
-        print(f"import impossible : {erreur}")
-    else:
-        print(f"signature importee ({points} points) dans {fichier}")
+        return "indique un fichier avec --file"
+    if erreur is not None:
+        return f"import impossible : {erreur}"
+    return f"signature importee ({points} points) dans {fichier}"
+
+
+def _afficher_import_signature(**options: object) -> None:
+    print(_message_import(**options))
+
+
+def _charger_points_signature(path: Path) -> tuple[list | None, object | None]:
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        return parse_points(data), None
+    except (OSError, json.JSONDecodeError, SignatureError) as exc:
+        return None, exc
 
 
 def command_import_signature(config: Config, file_path: str | None) -> int:
     if not file_path:
         _afficher_import_signature(manquant=True)
         return 1
-    path = Path(file_path).expanduser()
-    try:
-        raw = path.read_text(encoding="utf-8")
-        data = json.loads(raw)
-        points = parse_points(data)
-    except (OSError, json.JSONDecodeError, SignatureError) as exc:
-        _afficher_import_signature(erreur=exc)
+    points, erreur = _charger_points_signature(Path(file_path).expanduser())
+    if erreur:
+        _afficher_import_signature(erreur=erreur)
         return 1
     save_signature(config.signature.file, points)
     _afficher_import_signature(points=len(points), fichier=config.signature.file)
@@ -502,36 +552,47 @@ def _afficher_status_demarrage_echec() -> None:
     print("CheckMate n'a pas demarre. Consulte les logs.")
 
 
-def command_status(config: Config, config_path: Path) -> int:
+def _ouvrir_si_pret() -> bool:
     runtime = read_runtime()
     if runtime and status_alive(runtime):
         open_url(str(runtime["url"]))
-        return 0
+        return True
+    return False
 
-    executable = current_executable()
-    command = [str(executable), "--config", str(config_path), "run"]
+
+def _lancer_systemd() -> bool:
+    systemctl = shutil.which("systemctl")
+    if not systemctl:
+        return False
+    cmd = [systemctl, "--user", "start", UNIT_NAME]
+    lance = subprocess.run(cmd, check=False, capture_output=True, timeout=20)
+    return lance.returncode == 0
+
+
+def _demarrer(config_path: Path) -> None:
+    command = [str(current_executable()), "--config", str(config_path), "run"]
     if sys.platform.startswith("win"):
         subprocess.Popen(command, close_fds=True, creationflags=0x00000008)
-    else:
-        systemctl = shutil.which("systemctl")
-        started = False
-        if systemctl:
-            result = subprocess.run(
-                [systemctl, "--user", "start", UNIT_NAME],
-                check=False,
-                capture_output=True,
-                timeout=20,
-            )
-            started = result.returncode == 0
-        if not started:
-            subprocess.Popen(command, close_fds=True, start_new_session=True)
+        return
+    if _lancer_systemd():
+        return
+    subprocess.Popen(command, close_fds=True, start_new_session=True)
 
-    for _ in range(40):
-        runtime = read_runtime()
-        if runtime and status_alive(runtime):
-            open_url(str(runtime["url"]))
-            return 0
+
+def _attendre_runtime(tentatives: int = 40) -> bool:
+    for _ in range(tentatives):
+        if _ouvrir_si_pret():
+            return True
         time.sleep(0.5)
+    return False
+
+
+def command_status(config: Config, config_path: Path) -> int:
+    if _ouvrir_si_pret():
+        return 0
+    _demarrer(config_path)
+    if _attendre_runtime():
+        return 0
     _afficher_status_demarrage_echec()
     return 1
 
