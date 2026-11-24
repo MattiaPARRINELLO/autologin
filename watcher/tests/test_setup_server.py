@@ -219,3 +219,26 @@ def test_identifiants_invalides_refuses(tmp_path):
         assert "adresse" in str(exc)
     else:
         raise AssertionError("une adresse vide doit etre refusee")
+
+
+def test_active_days_tries_par_index(tmp_path):
+    config = local_config(tmp_path)
+    config = replace(config, schedule=replace(config.schedule, days=(6, 0, 2)))
+    session = SetupSession(tmp_path / "config.toml", config, "jeton")
+    assert session._active_days() == ["mon", "wed", "sun"]
+
+
+def test_escape_env_value_double_antislashs_et_guillemets():
+    assert setup_server._escape_env_value('a\\b"c') == 'a\\\\b\\"c'
+    assert setup_server._escape_env_value("plain") == "plain"
+
+
+def test_autostart_outcome(monkeypatch):
+    assert setup_server._autostart_outcome(False, True)[1] == "disabled"
+    assert setup_server._autostart_outcome(True, False)[1] == "failed"
+    monkeypatch.setattr(sys, "platform", "linux")
+    assert setup_server._autostart_outcome(True, True)[1] == "installed"
+    monkeypatch.setattr(sys, "platform", "win32")
+    message, state = setup_server._autostart_outcome(True, True)
+    assert state == "installed"
+    assert "prochaine ouverture de session" in message
