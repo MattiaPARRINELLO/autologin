@@ -12,6 +12,7 @@
   const feedback = document.querySelector('.swal2-html-container');
   const points = [];
   let drawing = false;
+  let context = null;
 
   function position(event) {
     const rect = canvas.getBoundingClientRect();
@@ -21,35 +22,38 @@
     };
   }
 
+  function startDraw(event) {
+    drawing = true;
+    const point = position(event);
+    points.push({ x: point.x, y: point.y, type: 'start' });
+    context.beginPath();
+    context.moveTo(point.x, point.y);
+  }
+
+  function moveDraw(event) {
+    if (!drawing) return;
+    const point = position(event);
+    points.push({ x: point.x, y: point.y, type: 'move' });
+    context.lineTo(point.x, point.y);
+    context.stroke();
+  }
+
+  function endDraw(event) {
+    if (!drawing) return;
+    drawing = false;
+    const point = position(event);
+    points.push({ x: point.x, y: point.y, type: 'end' });
+    context.stroke();
+  }
+
   function wireCanvas() {
-    const context = canvas.getContext('2d');
+    context = canvas.getContext('2d');
     context.lineWidth = 2.5;
     context.lineCap = 'round';
     context.strokeStyle = '#0f172a';
-
-    canvas.addEventListener('pointerdown', function (event) {
-      drawing = true;
-      const point = position(event);
-      points.push({ x: point.x, y: point.y, type: 'start' });
-      context.beginPath();
-      context.moveTo(point.x, point.y);
-    });
-
-    canvas.addEventListener('pointermove', function (event) {
-      if (!drawing) return;
-      const point = position(event);
-      points.push({ x: point.x, y: point.y, type: 'move' });
-      context.lineTo(point.x, point.y);
-      context.stroke();
-    });
-
-    canvas.addEventListener('pointerup', function (event) {
-      if (!drawing) return;
-      drawing = false;
-      const point = position(event);
-      points.push({ x: point.x, y: point.y, type: 'end' });
-      context.stroke();
-    });
+    canvas.addEventListener('pointerdown', startDraw);
+    canvas.addEventListener('pointermove', moveDraw);
+    canvas.addEventListener('pointerup', endDraw);
   }
 
   function openModal() {

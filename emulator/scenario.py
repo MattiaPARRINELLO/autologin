@@ -83,21 +83,33 @@ def mime_type(path: Path) -> str:
     return mimetypes.guess_type(path.name)[0] or "application/octet-stream"
 
 
-def load_scenario(directory: Path, close_delay_ms: int = 0) -> Scenario:
+def _scenario_root(directory: Path) -> Path:
     root = directory.expanduser().resolve()
     if not root.is_dir():
         raise ScenarioError(f"dossier introuvable : {directory}")
-    manifest = read_manifest(root)
-    assets_dir = (root / read_text(manifest, "assets", "assets")).resolve()
+    return root
+
+
+def _scenario_harness(root: Path, manifest: dict, close_delay_ms: int) -> str:
+    relative = manifest.get("harness", "harness.js")
+    harness = read_text_file(root, relative, "harness")
+    return harness.replace(CLOSE_DELAY_TOKEN, str(max(0, close_delay_ms)))
+
+
+def _build_scenario(root: Path, manifest: dict, close_delay_ms: int) -> Scenario:
+    assets = read_text(manifest, "assets", "assets")
     return Scenario(
         name=read_text(manifest, "name", root.name),
         root=root,
         pages=parse_pages(root, manifest.get("pages")),
-        harness=read_text_file(
-            root, manifest.get("harness", "harness.js"), "harness"
-        ).replace(CLOSE_DELAY_TOKEN, str(max(0, close_delay_ms))),
-        assets_dir=assets_dir,
+        harness=_scenario_harness(root, manifest, close_delay_ms),
+        assets_dir=(root / assets).resolve(),
     )
+
+
+def load_scenario(directory: Path, close_delay_ms: int = 0) -> Scenario:
+    root = _scenario_root(directory)
+    return _build_scenario(root, read_manifest(root), close_delay_ms)
 
 
 def read_manifest(root: Path) -> dict:
@@ -130,6 +142,16 @@ def parse_pages(root: Path, raw: object) -> dict[str, Page]:
     return {route: parse_page(root, route, value) for route, value in raw.items()}
 
 
+def _page_files(root: Path, route: str, raw: dict) -> dict:
+    files = {
+        state: resolve_file(root, value, f"pages{route}.{state}")
+        for state, value in raw.items()
+    }
+    if DEFAULT_STATE not in files:
+        raise ScenarioError(f"pages{route} : etat {DEFAULT_STATE!r} obligatoire")
+    return files
+
+
 def parse_page(root: Path, route: str, raw: object) -> Page:
     if not isinstance(route, str) or not route.startswith("/"):
         raise ScenarioError(f"pages : la route {route!r} doit commencer par /")
@@ -137,13 +159,7 @@ def parse_page(root: Path, route: str, raw: object) -> Page:
         return Page({DEFAULT_STATE: resolve_file(root, raw, f"pages{route}")})
     if not isinstance(raw, dict) or not raw:
         raise ScenarioError(f"pages{route} : chemin ou objet d'etats attendu")
-    files = {
-        state: resolve_file(root, value, f"pages{route}.{state}")
-        for state, value in raw.items()
-    }
-    if DEFAULT_STATE not in files:
-        raise ScenarioError(f"pages{route} : etat {DEFAULT_STATE!r} obligatoire")
-    return Page(files)
+    return Page(_page_files(root, route, raw))
 
 
 def resolve_file(root: Path, relative: object, label: str) -> Path:
