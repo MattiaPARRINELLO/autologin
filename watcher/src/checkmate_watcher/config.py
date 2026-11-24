@@ -68,6 +68,16 @@ DEFAULT_SELECTORS: dict[str, tuple[str, ...]] = {
 }
 
 
+def _normalize_selector_list(key: str, raw: object) -> tuple[str, ...]:
+    if isinstance(raw, str):
+        raw = (raw,)
+    if not raw or not all(isinstance(item, str) and item for item in raw):
+        raise ConfigError(
+            f"selecteurs.{key} doit etre une liste de selecteurs CSS non vides"
+        )
+    return tuple(raw)
+
+
 @dataclass(frozen=True)
 class Selectors:
     attendance_button: tuple[str, ...]
@@ -80,16 +90,10 @@ class Selectors:
 
     @classmethod
     def from_dict(cls, data: dict) -> Selectors:
-        values = {}
-        for key, default in DEFAULT_SELECTORS.items():
-            raw = data.get(key, default)
-            if isinstance(raw, str):
-                raw = (raw,)
-            if not raw or not all(isinstance(item, str) and item for item in raw):
-                raise ConfigError(
-                    f"selecteurs.{key} doit etre une liste de selecteurs CSS non vides"
-                )
-            values[key] = tuple(raw)
+        values = {
+            key: _normalize_selector_list(key, data.get(key, default))
+            for key, default in DEFAULT_SELECTORS.items()
+        }
         return cls(**values)
 
 
@@ -144,18 +148,30 @@ class AnalyticsConfig:
     endpoint: str = DEFAULT_ANALYTICS_ENDPOINT
 
 
-def parse_updates_channel(table: dict) -> str:
-    """Lit `[updates] channel`, avec `include_prerelease` en alias historique."""
-    raw_channel = table.get("channel")
-    if raw_channel is None:
-        if "include_prerelease" in table:
-            return BETA_CHANNEL if bool(table["include_prerelease"]) else STABLE_CHANNEL
-        return STABLE_CHANNEL
-    channel = str(raw_channel).strip().lower()
+def _legacy_channel(table: dict) -> str | None:
+    if "include_prerelease" not in table:
+        return None
+    return BETA_CHANNEL if bool(table["include_prerelease"]) else STABLE_CHANNEL
+
+
+def _normalize_channel(raw: object) -> str:
+    return str(raw).strip().lower()
+
+
+def _validate_channel(channel: str) -> str:
     if channel not in CHANNELS:
         values = ", ".join(f"'{item}'" for item in CHANNELS)
         raise ConfigError(f"[updates] channel doit valoir {values}")
     return channel
+
+
+def parse_updates_channel(table: dict) -> str:
+    """Lit `[updates] channel`, avec `include_prerelease` en alias historique."""
+    raw = table.get("channel")
+    if raw is None:
+        legacy = _legacy_channel(table)
+        return STABLE_CHANNEL if legacy is None else legacy
+    return _validate_channel(_normalize_channel(raw))
 
 
 @dataclass(frozen=True)
@@ -184,51 +200,81 @@ def _require(table: dict, key: str, table_name: str) -> str:
     return value.strip()
 
 
-def _resolve_password(
-    table: dict, username: str, service: str, required: bool = True
-) -> str:
+def _direct_password(table: dict) -> str:
     direct = table.get("password")
     if isinstance(direct, str) and direct:
         return direct
+    return ""
 
+
+def _env_password(table: dict) -> str:
     env_name = table.get("password_env")
-    if isinstance(env_name, str) and env_name:
-        value = os.environ.get(env_name)
-        if value:
-            return value
-        logger.debug("variable %s absente, essai du trousseau", env_name)
+    if not isinstance(env_name, str) or not env_name:
+        return ""
+    value = os.environ.get(env_name)
+    if value:
+        return value
+    logger.debug("variable %s absente, essai du trousseau", env_name)
+    return ""
 
-    stored = get_keyring_password(service, username)
-    if stored:
-        return stored
 
+def _required_password(required: bool) -> str:
     if required:
         raise ConfigError(
-            "[cesar] mot de passe introuvable : renseigne password ou password_env, "
-            "ou lance 'checkmate-watcher set-password'"
+            "[cesar] mot de passe introuvable : renseigne password ou "
+            "password_env, ou lance 'checkmate-watcher set-password'"
         )
     return ""
 
 
+def _resolve_password(
+    table: dict, username: str, service: str, required: bool = True
+) -> str:
+    for source in (
+        lambda: _direct_password(table),
+        lambda: _env_password(table),
+        lambda: get_keyring_password(service, username),
+    ):
+        if value := source():
+            return value
+    return _required_password(required)
+
+
+def _default_cesar() -> CesarConfig:
+    return CesarConfig(
+        base_url="https://cesar.emineo-education.fr",
+        username="",
+        password="",
+    )
+
+
+def _default_watcher() -> WatcherConfig:
+    return WatcherConfig(poll_interval=10, headless=True)
+
+
+def _default_schedule() -> Schedule:
+    return Schedule(
+        enabled=True,
+        days=parse_days(DEFAULT_DAYS),
+        windows=parse_windows(DEFAULT_WINDOWS),
+    )
+
+
+def _default_sections() -> dict:
+    return {
+        "cesar": _default_cesar(),
+        "watcher": _default_watcher(),
+        "signature": SignatureConfig(),
+        "notifications": NotificationConfig(),
+        "selectors": Selectors.from_dict({}),
+        "schedule": _default_schedule(),
+        "updates": UpdatesConfig(),
+    }
+
+
 def default_config() -> Config:
     """Configuration proposee par l'assistant : reglages recommandes."""
-    return Config(
-        cesar=CesarConfig(
-            base_url="https://cesar.emineo-education.fr",
-            username="",
-            password="",
-        ),
-        watcher=WatcherConfig(poll_interval=10, headless=True),
-        signature=SignatureConfig(),
-        notifications=NotificationConfig(),
-        selectors=Selectors.from_dict({}),
-        schedule=Schedule(
-            enabled=True,
-            days=parse_days(DEFAULT_DAYS),
-            windows=parse_windows(DEFAULT_WINDOWS),
-        ),
-        updates=UpdatesConfig(),
-    )
+    return Config(**_default_sections())
 
 
 def _days_to_names(days: tuple[int, ...]) -> list[str]:
@@ -236,74 +282,156 @@ def _days_to_names(days: tuple[int, ...]) -> list[str]:
     return [name for name, index in ordered if index in days]
 
 
-def config_to_dict(
-    config: Config,
-    *,
-    password: str | None = None,
-    password_env: str | None = None,
-) -> dict:
-    cesar: dict = {
-        "base_url": config.cesar.base_url,
-        "login_path": config.cesar.login_path,
-        "dashboard_path": config.cesar.dashboard_path,
-        "username": config.cesar.username,
-        "keyring_service": config.cesar.keyring_service,
-    }
+def _attr_dict(obj, names: tuple[str, ...]) -> dict:
+    return {name: getattr(obj, name) for name in names}
+
+
+def _with_secret(data: dict, password=None, password_env=None) -> dict:
     if password:
-        cesar["password"] = password
+        data["password"] = password
     elif password_env:
-        cesar["password_env"] = password_env
+        data["password_env"] = password_env
+    return data
 
-    watcher = {
-        "poll_interval": config.watcher.poll_interval,
-        "dedupe_ttl": config.watcher.dedupe_ttl,
-        "confirm_timeout": config.watcher.confirm_timeout,
-        "prompt_retry": config.watcher.prompt_retry,
-        "auto_sign": config.watcher.auto_sign,
-        "auto_sign_delay": config.watcher.auto_sign_delay,
-        "headless": config.watcher.headless,
-        "visible_on_sign": config.watcher.visible_on_sign,
-        "profile_dir": str(config.watcher.profile_dir),
-        "state_file": str(config.watcher.state_file),
+
+def _cesar_to_dict(cesar: CesarConfig, password=None, password_env=None) -> dict:
+    data = {
+        "base_url": cesar.base_url,
+        "login_path": cesar.login_path,
+        "dashboard_path": cesar.dashboard_path,
+        "username": cesar.username,
+        "keyring_service": cesar.keyring_service,
     }
-    if config.watcher.executable_path:
-        watcher["executable_path"] = config.watcher.executable_path
+    return _with_secret(data, password, password_env)
 
+
+def _watcher_to_dict(watcher: WatcherConfig) -> dict:
+    scalars = ("poll_interval", "dedupe_ttl", "confirm_timeout", "prompt_retry")
+    flags = ("auto_sign", "auto_sign_delay", "headless", "visible_on_sign")
+    data = {name: getattr(watcher, name) for name in scalars + flags}
+    data["profile_dir"] = str(watcher.profile_dir)
+    data["state_file"] = str(watcher.state_file)
+    if watcher.executable_path:
+        data["executable_path"] = watcher.executable_path
+    return data
+
+
+def _signature_to_dict(signature: SignatureConfig) -> dict:
+    return {"file": str(signature.file), "padding_ratio": signature.padding_ratio}
+
+
+def _notifications_to_dict(notifications: NotificationConfig) -> dict:
+    return _attr_dict(notifications, ("app_name", "icon", "enabled"))
+
+
+def _schedule_to_dict(schedule: Schedule) -> dict:
     return {
-        "cesar": cesar,
-        "watcher": watcher,
-        "signature": {
-            "file": str(config.signature.file),
-            "padding_ratio": config.signature.padding_ratio,
-        },
-        "notifications": {
-            "app_name": config.notifications.app_name,
-            "icon": config.notifications.icon,
-            "enabled": config.notifications.enabled,
-        },
-        "schedule": {
-            "enabled": config.schedule.enabled,
-            "days": _days_to_names(config.schedule.days),
-            "windows": [str(window) for window in config.schedule.windows],
-        },
-        "updates": {
-            "enabled": config.updates.enabled,
-            "channel": config.updates.channel,
-        },
-        "analytics": {
-            "enabled": config.analytics.enabled,
-            "endpoint": config.analytics.endpoint,
-        },
-        "selectors": {
-            "attendance_button": list(config.selectors.attendance_button),
-            "signature_canvas": list(config.selectors.signature_canvas),
-            "signature_save": list(config.selectors.signature_save),
-            "confirmation": list(config.selectors.confirmation),
-            "login_username": list(config.selectors.login_username),
-            "login_password": list(config.selectors.login_password),
-            "login_submit": list(config.selectors.login_submit),
-        },
+        "enabled": schedule.enabled,
+        "days": _days_to_names(schedule.days),
+        "windows": [str(window) for window in schedule.windows],
     }
+
+
+def _selectors_to_dict(selectors: Selectors) -> dict:
+    first = ("attendance_button", "signature_canvas", "signature_save")
+    last = ("confirmation", "login_username", "login_password", "login_submit")
+    return {key: list(getattr(selectors, key)) for key in first + last}
+
+
+def _remaining_sections(config: Config) -> dict:
+    return {
+        "signature": _signature_to_dict(config.signature),
+        "notifications": _notifications_to_dict(config.notifications),
+        "schedule": _schedule_to_dict(config.schedule),
+        "updates": _attr_dict(config.updates, ("enabled", "channel")),
+        "analytics": _attr_dict(config.analytics, ("enabled", "endpoint")),
+        "selectors": _selectors_to_dict(config.selectors),
+    }
+
+
+def config_to_dict(config: Config, *, password=None, password_env=None) -> dict:
+    sections = {
+        "cesar": _cesar_to_dict(config.cesar, password, password_env),
+        "watcher": _watcher_to_dict(config.watcher),
+    }
+    sections.update(_remaining_sections(config))
+    return sections
+
+
+RETRY_WARNING = "ecriture de la configuration retentee (%s/4) : %s"
+
+
+def _config_payload(
+    config: Config, *, password: str | None, password_env: str | None
+) -> str:
+    return tomli_w.dumps(
+        config_to_dict(config, password=password, password_env=password_env)
+    )
+
+
+def _prepare_temp_path(target: Path) -> Path:
+    return target.with_name(f".{target.name}.{uuid.uuid4().hex}.tmp")
+
+
+def _write_secure_temp(temporary: Path, payload: str) -> None:
+    temporary.write_text(payload, encoding="utf-8")
+    temporary.chmod(0o600)
+
+
+def _make_writable(target: Path) -> None:
+    if not target.exists():
+        return
+    try:
+        target.chmod(stat.S_IWRITE | stat.S_IREAD)
+    except OSError:
+        pass
+
+
+def _try_replace(temporary: Path, target: Path) -> OSError | None:
+    _make_writable(target)
+    try:
+        temporary.replace(target)
+        return None
+    except OSError as exc:
+        return exc
+
+
+def _retry_replace(
+    temporary: Path, target: Path, attempts: int, delay: float
+) -> OSError | None:
+    last_error = None
+    for attempt in range(attempts):
+        last_error = _try_replace(temporary, target)
+        if last_error is None:
+            return None
+        logger.warning(RETRY_WARNING, attempt + 1, last_error)
+        time.sleep(delay * (attempt + 1))
+    return last_error
+
+
+def _replace_with_retries(
+    temporary: Path, target: Path, attempts: int = 4, delay: float = 0.15
+) -> Path:
+    last_error = _retry_replace(temporary, target, attempts, delay)
+    if last_error is not None:
+        raise last_error
+    return target
+
+
+def _discard_temp(temporary: Path) -> None:
+    try:
+        temporary.unlink()
+    except FileNotFoundError:
+        pass
+
+
+def _write_config_atomically(target: Path, payload: str) -> Path:
+    temporary = _prepare_temp_path(target)
+    try:
+        _write_secure_temp(temporary, payload)
+        return _replace_with_retries(temporary, target)
+    finally:
+        _discard_temp(temporary)
 
 
 def save_config(
@@ -316,175 +444,182 @@ def save_config(
     """Ecrit la configuration de facon atomique, lisible par l'utilisateur seul."""
     target = expand_path(str(path))
     target.parent.mkdir(parents=True, exist_ok=True)
-    payload = tomli_w.dumps(
-        config_to_dict(config, password=password, password_env=password_env)
-    )
-    temporary = target.with_name(f".{target.name}.{uuid.uuid4().hex}.tmp")
-    try:
-        temporary.write_text(payload, encoding="utf-8")
-        temporary.chmod(0o600)
-        last_error: OSError | None = None
-        for attempt in range(4):
-            if target.exists():
-                try:
-                    target.chmod(stat.S_IWRITE | stat.S_IREAD)
-                except OSError:
-                    pass
-            try:
-                temporary.replace(target)
-                return target
-            except OSError as exc:
-                last_error = exc
-                logger.warning(
-                    "ecriture de la configuration retentee (%s/4) : %s",
-                    attempt + 1,
-                    exc,
-                )
-                time.sleep(0.15 * (attempt + 1))
-        assert last_error is not None
-        raise last_error
-    finally:
-        try:
-            temporary.unlink()
-        except FileNotFoundError:
-            pass
+    payload = _config_payload(config, password=password, password_env=password_env)
+    return _write_config_atomically(target, payload)
 
 
-def load_config(path: str | Path, *, require_password: bool = True) -> Config:
-    config_path = Path(path)
+def _read_toml(config_path: Path) -> dict:
     if not config_path.is_file():
         raise ConfigError(f"fichier de configuration introuvable : {config_path}")
-
     with config_path.open("rb") as handle:
-        data = tomllib.load(handle)
+        return tomllib.load(handle)
 
-    cesar_table = data.get("cesar", {})
-    watcher_table = data.get("watcher", {})
-    signature_table = data.get("signature", {})
-    notification_table = data.get("notifications", {})
-    selectors_table = data.get("selectors", {})
-    schedule_table = data.get("schedule", {})
-    updates_table = data.get("updates", {})
 
-    if not isinstance(cesar_table, dict):
-        raise ConfigError("[cesar] doit etre une table TOML")
+def _table(data: dict, name: str) -> dict:
+    value = data.get(name, {})
+    if not isinstance(value, dict):
+        raise ConfigError(f"[{name}] doit etre une table TOML")
+    return value
 
-    username = _require(cesar_table, "username", "cesar")
-    keyring_service = str(cesar_table.get("keyring_service", DEFAULT_SERVICE))
 
-    cesar = CesarConfig(
-        base_url=_require(cesar_table, "base_url", "cesar").rstrip("/"),
-        username=username,
-        password=_resolve_password(
-            cesar_table, username, keyring_service, required=require_password
-        ),
-        keyring_service=keyring_service,
-        login_path=str(cesar_table.get("login_path", "/connexion")),
-        dashboard_path=str(cesar_table.get("dashboard_path", "/")),
+def _http(value: str, name: str, key: str) -> str:
+    if not value.startswith(("http://", "https://")):
+        raise ConfigError(f"[{name}] {key} doit commencer par http:// ou https://")
+    return value
+
+
+def _int(table: dict, key: str, default: int) -> int:
+    return int(table.get(key, default))
+
+
+def _bool(table: dict, key: str, default: bool) -> bool:
+    return bool(table.get(key, default))
+
+
+def _path(table: dict, key: str, default: Path) -> Path:
+    return expand_path(str(table.get(key, default)))
+
+
+def _opt_str(table: dict, key: str) -> str | None:
+    value = table.get(key)
+    return str(value) if value else None
+
+
+def _build_cesar(
+    table: dict, base_url: str, username: str, password: str, service: str
+) -> CesarConfig:
+    login_path = str(table.get("login_path", "/connexion"))
+    dashboard_path = str(table.get("dashboard_path", "/"))
+    return CesarConfig(
+        base_url, username, password, service, login_path, dashboard_path
     )
 
-    if not cesar.base_url.startswith(("http://", "https://")):
-        raise ConfigError("[cesar] base_url doit commencer par http:// ou https://")
 
-    watcher_defaults = WatcherConfig()
-    watcher = WatcherConfig(
-        poll_interval=int(
-            watcher_table.get("poll_interval", watcher_defaults.poll_interval)
-        ),
-        dedupe_ttl=int(watcher_table.get("dedupe_ttl", watcher_defaults.dedupe_ttl)),
-        confirm_timeout=int(
-            watcher_table.get("confirm_timeout", watcher_defaults.confirm_timeout)
-        ),
-        prompt_retry=int(
-            watcher_table.get("prompt_retry", watcher_defaults.prompt_retry)
-        ),
-        auto_sign=bool(watcher_table.get("auto_sign", watcher_defaults.auto_sign)),
-        auto_sign_delay=int(
-            watcher_table.get("auto_sign_delay", watcher_defaults.auto_sign_delay)
-        ),
-        headless=bool(watcher_table.get("headless", watcher_defaults.headless)),
-        visible_on_sign=bool(
-            watcher_table.get("visible_on_sign", watcher_defaults.visible_on_sign)
-        ),
-        executable_path=(
-            str(watcher_table["executable_path"])
-            if watcher_table.get("executable_path")
-            else None
-        ),
-        profile_dir=expand_path(
-            str(watcher_table.get("profile_dir", watcher_defaults.profile_dir))
-        ),
-        state_file=expand_path(
-            str(watcher_table.get("state_file", watcher_defaults.state_file))
-        ),
+def _load_cesar(data: dict, *, require_password: bool) -> CesarConfig:
+    table = _table(data, "cesar")
+    username = _require(table, "username", "cesar")
+    service = str(table.get("keyring_service", DEFAULT_SERVICE))
+    raw_base = _require(table, "base_url", "cesar").rstrip("/")
+    password = _resolve_password(table, username, service, require_password)
+    base_url = _http(raw_base, "cesar", "base_url")
+    return _build_cesar(table, base_url, username, password, service)
+
+
+def _watcher_timing(table: dict, defaults: WatcherConfig) -> dict:
+    return {
+        "poll_interval": _int(table, "poll_interval", defaults.poll_interval),
+        "dedupe_ttl": _int(table, "dedupe_ttl", defaults.dedupe_ttl),
+        "confirm_timeout": _int(table, "confirm_timeout", defaults.confirm_timeout),
+        "prompt_retry": _int(table, "prompt_retry", defaults.prompt_retry),
+        "auto_sign": _bool(table, "auto_sign", defaults.auto_sign),
+        "auto_sign_delay": _int(table, "auto_sign_delay", defaults.auto_sign_delay),
+    }
+
+
+def _watcher_flags(table: dict, defaults: WatcherConfig) -> dict:
+    return {
+        "headless": _bool(table, "headless", defaults.headless),
+        "visible_on_sign": _bool(table, "visible_on_sign", defaults.visible_on_sign),
+        "executable_path": _opt_str(table, "executable_path"),
+        "profile_dir": _path(table, "profile_dir", defaults.profile_dir),
+        "state_file": _path(table, "state_file", defaults.state_file),
+    }
+
+
+def _load_watcher(data: dict) -> WatcherConfig:
+    table = data.get("watcher", {})
+    defaults = WatcherConfig()
+    timing = _watcher_timing(table, defaults)
+    flags = _watcher_flags(table, defaults)
+    return WatcherConfig(**{**timing, **flags})
+
+
+def _load_signature(data: dict) -> SignatureConfig:
+    table = data.get("signature", {})
+    defaults = SignatureConfig()
+    return SignatureConfig(
+        file=_path(table, "file", defaults.file),
+        padding_ratio=float(table.get("padding_ratio", defaults.padding_ratio)),
     )
 
-    signature_defaults = SignatureConfig()
-    signature = SignatureConfig(
-        file=expand_path(str(signature_table.get("file", signature_defaults.file))),
-        padding_ratio=float(
-            signature_table.get("padding_ratio", signature_defaults.padding_ratio)
-        ),
+
+def _load_notifications(data: dict) -> NotificationConfig:
+    table = data.get("notifications", {})
+    defaults = NotificationConfig()
+    return NotificationConfig(
+        app_name=str(table.get("app_name", defaults.app_name)),
+        icon=str(table.get("icon", defaults.icon)),
+        enabled=_bool(table, "enabled", defaults.enabled),
     )
 
-    notification_defaults = NotificationConfig()
-    notifications = NotificationConfig(
-        app_name=str(
-            notification_table.get("app_name", notification_defaults.app_name)
-        ),
-        icon=str(notification_table.get("icon", notification_defaults.icon)),
-        enabled=bool(notification_table.get("enabled", notification_defaults.enabled)),
-    )
 
-    selectors = Selectors.from_dict(selectors_table)
-    updates_defaults = UpdatesConfig()
-    updates = UpdatesConfig(
-        enabled=bool(updates_table.get("enabled", updates_defaults.enabled)),
-        channel=parse_updates_channel(updates_table),
-    )
+def _load_selectors(data: dict) -> Selectors:
+    return Selectors.from_dict(data.get("selectors", {}))
 
-    analytics_table = data.get("analytics", {})
-    if not isinstance(analytics_table, dict):
-        raise ConfigError("[analytics] doit etre une table TOML")
-    analytics_defaults = AnalyticsConfig()
-    analytics = AnalyticsConfig(
-        enabled=bool(analytics_table.get("enabled", analytics_defaults.enabled)),
-        endpoint=str(analytics_table.get("endpoint", analytics_defaults.endpoint)),
-    )
-    if analytics.enabled and not analytics.endpoint.startswith(("http://", "https://")):
-        raise ConfigError("[analytics] endpoint doit commencer par http:// ou https://")
 
+def _load_updates(data: dict) -> UpdatesConfig:
+    table = data.get("updates", {})
+    defaults = UpdatesConfig()
+    enabled = _bool(table, "enabled", defaults.enabled)
+    return UpdatesConfig(enabled=enabled, channel=parse_updates_channel(table))
+
+
+def _load_analytics(data: dict) -> AnalyticsConfig:
+    table = _table(data, "analytics")
+    defaults = AnalyticsConfig()
+    enabled = _bool(table, "enabled", defaults.enabled)
+    endpoint = str(table.get("endpoint", defaults.endpoint))
+    if enabled:
+        _http(endpoint, "analytics", "endpoint")
+    return AnalyticsConfig(enabled=enabled, endpoint=endpoint)
+
+
+def _load_schedule(data: dict) -> Schedule:
+    table = data.get("schedule", {})
     try:
-        schedule = Schedule(
-            enabled=bool(schedule_table.get("enabled", False)),
-            days=parse_days(schedule_table.get("days", DEFAULT_DAYS)),
-            windows=parse_windows(schedule_table.get("windows", DEFAULT_WINDOWS)),
+        return Schedule(
+            enabled=bool(table.get("enabled", False)),
+            days=parse_days(table.get("days", DEFAULT_DAYS)),
+            windows=parse_windows(table.get("windows", DEFAULT_WINDOWS)),
         )
     except ScheduleError as exc:
         raise ConfigError(f"[schedule] {exc}") from exc
 
+
+def _validate_padding(signature: SignatureConfig) -> None:
+    ratio = signature.padding_ratio
+    if ratio < MIN_PADDING_RATIO or ratio > MAX_PADDING_RATIO:
+        raise ConfigError(
+            f"[signature] padding_ratio doit etre entre "
+            f"{MIN_PADDING_RATIO} et {MAX_PADDING_RATIO}"
+        )
+
+
+def _validate_limits(watcher: WatcherConfig, signature: SignatureConfig) -> None:
     if watcher.poll_interval < 10:
         raise ConfigError("[watcher] poll_interval doit etre >= 10 secondes")
     if watcher.confirm_timeout < 10:
         raise ConfigError("[watcher] confirm_timeout doit etre >= 10 secondes")
     if watcher.prompt_retry < 30:
         raise ConfigError("[watcher] prompt_retry doit etre >= 30 secondes")
-    if (
-        signature.padding_ratio < MIN_PADDING_RATIO
-        or signature.padding_ratio > MAX_PADDING_RATIO
-    ):
-        raise ConfigError(
-            f"[signature] padding_ratio doit etre entre "
-            f"{MIN_PADDING_RATIO} et {MAX_PADDING_RATIO}"
-        )
+    _validate_padding(signature)
 
-    return Config(
-        cesar=cesar,
-        watcher=watcher,
-        signature=signature,
-        notifications=notifications,
-        selectors=selectors,
-        schedule=schedule,
-        updates=updates,
-        analytics=analytics,
-    )
+
+def _load_parts(data: dict, require_password: bool) -> dict:
+    return {
+        "cesar": _load_cesar(data, require_password=require_password),
+        "watcher": _load_watcher(data),
+        "signature": _load_signature(data),
+        "notifications": _load_notifications(data),
+        "selectors": _load_selectors(data),
+        "updates": _load_updates(data),
+        "analytics": _load_analytics(data),
+    }
+
+
+def load_config(path: str | Path, *, require_password: bool = True) -> Config:
+    data = _read_toml(Path(path))
+    parts = _load_parts(data, require_password)
+    parts["schedule"] = _load_schedule(data)
+    _validate_limits(parts["watcher"], parts["signature"])
+    return Config(**parts)
