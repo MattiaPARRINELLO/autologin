@@ -6,12 +6,14 @@ from pathlib import Path
 
 import pytest
 
+from checkmate_watcher import config as config_module
 from checkmate_watcher.config import (
     Config,
     ConfigError,
     default_config,
     load_config,
     save_config,
+    save_updates_channel,
 )
 
 
@@ -183,3 +185,21 @@ def test_le_canal_prime_sur_l_alias(tmp_path):
 def test_refuse_un_canal_inconnu(tmp_path):
     with pytest.raises(ConfigError, match="channel doit valoir"):
         load_config(write_config(tmp_path, '[updates]\nchannel = "nightly"'))
+
+
+def test_save_updates_channel_preserve_le_mot_de_passe(tmp_path):
+    path = _write_config_env(tmp_path, "CHECKMATE_TEST_PASSWORD")
+    config = save_updates_channel(path, "beta")
+    assert config.updates.channel == "beta"
+    assert "password_env" in path.read_text(encoding="utf-8")
+
+
+def test_save_updates_channel_refuse_un_canal_inconnu(tmp_path):
+    path = _write_config_env(tmp_path, "CHECKMATE_TEST_PASSWORD")
+    with pytest.raises(ConfigError):
+        save_updates_channel(path, "nightly")
+
+
+def test_le_canal_par_defaut_suit_la_version(monkeypatch):
+    monkeypatch.setattr(config_module, "__version__", "0.7.0-beta.1")
+    assert config_module.UpdatesConfig().channel == "beta"

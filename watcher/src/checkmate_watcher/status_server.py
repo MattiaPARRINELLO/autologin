@@ -18,7 +18,7 @@ from urllib.parse import urlparse
 
 from . import __version__
 from .autostart import current_executable
-from .config import Config
+from .config import Config, save_updates_channel
 from .local_http import LocalError, LocalHandler
 from .local_http import create_server as _create_server
 from .notifications import Notifier
@@ -26,7 +26,7 @@ from .paths import data_dir, default_log_file
 from .self_update import update_now
 from .status_data import build_snapshot
 from .status_ui import STATUS_HTML
-from .updates import UpdateError, check_for_update
+from .updates import BETA_CHANNEL, STABLE_CHANNEL, UpdateError, check_for_update
 
 logger = logging.getLogger(__name__)
 
@@ -61,9 +61,19 @@ ACTIONS = (
     ),
     Action("install-update", "Installer la mise a jour", "install_update"),
     Action("open-logs", "Ouvrir les logs", "open_logs"),
+    Action("set-channel", "Changer de canal", "set_channel"),
     Action("quit", "Quitter", "quit"),
 )
 ACTIONS_BY_NAME = {action.name: action for action in ACTIONS}
+
+
+def _channel_message(channel: str) -> str:
+    if channel == BETA_CHANNEL:
+        return (
+            "Canal beta active. Les mises a jour arrivent souvent et la "
+            "stabilite du projet n'est pas garantie."
+        )
+    return "Canal stable reactive : mises a jour moins frequentes."
 
 
 def runtime_path() -> Path:
@@ -307,10 +317,19 @@ class StatusSession:
         self.stop_event.set()
         return {"ok": True, "message": "CheckMate est arrêté."}
 
-    def action(self, name: str) -> dict:
+    def set_channel(self, channel: str) -> dict:
+        desired = channel.strip().lower()
+        if desired not in {STABLE_CHANNEL, BETA_CHANNEL}:
+            raise StatusError("canal inconnu")
+        self.config = save_updates_channel(self.config_path, desired)
+        return {"ok": True, "channel": desired, "message": _channel_message(desired)}
+
+    def action(self, name: str, payload: dict | None = None) -> dict:
         action = ACTIONS_BY_NAME.get(name)
         if action is None:
             raise StatusError("action inconnue")
+        if action.method == "set_channel":
+            return self.set_channel(str((payload or {}).get("channel") or ""))
         return getattr(self, action.method)()
 
 
@@ -366,7 +385,7 @@ class _Handler(LocalHandler):
 
     def _perform_action(self):
         payload = self._read_json()
-        return self.session.action(str(payload.get("action") or ""))
+        return self.session.action(str(payload.get("action") or ""), payload)
 
     def _report_action_error(self, exc) -> None:
         if isinstance(exc, LocalError):

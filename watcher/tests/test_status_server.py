@@ -12,7 +12,12 @@ from datetime import datetime
 import pytest
 
 from checkmate_watcher import status_server
-from checkmate_watcher.config import UpdatesConfig, default_config
+from checkmate_watcher.config import (
+    UpdatesConfig,
+    default_config,
+    load_config,
+    save_config,
+)
 from checkmate_watcher.state import StateStore
 from checkmate_watcher.status_server import StatusSession, create_server
 from checkmate_watcher.updates import Release, parse_version
@@ -177,6 +182,24 @@ def _beta_session(tmp_path) -> StatusSession:
         StateStore(tmp_path / "state.json"),
         datetime.now(),
     )
+
+
+def _channel_config():
+    base = default_config()
+    cesar = replace(base.cesar, username="eleve", password="secret")
+    return replace(base, cesar=cesar, updates=UpdatesConfig(channel="stable"))
+
+
+def test_le_canal_beta_se_change_et_se_persiste(tmp_path):
+    config = _channel_config()
+    path = tmp_path / "config.toml"
+    save_config(path, config, password="secret")
+    session = StatusSession(
+        config, path, StateStore(tmp_path / "state.json"), datetime.now()
+    )
+    result = session.action("set-channel", {"channel": "beta"})
+    assert result["channel"] == "beta"
+    assert load_config(path).updates.channel == "beta"
 
 
 def test_check_update_utilise_le_canal(tmp_path, monkeypatch):
