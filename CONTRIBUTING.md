@@ -305,6 +305,30 @@ une release deja publiee. Les releases historiques 0.1.x a 0.6.0 sont marquees
 prerelease cote GitHub sans suffixe de tag, et elles restent filtrees par ce
 booleen cote watcher.
 
+## Marqueurs obligatoires de release
+
+Chaque release doit declarer deux marqueurs dans
+`.github/release-markers.txt`, mis a jour avec le commit de version :
+
+```
+CHECKMATE-MIGRATION: 0
+CHECKMATE-REQUIRED: 0
+```
+
+- `CHECKMATE-MIGRATION` : la release migre des donnees ou un format de facon
+  irreversible. Mettre `0` si aucune migration. Sinon, une raison courte.
+  Sauter cette version lors d'une mise a jour n'est pas supporte.
+- `CHECKMATE-REQUIRED` : version minimale obligatoire. Mettre `0` si aucune
+  contrainte. Sinon, une raison courte qui sera affichee a l'utilisateur.
+
+Les deux marqueurs sont obligatoires. Une valeur vide ou un marqueur absent
+fait echouer le workflow de release. Si l'un des deux n'est pas `0`, la
+publication passe par l'environnement GitHub `release-manual`, qui doit avoir
+des relecteurs obligatoires configures. Une validation manuelle est alors
+necessaire avant publication.
+
+Les marqueurs sont ajoutes en tete des notes de release par le workflow.
+
 ## Procedure de stabilisation beta vers main
 
 1. Verifier la CI et la validation Windows sur `beta`.
