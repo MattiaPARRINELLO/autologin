@@ -40,44 +40,35 @@ def test_trousseau_en_erreur_ne_plante_pas(monkeypatch):
     assert credentials.set_password("checkmate", "eleve", "secret") is False
 
 
+def _ecrire_config(tmp_path, contenu: str):
+    path = tmp_path / "config.toml"
+    path.write_text(textwrap.dedent(contenu), encoding="utf-8")
+    return path
+
+
+def _keyring(monkeypatch, valeur):
+    monkeypatch.setattr(
+        "checkmate_watcher.config.get_keyring_password",
+        lambda service, username: valeur,
+    )
+
+
 def test_config_lit_le_mot_de_passe_du_trousseau(monkeypatch, tmp_path):
     monkeypatch.setenv("HOME", str(tmp_path))
     monkeypatch.delenv("CHECKMATE_TEST_PASSWORD", raising=False)
-    monkeypatch.setattr(
-        "checkmate_watcher.config.get_keyring_password",
-        lambda service, username: "depuis-keyring",
+    _keyring(monkeypatch, "depuis-keyring")
+    contenu = (
+        '[cesar]\nbase_url = "https://cesar.example.fr"\n'
+        'username = "eleve"\npassword_env = "CHECKMATE_TEST_PASSWORD"'
     )
-    path = tmp_path / "config.toml"
-    path.write_text(
-        textwrap.dedent(
-            """
-            [cesar]
-            base_url = "https://cesar.example.fr"
-            username = "eleve"
-            password_env = "CHECKMATE_TEST_PASSWORD"
-            """
-        ),
-        encoding="utf-8",
-    )
-    config = load_config(path)
-    assert config.cesar.password == "depuis-keyring"
+    path = _ecrire_config(tmp_path, contenu)
+    assert load_config(path).cesar.password == "depuis-keyring"
 
 
 def test_config_sans_mot_de_passe_en_mode_onboarding(monkeypatch, tmp_path):
-    monkeypatch.setattr(
-        "checkmate_watcher.config.get_keyring_password",
-        lambda service, username: None,
-    )
-    path = tmp_path / "config.toml"
-    path.write_text(
-        textwrap.dedent(
-            """
-            [cesar]
-            base_url = "https://cesar.example.fr"
-            username = "eleve"
-            """
-        ),
-        encoding="utf-8",
-    )
+    """Onboarding: aucune source de mot de passe ne doit lever d'erreur."""
+    _keyring(monkeypatch, None)
+    bloc = '[cesar]\nbase_url = "https://cesar.example.fr"\nusername = "eleve"'
+    path = _ecrire_config(tmp_path, bloc)
     config = load_config(path, require_password=False)
     assert config.cesar.password == ""
