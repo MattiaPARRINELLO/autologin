@@ -320,6 +320,10 @@ CHECKMATE-REQUIRED: 0
   Sauter cette version lors d'une mise a jour n'est pas supporte.
 - `CHECKMATE-REQUIRED` : version minimale obligatoire. Mettre `0` si aucune
   contrainte. Sinon, une raison courte qui sera affichee a l'utilisateur.
+  Une version locale inferieure a la derniere release `REQUIRED` est bloquee
+  au demarrage : le tableau de bord passe en mode bloque avec le bouton
+  d'installation, l'icone signale une attention requise, et la CLI sort avec
+  le code 3. Le controle echoue ouvert si GitHub est injoignable.
 
 Les deux marqueurs sont obligatoires. Une valeur vide ou un marqueur absent
 fait echouer le workflow de release. Si l'un des deux n'est pas `0`, la

@@ -25,6 +25,7 @@ COLORS = {
     "outside": (154, 107, 47, 255),
     "signed": (31, 27, 22, 255),
     "error": (179, 38, 30, 255),
+    "blocked": (179, 38, 30, 255),
 }
 
 TRAY_ENV = "CHECKMATE_TRAY"
@@ -66,7 +67,7 @@ def status_pixmaps(mode: str) -> list:
 
 
 def status_level(mode: str) -> str:
-    return "NeedsAttention" if mode == "error" else "Active"
+    return "NeedsAttention" if mode in {"error", "blocked"} else "Active"
 
 
 def menu_handler(action):

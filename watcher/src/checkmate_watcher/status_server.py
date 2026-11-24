@@ -181,6 +181,7 @@ class StatusSession:
         self.config_path = config_path
         self.state = state
         self.started_at = started_at
+        self.blocked: dict | None = None
 
     def _init_token(self) -> None:
         self.token = secrets.token_urlsafe(24)
@@ -196,7 +197,15 @@ class StatusSession:
             self.state,
             self.started_at,
             self.config_path,
+            blocked=self.blocked,
         )
+
+    def set_blocked(self, release) -> None:
+        self.blocked = {
+            "tag": release.tag,
+            "version": release.version_text,
+            "reason": release.required_reason,
+        }
 
     def _create_notifier(self) -> Notifier:
         return Notifier.from_config(self.config)
