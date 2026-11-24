@@ -50,44 +50,49 @@ def test_decode_data_url_gere_les_valeurs_invalides():
     assert diagnostics.decode_data_url("data:image/png;base64,cG5n") == b"png"
 
 
-def test_une_capture_ecrit_diagnostic_canvas_et_page(tmp_path):
-    tracker = diagnostics.SignatureDiagnostics(tmp_path, FakePage())
-    canvas = FakeCanvas()
-    ink = {"count": 906, "minX": 54, "minY": 6, "maxX": 264, "maxY": 142}
+INK = {"count": 906, "minX": 54, "minY": 6, "maxX": 264, "maxY": 142}
+ETAPE_RECOUVERTE = {
+    "label": "premier essai",
+    "ink": {"count": 0, "minX": 300, "minY": 150, "maxX": -1, "maxY": -1},
+    "context": {
+        "box": {"width": 302, "height": 152},
+        "canvas": {"width": 300, "height": 150},
+        "devicePixelRatio": 1.25,
+        "covered": True,
+        "hit": {"tag": "DIV", "className": "swal2-container"},
+        "inputLength": 0,
+    },
+    "events": {"total": 145, "trusted": 0},
+}
 
-    async def scenario() -> None:
+
+def capture(tmp_path, ink=INK):
+    tracker = diagnostics.SignatureDiagnostics(tmp_path, FakePage())
+
+    async def fill() -> None:
+        canvas = FakeCanvas()
         await tracker.begin(canvas)
         await tracker.add_step("premier essai", canvas, ink)
         await tracker.save(canvas)
 
-    asyncio.run(scenario())
+    asyncio.run(fill())
+    return tracker
 
+
+def test_une_capture_ecrit_diagnostic_canvas_et_page(tmp_path):
+    tracker = capture(tmp_path)
     attempt = tracker.attempt_dir
     assert (attempt / "canvas.png").read_bytes() == b"png"
     assert (attempt / "page.png").read_bytes() == b"page"
     payload = json.loads((attempt / "diagnostic.json").read_text(encoding="utf-8"))
     assert payload["steps"][0]["label"] == "avant le trace"
-    assert payload["steps"][1]["ink"] == ink
+    assert payload["steps"][1]["ink"] == INK
     assert payload["steps"][1]["events"]["total"] == 145
     assert payload["steps"][1]["context"]["covered"] is False
 
 
 def test_le_resume_contient_les_valeurs_utiles():
-    step = {
-        "label": "premier essai",
-        "ink": {"count": 0, "minX": 300, "minY": 150, "maxX": -1, "maxY": -1},
-        "context": {
-            "box": {"width": 302, "height": 152},
-            "canvas": {"width": 300, "height": 150},
-            "devicePixelRatio": 1.25,
-            "covered": True,
-            "hit": {"tag": "DIV", "className": "swal2-container"},
-            "inputLength": 0,
-        },
-        "events": {"total": 145, "trusted": 0},
-    }
-
-    resume = diagnostics.summary(step)
+    resume = diagnostics.summary(ETAPE_RECOUVERTE)
 
     assert "canvas 302x152" in resume
     assert "dpr 1.25" in resume
