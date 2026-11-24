@@ -37,6 +37,7 @@ SCENARIO = REPO_ROOT / "emulator" / "scenarios" / "cesar-simplifie"
 E2E_ENABLED = os.environ.get("CHECKMATE_E2E") == "1"
 
 
+# Fixture autouse : isole les diagnostics de chaque test sans appel explicite.
 @pytest.fixture(autouse=True)
 def diagnostics_isolees(tmp_path, monkeypatch):
     monkeypatch.setenv("CHECKMATE_DIAGNOSTICS_DIR", str(tmp_path / "diagnostics"))
