@@ -1,28 +1,36 @@
 from __future__ import annotations
 
 import textwrap
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
 
-from checkmate_watcher.config import ConfigError, load_config
+from checkmate_watcher.config import (
+    Config,
+    ConfigError,
+    default_config,
+    load_config,
+    save_config,
+)
+
+
+def _config_text(extra: str) -> str:
+    return textwrap.dedent(
+        f"""
+        [cesar]
+        base_url = "https://cesar.example.fr/"
+        username = "eleve"
+        password = "secret"
+
+        {extra}
+        """
+    )
 
 
 def write_config(tmp_path, extra: str = ""):
     path = tmp_path / "config.toml"
-    path.write_text(
-        textwrap.dedent(
-            f"""
-            [cesar]
-            base_url = "https://cesar.example.fr/"
-            username = "eleve"
-            password = "secret"
-
-            {extra}
-            """
-        ),
-        encoding="utf-8",
-    )
+    path.write_text(_config_text(extra), encoding="utf-8")
     return path
 
 
@@ -48,11 +56,8 @@ def test_les_chemins_par_defaut_viennent_de_paths(tmp_path):
     assert config.signature.file == default_signature_path()
 
 
-def test_surcharge_les_valeurs(tmp_path):
-    config = load_config(
-        write_config(
-            tmp_path,
-            """
+def _surcharge_watcher_et_signature() -> str:
+    return """
             [watcher]
             poll_interval = 30
             auto_sign = true
@@ -61,31 +66,32 @@ def test_surcharge_les_valeurs(tmp_path):
 
             [signature]
             padding_ratio = 0.5
-            """,
-        )
-    )
+            """
+
+
+def test_surcharge_les_valeurs(tmp_path):
+    config = load_config(write_config(tmp_path, _surcharge_watcher_et_signature()))
     assert config.watcher.poll_interval == 30
     assert config.watcher.auto_sign is True
     assert config.watcher.headless is True
     assert config.signature.padding_ratio == 0.5
 
 
-def test_save_puis_reload_conserve_toute_la_configuration(tmp_path):
-    from dataclasses import replace
-
-    from checkmate_watcher.config import default_config, save_config
-
+def _config_personnalisee() -> Config:
     config = default_config()
-    config = replace(
+    return replace(
         config,
         cesar=replace(config.cesar, username="eleve", password="secret"),
         watcher=replace(config.watcher, executable_path="/opt/chrome", auto_sign=True),
         notifications=replace(config.notifications, enabled=False),
         updates=replace(config.updates, channel="beta"),
     )
+
+
+def test_save_puis_reload_conserve_toute_la_configuration(tmp_path):
+    config = _config_personnalisee()
     path = tmp_path / "config.toml"
     save_config(path, config, password="secret")
-
     assert load_config(path) == config
 
 
@@ -94,52 +100,49 @@ def test_refuse_un_intervalle_trop_court(tmp_path):
         load_config(write_config(tmp_path, "[watcher]\npoll_interval = 5"))
 
 
-def test_save_config_retente_apres_verrou(tmp_path, monkeypatch):
-    from checkmate_watcher.config import default_config, save_config
-
-    path = tmp_path / "config.toml"
-    original = Path.replace
+def _fail_once(monkeypatch, method: str, error: Exception):
+    original = getattr(Path, method)
     calls = {"count": 0}
 
     def flaky(self, target):
         calls["count"] += 1
         if calls["count"] == 1:
-            raise PermissionError("fichier verrouille")
+            raise error
         return original(self, target)
 
-    monkeypatch.setattr(Path, "replace", flaky)
+    monkeypatch.setattr(Path, method, flaky)
+    return calls
+
+
+def test_save_config_retente_apres_verrou(tmp_path, monkeypatch):
+    path = tmp_path / "config.toml"
+    calls = _fail_once(monkeypatch, "replace", PermissionError("fichier verrouille"))
     save_config(path, default_config(), password_env="CHECKMATE_PASSWORD")
     assert calls["count"] >= 2
     assert path.is_file()
 
 
-def test_refuse_un_mot_de_passe_absent(tmp_path):
+def _write_config_env(tmp_path, variable: str) -> Path:
     path = tmp_path / "config.toml"
     path.write_text(
-        """
-[cesar]
-base_url = "https://cesar.example.fr"
-username = "eleve"
-password_env = "VARIABLE_QUI_N_EXISTE_PAS"
-""",
+        "[cesar]\n"
+        'base_url = "https://cesar.example.fr"\n'
+        'username = "eleve"\n'
+        f'password_env = "{variable}"\n',
         encoding="utf-8",
     )
+    return path
+
+
+def test_refuse_un_mot_de_passe_absent(tmp_path):
+    path = _write_config_env(tmp_path, "VARIABLE_QUI_N_EXISTE_PAS")
     with pytest.raises(ConfigError):
         load_config(path)
 
 
 def test_lit_le_mot_de_passe_depuis_l_environnement(tmp_path, monkeypatch):
     monkeypatch.setenv("CHECKMATE_TEST_PASSWORD", "depuis-env")
-    path = tmp_path / "config.toml"
-    path.write_text(
-        """
-[cesar]
-base_url = "https://cesar.example.fr"
-username = "eleve"
-password_env = "CHECKMATE_TEST_PASSWORD"
-""",
-        encoding="utf-8",
-    )
+    path = _write_config_env(tmp_path, "CHECKMATE_TEST_PASSWORD")
     assert load_config(path).cesar.password == "depuis-env"
 
 
