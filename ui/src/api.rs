@@ -118,34 +118,49 @@ pub fn action(name: &str) -> Result<ActionResponse, ApiError> {
 }
 
 fn backend_candidates() -> Vec<PathBuf> {
-    let mut candidates = Vec::new();
-    if let Ok(path) = std::env::var("CHECKMATE_BACKEND") {
-        candidates.push(PathBuf::from(path));
-    }
-
-    if cfg!(windows) {
-        if let Ok(local) = std::env::var("LOCALAPPDATA") {
-            candidates.push(
-                PathBuf::from(local)
-                    .join("Programs")
-                    .join("CheckMate")
-                    .join("CheckMate.exe"),
-            );
-        }
-        if let Ok(current) = std::env::current_exe() {
-            candidates.extend(current.parent().map(|folder| folder.join("CheckMate.exe")));
-        }
+    let mut candidates = env_candidate();
+    let defaults = if cfg!(windows) {
+        windows_candidates()
     } else {
-        if let Ok(current) = std::env::current_exe() {
-            candidates.extend(
-                current
-                    .parent()
-                    .map(|folder| folder.join("checkmate-watcher")),
-            );
-        }
-        candidates.push(PathBuf::from("checkmate-watcher"));
+        unix_candidates()
+    };
+    candidates.extend(defaults);
+    candidates
+}
+
+fn env_candidate() -> Vec<PathBuf> {
+    match std::env::var("CHECKMATE_BACKEND") {
+        Ok(path) => vec![PathBuf::from(path)],
+        Err(_) => Vec::new(),
+    }
+}
+
+fn windows_candidates() -> Vec<PathBuf> {
+    let mut candidates = Vec::new();
+    if let Ok(local) = std::env::var("LOCALAPPDATA") {
+        let folder = PathBuf::from(local).join("Programs").join("CheckMate");
+        candidates.push(folder.join("CheckMate.exe"));
+    }
+    if let Ok(current) = std::env::current_exe() {
+        candidates.extend(current.parent().map(|folder| folder.join("CheckMate.exe")));
     }
     candidates
+}
+
+fn unix_candidates() -> Vec<PathBuf> {
+    let mut candidates = sibling_candidate("checkmate-watcher");
+    candidates.push(PathBuf::from("checkmate-watcher"));
+    candidates
+}
+
+fn sibling_candidate(name: &str) -> Vec<PathBuf> {
+    let Ok(current) = std::env::current_exe() else {
+        return Vec::new();
+    };
+    current
+        .parent()
+        .map(|folder| vec![folder.join(name)])
+        .unwrap_or_default()
 }
 
 pub fn start_backend() -> Result<(), String> {

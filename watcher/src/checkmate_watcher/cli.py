@@ -162,42 +162,45 @@ CAPTURE_HTML = """
 """
 
 
-def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
-        prog="checkmate-watcher",
-        description="Surveille CESAR Emineo et propose de signer l'emargement.",
-    )
-    parser.add_argument(
-        "command",
-        nargs="?",
-        default="run",
-        choices=[
-            "run",
-            "capture",
-            "test-notification",
-            "check-config",
-            "reset-state",
-            "self-test",
-            "set-password",
-            "install-autostart",
-            "uninstall-autostart",
-            "setup",
-            "support-bundle",
-            "import-signature",
-            "check-update",
-            "update",
-            "stats",
-            "status",
-        ],
-    )
+HELP_NO_BROWSER = "setup : ne pas ouvrir le navigateur automatiquement"
+HELP_NOTIFY = "self-test : envoie aussi une notification reelle"
+
+COMMANDS = (
+    "run",
+    "capture",
+    "test-notification",
+    "check-config",
+    "reset-state",
+    "self-test",
+    "set-password",
+    "install-autostart",
+    "uninstall-autostart",
+    "setup",
+    "support-bundle",
+    "import-signature",
+    "check-update",
+    "update",
+    "stats",
+    "status",
+)
+
+
+def _add_common_args(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("command", nargs="?", default="run", choices=COMMANDS)
     parser.add_argument(
         "--config", default=DEFAULT_CONFIG, help="chemin du fichier TOML"
     )
+
+
+def _add_run_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--once", action="store_true", help="un seul cycle puis sortie")
     parser.add_argument(
         "--dry-run", action="store_true", help="detecte sans notifier ni signer"
     )
     parser.add_argument("--auto", action="store_true", help="signe sans confirmation")
+
+
+def _add_update_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--yes",
         action="store_true",
@@ -208,24 +211,34 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="update : verifier seulement, sans installer",
     )
+
+
+def _add_command_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--output", help="support-bundle : chemin de l'archive")
     parser.add_argument("--file", help="import-signature : fichier JSON")
-    parser.add_argument(
-        "--no-browser",
-        action="store_true",
-        help="setup : ne pas ouvrir le navigateur automatiquement",
-    )
-    parser.add_argument(
-        "--notify",
-        action="store_true",
-        help="self-test : envoie aussi une notification reelle",
-    )
+    parser.add_argument("--no-browser", action="store_true", help=HELP_NO_BROWSER)
+    parser.add_argument("--notify", action="store_true", help=HELP_NOTIFY)
+
+
+def _add_meta_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--verbose", "-v", action="store_true")
     parser.add_argument(
         "--version",
         action="version",
         version=f"%(prog)s {__version__} (build {BUILD})",
     )
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="checkmate-watcher",
+        description="Surveille CESAR Emineo et propose de signer l'emargement.",
+    )
+    _add_common_args(parser)
+    _add_run_args(parser)
+    _add_update_args(parser)
+    _add_command_args(parser)
+    _add_meta_args(parser)
     return parser
 
 
@@ -235,16 +248,15 @@ def _mask(value: str) -> str:
     return "*" * min(len(value), 8) + f" ({len(value)} caracteres)"
 
 
-def _afficher_check_config(
-    config: Config,
-    signature_status: tuple[str, object],
-    tools_status: list[tuple[str, str | None]],
-) -> None:
+def _afficher_identite(config: Config) -> None:
     print(f"CheckMate {__version__} (build {BUILD})")
     print("Configuration chargee")
     print(f"  CESAR          : {config.cesar.base_url}")
     print(f"  Utilisateur    : {config.cesar.username}")
     print(f"  Mot de passe   : {_mask(config.cesar.password)}")
+
+
+def _afficher_watcher(config: Config) -> None:
     print(f"  Intervalle     : {config.watcher.poll_interval}s")
     print(f"  Deduplication  : {config.watcher.dedupe_ttl}s")
     print(f"  Confirmation   : {config.watcher.confirm_timeout}s")
@@ -252,35 +264,56 @@ def _afficher_check_config(
     print(f"  Auto-signature : {config.watcher.auto_sign}")
     print(f"  Visible a la signature : {config.watcher.visible_on_sign}")
     print(f"  Plages         : {config.schedule.describe()}")
+
+
+def _afficher_chemins(config: Config) -> None:
     print(f"  Profil         : {config.watcher.profile_dir}")
     print(f"  Etat           : {config.watcher.state_file}")
     print(f"  Signature      : {config.signature.file}")
     print(f"  Logs           : {default_log_file()}")
 
-    status, detail = signature_status
+
+def _afficher_signature(statut: tuple[str, object]) -> None:
+    status, detail = statut
     if status == "ok":
         print(f"  Signature      : OK ({detail} points)")
-    elif status == "invalid":
+        return
+    if status == "invalid":
         print(f"  Signature      : INVALIDE ({detail})")
-    else:
-        print("  Signature      : ABSENTE, lance 'capture'")
+        return
+    print("  Signature      : ABSENTE, lance 'capture'")
 
-    for tool, found in tools_status:
+
+def _afficher_outils(outils: list[tuple[str, str | None]]) -> None:
+    for tool, found in outils:
         print(f"  Outil {tool:<10}: {found or 'INTROUVABLE'}")
 
 
-def command_check_config(config: Config) -> int:
-    if config.signature.file.is_file():
-        try:
-            points = load_signature(config.signature.file)
-            signature_status = ("ok", len(points))
-        except SignatureError as exc:
-            signature_status = ("invalid", exc)
-    else:
-        signature_status = ("absent", None)
+def _afficher_check_config(
+    config: Config,
+    signature_status: tuple[str, object],
+    tools_status: list[tuple[str, str | None]],
+) -> None:
+    _afficher_identite(config)
+    _afficher_watcher(config)
+    _afficher_chemins(config)
+    _afficher_signature(signature_status)
+    _afficher_outils(tools_status)
 
+
+def _statut_signature(fichier: Path) -> tuple[str, object]:
+    if not fichier.is_file():
+        return ("absent", None)
+    try:
+        return ("ok", len(load_signature(fichier)))
+    except SignatureError as exc:
+        return ("invalid", exc)
+
+
+def command_check_config(config: Config) -> int:
+    statut = _statut_signature(config.signature.file)
     tools_status = [(tool, shutil.which(tool)) for tool in ("notify-send", "zenity")]
-    _afficher_check_config(config, signature_status, tools_status)
+    _afficher_check_config(config, statut, tools_status)
     return 0
 
 
@@ -329,18 +362,26 @@ def _afficher_test_notification(sent: bool, answer: object) -> None:
     print(f"reponse : {answer}")
 
 
-def command_test_notification(config: Config) -> int:
-    notifier = Notifier.from_config(config)
-    sent = notifier.send(
+def _envoyer_test(notifier: Notifier) -> bool:
+    return notifier.send(
         "CheckMate",
         "Ceci est une notification de test.",
         urgency="normal",
     )
-    answer = notifier.ask(
+
+
+def _demander_test(notifier: Notifier, config: Config) -> object:
+    return notifier.ask(
         "Ceci est une confirmation de test. Clique sur un bouton.",
         timeout=60,
         title=config.notifications.app_name,
     )
+
+
+def command_test_notification(config: Config) -> int:
+    notifier = Notifier.from_config(config)
+    sent = _envoyer_test(notifier)
+    answer = _demander_test(notifier, config)
     _afficher_test_notification(sent, answer)
     return 0 if sent else 1
 
@@ -356,19 +397,21 @@ def _afficher_set_password(etape: str, service: str = "") -> None:
         print(f"mot de passe enregistre dans le trousseau ({service})")
 
 
-def command_set_password(config: Config) -> int:
-    password = getpass.getpass("Mot de passe CESAR : ")
+def _enregistrer_set_password(config: Config, password: str) -> int:
+    cesar = config.cesar
+    etape = "ok"
     if not password:
-        _afficher_set_password("vide")
-        return 1
-    if not keyring_available():
-        _afficher_set_password("pas_trousseau")
-        return 1
-    if not set_password(config.cesar.keyring_service, config.cesar.username, password):
-        _afficher_set_password("echec")
-        return 1
-    _afficher_set_password("ok", config.cesar.keyring_service)
-    return 0
+        etape = "vide"
+    elif not keyring_available():
+        etape = "pas_trousseau"
+    elif not set_password(cesar.keyring_service, cesar.username, password):
+        etape = "echec"
+    _afficher_set_password(etape, cesar.keyring_service)
+    return 0 if etape == "ok" else 1
+
+
+def command_set_password(config: Config) -> int:
+    return _enregistrer_set_password(config, getpass.getpass("Mot de passe CESAR : "))
 
 
 def _afficher_self_test(checks: list[tuple[str, bool, str]]) -> None:
@@ -378,52 +421,55 @@ def _afficher_self_test(checks: list[tuple[str, bool, str]]) -> None:
         print(f"  [{marker}] {name:<16} {detail}")
 
 
-def command_self_test(config: Config, *, notify: bool = False) -> int:
-    checks: list[tuple[str, bool, str]] = []
-
+def _check_password(config: Config) -> tuple[str, bool, str]:
     if config.cesar.password:
-        checks.append(("mot de passe", True, "disponible"))
-    else:
-        checks.append(("mot de passe", False, "absent"))
+        return ("mot de passe", True, "disponible")
+    return ("mot de passe", False, "absent")
 
+
+def _check_signature(config: Config) -> tuple[str, bool, str]:
     try:
         points = load_signature(config.signature.file)
     except SignatureError as exc:
-        checks.append(("signature", False, str(exc)))
-    else:
-        checks.append(("signature", True, f"{len(points)} points"))
+        return ("signature", False, str(exc))
+    return ("signature", True, f"{len(points)} points")
 
+
+def _check_browser(config: Config) -> tuple[str, bool, str]:
     class Probe:
         executable_path = ""
 
     options = resolve_launch_options(Probe(), config.watcher.executable_path)
     if options.executable_path:
-        checks.append(("navigateur", True, options.executable_path))
-    elif options.channel:
-        checks.append(("navigateur", True, f"canal {options.channel}"))
-    elif bundled_browser_present():
-        checks.append(("navigateur", True, "Chromium Playwright"))
-    else:
-        checks.append(("navigateur", False, "aucun navigateur trouve"))
+        return ("navigateur", True, options.executable_path)
+    if options.channel:
+        return ("navigateur", True, f"canal {options.channel}")
+    if bundled_browser_present():
+        return ("navigateur", True, "Chromium Playwright")
+    return ("navigateur", False, "aucun navigateur trouve")
 
-    if keyring_available():
-        stored = get_password(config.cesar.keyring_service, config.cesar.username)
-        checks.append(
-            ("trousseau", True, "mot de passe present" if stored else "disponible")
-        )
-    else:
-        checks.append(("trousseau", False, "indisponible"))
 
+def _check_keyring(config: Config) -> tuple[str, bool, str]:
+    if not keyring_available():
+        return ("trousseau", False, "indisponible")
+    stored = get_password(config.cesar.keyring_service, config.cesar.username)
+    detail = "mot de passe present" if stored else "disponible"
+    return ("trousseau", True, detail)
+
+
+def _check_autostart() -> tuple[str, bool, str]:
     if autostart_enabled():
-        checks.append(("demarrage auto", True, "actif"))
-    else:
-        checks.append(("demarrage auto", False, "inactif"))
+        return ("demarrage auto", True, "actif")
+    return ("demarrage auto", False, "inactif")
 
+
+def _check_schedule(config: Config) -> tuple[str, bool, str]:
     if config.schedule.enabled:
-        checks.append(("planning", True, config.schedule.describe()))
-    else:
-        checks.append(("planning", False, "desactive"))
+        return ("planning", True, config.schedule.describe())
+    return ("planning", False, "desactive")
 
+
+def _check_data_dir(config: Config) -> tuple[str, bool, str]:
     log_dir = config.watcher.state_file.parent
     try:
         log_dir.mkdir(parents=True, exist_ok=True)
@@ -431,19 +477,37 @@ def command_self_test(config: Config, *, notify: bool = False) -> int:
         probe.write_text("ok", encoding="utf-8")
         probe.unlink()
     except OSError as exc:
-        checks.append(("dossier de donnees", False, str(exc)))
-    else:
-        checks.append(("dossier de donnees", True, str(log_dir)))
+        return ("dossier de donnees", False, str(exc))
+    return ("dossier de donnees", True, str(log_dir))
 
+
+def _check_notification(config: Config) -> tuple[str, bool, str]:
+    notifier = Notifier.from_config(config)
+    sent = notifier.send("CheckMate", "Test de notification reussi.", "normal")
+    return ("notification", sent, "envoyee" if sent else "echec")
+
+
+def _checks_base(config: Config) -> list:
+    return [
+        _check_password(config),
+        _check_signature(config),
+        _check_browser(config),
+        _check_keyring(config),
+        _check_autostart(),
+        _check_schedule(config),
+        _check_data_dir(config),
+    ]
+
+
+def _collecter_checks(config: Config, notify: bool) -> list:
+    checks = _checks_base(config)
     if notify:
-        notifier = Notifier.from_config(config)
-        sent = notifier.send(
-            "CheckMate",
-            "Test de notification reussi.",
-            urgency="normal",
-        )
-        checks.append(("notification", sent, "envoyee" if sent else "echec"))
+        checks.append(_check_notification(config))
+    return checks
 
+
+def command_self_test(config: Config, *, notify: bool = False) -> int:
+    checks = _collecter_checks(config, notify)
     failures = sum(1 for _name, ok, _detail in checks if not ok)
     _afficher_self_test(checks)
     return 0 if failures == 0 else 1
@@ -466,32 +530,39 @@ def command_support_bundle(
     return 0
 
 
-def _afficher_import_signature(
+def _message_import(
     *,
     manquant: bool = False,
     erreur: object = None,
     points: int | None = None,
     fichier: Path | None = None,
-) -> None:
+) -> str:
     if manquant:
-        print("indique un fichier avec --file")
-    elif erreur is not None:
-        print(f"import impossible : {erreur}")
-    else:
-        print(f"signature importee ({points} points) dans {fichier}")
+        return "indique un fichier avec --file"
+    if erreur is not None:
+        return f"import impossible : {erreur}"
+    return f"signature importee ({points} points) dans {fichier}"
+
+
+def _afficher_import_signature(**options: object) -> None:
+    print(_message_import(**options))
+
+
+def _charger_points_signature(path: Path) -> tuple[list | None, object | None]:
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        return parse_points(data), None
+    except (OSError, json.JSONDecodeError, SignatureError) as exc:
+        return None, exc
 
 
 def command_import_signature(config: Config, file_path: str | None) -> int:
     if not file_path:
         _afficher_import_signature(manquant=True)
         return 1
-    path = Path(file_path).expanduser()
-    try:
-        raw = path.read_text(encoding="utf-8")
-        data = json.loads(raw)
-        points = parse_points(data)
-    except (OSError, json.JSONDecodeError, SignatureError) as exc:
-        _afficher_import_signature(erreur=exc)
+    points, erreur = _charger_points_signature(Path(file_path).expanduser())
+    if erreur:
+        _afficher_import_signature(erreur=erreur)
         return 1
     save_signature(config.signature.file, points)
     _afficher_import_signature(points=len(points), fichier=config.signature.file)
@@ -502,55 +573,61 @@ def _afficher_status_demarrage_echec() -> None:
     print("CheckMate n'a pas demarre. Consulte les logs.")
 
 
-def command_status(config: Config, config_path: Path) -> int:
+def _ouvrir_si_pret() -> bool:
     runtime = read_runtime()
     if runtime and status_alive(runtime):
         open_url(str(runtime["url"]))
-        return 0
+        return True
+    return False
 
-    executable = current_executable()
-    command = [str(executable), "--config", str(config_path), "run"]
+
+def _lancer_systemd() -> bool:
+    systemctl = shutil.which("systemctl")
+    if not systemctl:
+        return False
+    cmd = [systemctl, "--user", "start", UNIT_NAME]
+    lance = subprocess.run(cmd, check=False, capture_output=True, timeout=20)
+    return lance.returncode == 0
+
+
+def _demarrer(config_path: Path) -> None:
+    command = [str(current_executable()), "--config", str(config_path), "run"]
     if sys.platform.startswith("win"):
         subprocess.Popen(command, close_fds=True, creationflags=0x00000008)
-    else:
-        systemctl = shutil.which("systemctl")
-        started = False
-        if systemctl:
-            result = subprocess.run(
-                [systemctl, "--user", "start", UNIT_NAME],
-                check=False,
-                capture_output=True,
-                timeout=20,
-            )
-            started = result.returncode == 0
-        if not started:
-            subprocess.Popen(command, close_fds=True, start_new_session=True)
+        return
+    if _lancer_systemd():
+        return
+    subprocess.Popen(command, close_fds=True, start_new_session=True)
 
-    for _ in range(40):
-        runtime = read_runtime()
-        if runtime and status_alive(runtime):
-            open_url(str(runtime["url"]))
-            return 0
+
+def _attendre_runtime(tentatives: int = 40) -> bool:
+    for _ in range(tentatives):
+        if _ouvrir_si_pret():
+            return True
         time.sleep(0.5)
+    return False
+
+
+def command_status(config: Config, config_path: Path) -> int:
+    if _ouvrir_si_pret():
+        return 0
+    _demarrer(config_path)
+    if _attendre_runtime():
+        return 0
     _afficher_status_demarrage_echec()
     return 1
 
 
-def _afficher_stats(
-    starts: int,
-    detections: int,
-    signed: int,
-    errors: int,
-    downloads: int | None,
-    latest_tag: str | None,
-    erreur: object = None,
-) -> None:
-    print(f"CheckMate {__version__} (build {BUILD})")
-    print("Statistiques locales")
+def _afficher_compteurs(starts: int, detections: int, signed: int, errors: int) -> None:
     print(f"  Demarrages        : {starts}")
     print(f"  Detections        : {detections}")
     print(f"  Signatures        : {signed}")
     print(f"  Erreurs           : {errors}")
+
+
+def _afficher_telechargements(
+    downloads: int | None, latest_tag: str | None, erreur: object
+) -> None:
     if erreur is not None:
         print(f"  Telechargements   : indisponibles ({erreur})")
         return
@@ -559,59 +636,67 @@ def _afficher_stats(
         print(f"  Derniere version  : {latest_tag}")
 
 
-def command_stats(config: Config) -> int:
-    state = StateStore(config.watcher.state_file)
-    starts = state.counter("stats.starts")
-    detections = state.counter("stats.detections")
-    signed = state.counter("stats.signed")
-    errors = state.counter("stats.errors")
-    downloads: int | None = None
-    latest_tag: str | None = None
-    erreur: object = None
+def _afficher_stats(
+    starts, detections, signed, errors, downloads, latest_tag, erreur=None
+):
+    print(f"CheckMate {__version__} (build {BUILD})")
+    print("Statistiques locales")
+    _afficher_compteurs(starts, detections, signed, errors)
+    _afficher_telechargements(downloads, latest_tag, erreur)
+
+
+def _lire_compteurs(state: StateStore) -> tuple[int, int, int, int]:
+    return (
+        state.counter("stats.starts"),
+        state.counter("stats.detections"),
+        state.counter("stats.signed"),
+        state.counter("stats.errors"),
+    )
+
+
+def _lire_telechargements() -> tuple[int | None, str | None, object]:
     try:
         releases = fetch_releases()
         downloads = sum(release.downloads for release in releases)
-        if releases:
-            latest = max(releases, key=lambda release: release.version)
-            latest_tag = latest.tag
+        latest_tag = max(releases, key=lambda r: r.version).tag if releases else None
     except Exception as exc:
-        erreur = exc
+        return None, None, exc
+    return downloads, latest_tag, None
+
+
+def command_stats(config: Config) -> int:
+    state = StateStore(config.watcher.state_file)
+    starts, detections, signed, errors = _lire_compteurs(state)
+    downloads, latest_tag, erreur = _lire_telechargements()
     _afficher_stats(starts, detections, signed, errors, downloads, latest_tag, erreur)
     return 0
 
 
-def _afficher_check_update(
-    channel: str,
-    release_tag: str | None,
-    release_url: str | None,
-    erreur: object = None,
-) -> None:
+def _afficher_check_update(channel, release_tag, release_url, erreur=None) -> None:
     if erreur is not None:
-        print(f"verification impossible : {erreur}")
+        _afficher_update_verification_impossible(erreur)
         return
     if release_tag is None:
-        print(f"CheckMate {__version__} est a jour (canal {channel})")
+        _afficher_update_a_jour(channel)
         return
-    print(f"Mise a jour disponible : {release_tag} (canal {channel})")
+    _afficher_update_disponible(release_tag, channel)
     if release_url is not None:
-        print(release_url)
+        _afficher_update_url(release_url)
+
+
+def _release_status(config: Config) -> tuple[str | None, str | None, object]:
+    try:
+        release = check_for_update(__version__, channel=config.updates.channel)
+    except Exception as exc:
+        return None, None, exc
+    if release is None:
+        return None, None, None
+    return release.tag, release.url, None
 
 
 def command_check_update(config: Config) -> int:
-    erreur: object = None
-    release_tag: str | None = None
-    release_url: str | None = None
-    try:
-        release = check_for_update(
-            __version__,
-            channel=config.updates.channel,
-        )
-        if release is not None:
-            release_tag = release.tag
-            release_url = release.url
-    except Exception as exc:
-        erreur = exc
-    _afficher_check_update(config.updates.channel, release_tag, release_url, erreur)
+    tag, url, erreur = _release_status(config)
+    _afficher_check_update(config.updates.channel, tag, url, erreur)
     return 1 if erreur is not None else 0
 
 
@@ -654,33 +739,43 @@ def _afficher_demander_confirmation(reponse: list[str]) -> None:
         reponse.append("")
 
 
-def command_update(config: Config, *, check_only: bool, assume_yes: bool) -> int:
-    erreur: object = None
-    release = None
+def _release_pour_update(config: Config):
     try:
-        release = check_for_update(
-            __version__,
-            channel=config.updates.channel,
-        )
+        release = check_for_update(__version__, channel=config.updates.channel)
     except Exception as exc:
-        erreur = exc
+        return None, exc
+    return release, None
+
+
+def _release_ou_code(config: Config):
+    release, erreur = _release_pour_update(config)
     if erreur is not None:
         _afficher_update_verification_impossible(erreur)
-        return 1
+        return None, 1
     if release is None:
         _afficher_update_a_jour(config.updates.channel)
-        return 0
-    _afficher_update_disponible(release.tag, config.updates.channel)
+        return None, 0
+    return release, None
+
+
+def _update_disponible(release, channel: str, check_only: bool) -> int | None:
+    _afficher_update_disponible(release.tag, channel)
     if check_only:
         _afficher_update_url(release.url)
         return 0
-    if not assume_yes:
-        reponse: list[str] = []
-        _afficher_demander_confirmation(reponse)
-        answer = reponse[0] if reponse else ""
-        if answer not in {"o", "oui", "y", "yes"}:
-            _afficher_update_annule()
-            return 1
+    return None
+
+
+def _confirmer_installation(assume_yes: bool) -> bool:
+    if assume_yes:
+        return True
+    reponse: list[str] = []
+    _afficher_demander_confirmation(reponse)
+    answer = reponse[0] if reponse else ""
+    return answer in {"o", "oui", "y", "yes"}
+
+
+def _installer_update(config: Config) -> int:
     _afficher_update_telechargement()
     try:
         version = update_now(config)
@@ -689,6 +784,23 @@ def command_update(config: Config, *, check_only: bool, assume_yes: bool) -> int
         return 1
     _afficher_update_installation(version)
     return 0
+
+
+def _installer_si_confirme(config: Config, assume_yes: bool) -> int:
+    if not _confirmer_installation(assume_yes):
+        _afficher_update_annule()
+        return 1
+    return _installer_update(config)
+
+
+def command_update(config: Config, *, check_only: bool, assume_yes: bool) -> int:
+    release, code = _release_ou_code(config)
+    if code is not None:
+        return code
+    code = _update_disponible(release, config.updates.channel, check_only)
+    if code is not None:
+        return code
+    return _installer_si_confirme(config, assume_yes)
 
 
 def _afficher_autostart_install_echec() -> None:
@@ -749,74 +861,124 @@ def _afficher_main_arret_demande() -> None:
     logger.info("arret demande")
 
 
-def main(argv: list[str] | None = None) -> int:
-    _ensure_console_streams()
-    args = build_parser().parse_args(argv)
-    setup_logging(args.verbose)
-
+def _command_sans_config(args) -> int | None:
     if args.command == "setup":
         return run_setup(
             Path(args.config).expanduser(),
             open_browser=not args.no_browser,
         )
-
-    needs_password = args.command in {"run", "capture", "test-notification"}
-    try:
-        config = load_config(Path(args.config), require_password=needs_password)
-    except ConfigError as exc:
-        _afficher_main_config_invalide(exc)
-        return 2
-
-    if args.command == "set-password":
-        return command_set_password(config)
-    if args.command == "self-test":
-        return command_self_test(config, notify=args.notify)
     if args.command == "install-autostart":
         return command_install_autostart(Path(args.config))
     if args.command == "uninstall-autostart":
         return command_uninstall_autostart()
-    if args.command == "support-bundle":
-        return command_support_bundle(
-            config, Path(args.config).expanduser(), args.output
-        )
+    return None
+
+
+def _charger_config(args) -> Config | int:
+    needs_password = args.command in {"run", "capture", "test-notification"}
+    try:
+        return load_config(Path(args.config), require_password=needs_password)
+    except ConfigError as exc:
+        _afficher_main_config_invalide(exc)
+        return 2
+
+
+def _dispatch_actions(config: Config, args) -> int | None:
+    if args.command == "set-password":
+        return command_set_password(config)
+    if args.command == "self-test":
+        return command_self_test(config, notify=args.notify)
     if args.command == "import-signature":
         return command_import_signature(config, args.file)
-    if args.command == "check-update":
-        return command_check_update(config)
     if args.command == "update":
         return command_update(config, check_only=args.check, assume_yes=args.yes)
-    if args.command == "stats":
-        return command_stats(config)
-    if args.command == "status":
-        return command_status(config, Path(args.config).expanduser())
+    return None
+
+
+def _dispatch_inspection(config: Config, args) -> int | None:
     if args.command == "check-config":
         return command_check_config(config)
     if args.command == "test-notification":
         return command_test_notification(config)
-    if args.command == "reset-state":
-        path = config.watcher.state_file
-        if path.is_file():
-            path.unlink()
-            _afficher_reset_etat_reinitialise(path)
-        else:
-            _afficher_reset_aucun_etat(path)
-        return 0
-    if args.command == "capture":
-        return asyncio.run(command_capture(config))
+    if args.command == "check-update":
+        return command_check_update(config)
+    if args.command == "stats":
+        return command_stats(config)
+    return None
 
-    try:
-        return asyncio.run(
-            run_loop(
-                config,
-                once=args.once,
-                dry_run=args.dry_run,
-                auto_override=True if args.auto else None,
-                config_path=Path(args.config).expanduser(),
-            )
+
+def _dispatch_support(config: Config, args) -> int | None:
+    if args.command == "support-bundle":
+        return command_support_bundle(
+            config, Path(args.config).expanduser(), args.output
         )
+    return None
+
+
+def _dispatch_config(config: Config, args) -> int | None:
+    for dispatch in (_dispatch_inspection, _dispatch_actions, _dispatch_support):
+        result = dispatch(config, args)
+        if result is not None:
+            return result
+    return None
+
+
+def _reset_state(config: Config) -> int:
+    path = config.watcher.state_file
+    if path.is_file():
+        path.unlink()
+        _afficher_reset_etat_reinitialise(path)
+    else:
+        _afficher_reset_aucun_etat(path)
+    return 0
+
+
+def _lancer_surveillance(config: Config, args) -> int:
+    options = {
+        "once": args.once,
+        "dry_run": args.dry_run,
+        "auto_override": True if args.auto else None,
+        "config_path": Path(args.config).expanduser(),
+    }
+    return asyncio.run(run_loop(config, **options))
+
+
+def _run_loop(config: Config, args) -> int:
+    try:
+        return _lancer_surveillance(config, args)
     except KeyboardInterrupt:
         _afficher_main_arret_demande()
         return 130
+
+
+def _command_final(config: Config, args) -> int:
+    if args.command == "status":
+        return command_status(config, Path(args.config).expanduser())
+    if args.command == "reset-state":
+        return _reset_state(config)
+    if args.command == "capture":
+        return asyncio.run(command_capture(config))
+    return _run_loop(config, args)
+
+
+def _main_dispatch(args) -> int:
+    early = _command_sans_config(args)
+    if early is not None:
+        return early
+    loaded = _charger_config(args)
+    if isinstance(loaded, int):
+        return loaded
+    result = _dispatch_config(loaded, args)
+    if result is not None:
+        return result
+    return _command_final(loaded, args)
+
+
+def main(argv: list[str] | None = None) -> int:
+    _ensure_console_streams()
+    args = build_parser().parse_args(argv)
+    setup_logging(args.verbose)
+    return _main_dispatch(args)
 
 
 if __name__ == "__main__":

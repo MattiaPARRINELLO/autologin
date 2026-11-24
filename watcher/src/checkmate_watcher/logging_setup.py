@@ -25,28 +25,48 @@ def _utf8_stream(stream):
     return stream
 
 
-def setup_logging(verbose: bool = False, log_file: Path | None = None) -> Path:
-    """Configure stdout + fichier tournant et renvoie le chemin du fichier."""
-    target = log_file or default_log_file()
+def _ensure_log_dir(target: Path) -> None:
     target.parent.mkdir(parents=True, exist_ok=True)
 
-    level = logging.DEBUG if verbose else logging.INFO
+
+def _reset_root_logger(level: int) -> logging.Logger:
     root = logging.getLogger()
     root.setLevel(level)
     for handler in list(root.handlers):
         root.removeHandler(handler)
+    return root
 
-    if sys.stdout is not None:
-        stream = logging.StreamHandler(_utf8_stream(sys.stdout))
-        stream.setFormatter(logging.Formatter(LOG_FORMAT, LOG_DATEFMT))
-        root.addHandler(stream)
 
-    file_handler = RotatingFileHandler(
+def _make_formatter() -> logging.Formatter:
+    return logging.Formatter(LOG_FORMAT, LOG_DATEFMT)
+
+
+def _add_stdout_handler(root: logging.Logger) -> None:
+    if sys.stdout is None:
+        return
+    stream = logging.StreamHandler(_utf8_stream(sys.stdout))
+    stream.setFormatter(_make_formatter())
+    root.addHandler(stream)
+
+
+def _add_file_handler(root: logging.Logger, target: Path) -> None:
+    handler = RotatingFileHandler(
         target,
         maxBytes=MAX_BYTES,
         backupCount=BACKUP_COUNT,
         encoding="utf-8",
     )
-    file_handler.setFormatter(logging.Formatter(LOG_FORMAT, LOG_DATEFMT))
-    root.addHandler(file_handler)
+    handler.setFormatter(_make_formatter())
+    root.addHandler(handler)
+
+
+def setup_logging(verbose: bool = False, log_file: Path | None = None) -> Path:
+    """Configure stdout + fichier tournant et renvoie le chemin du fichier."""
+    target = log_file or default_log_file()
+    _ensure_log_dir(target)
+
+    level = logging.DEBUG if verbose else logging.INFO
+    root = _reset_root_logger(level)
+    _add_stdout_handler(root)
+    _add_file_handler(root, target)
     return target

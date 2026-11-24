@@ -46,20 +46,27 @@ def test_parse_points_refuse_une_signature_reduite_a_un_point():
         )
 
 
-def test_fit_points_centre_et_respecte_les_dimensions():
-    points = [
-        Point(0, 0, "start"),
-        Point(100, 50, "move"),
-        Point(200, 100, "end"),
-    ]
-    fitted = fit_points(points, 320, 150, 0.9)
-    assert len(fitted) == 3
-    assert all(0 <= p.x and p.x <= 320 and 0 <= p.y and p.y <= 150 for p in fitted)
+def _points_ligne() -> list[Point]:
+    return [Point(0, 0, "start"), Point(100, 50, "move"), Point(200, 100, "end")]
 
+
+def _assert_dans_bornes(fitted, largeur, hauteur) -> None:
+    assert len(fitted) == 3
+    assert all(0 <= p.x <= largeur and 0 <= p.y <= hauteur for p in fitted)
+
+
+def _centres(fitted) -> tuple[float, float]:
     xs = [p.x for p in fitted]
     ys = [p.y for p in fitted]
-    assert pytest.approx((min(xs) + max(xs)) / 2, abs=1) == 160
-    assert pytest.approx((min(ys) + max(ys)) / 2, abs=1) == 75
+    return (min(xs) + max(xs)) / 2, (min(ys) + max(ys)) / 2
+
+
+def test_fit_points_centre_et_respecte_les_dimensions():
+    fitted = fit_points(_points_ligne(), 320, 150, 0.9)
+    _assert_dans_bornes(fitted, 320, 150)
+    cx, cy = _centres(fitted)
+    assert pytest.approx(cx, abs=1) == 160
+    assert pytest.approx(cy, abs=1) == 75
 
 
 def test_fit_points_conserve_le_ratio():
