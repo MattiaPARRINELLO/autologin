@@ -29,7 +29,7 @@ active.
 |--------|------|
 | `cli.py` | point d'entree `checkmate-watcher` : commandes `run`, `setup`, `status`, `capture`, `self-test`, `update`, `support-bundle`, etc. |
 | `watcher.py` | boucle de surveillance `run_loop`, orchestration des decisions et des signatures |
-| `cesar.py` | `CesarSession` : navigation Playwright, connexion, detection de l'emargement, trace de la signature |
+| `cesar.py` | `CesarSession` : navigation Playwright allégée, connexion, detection de l'emargement, trace de la signature |
 | `http_session.py` | `HttpCesarSession` : login CSRF/CVEC, detection HTTP, cookie partage et signature a la demande |
 | `browser.py` | choix du navigateur : config, Chromium de Playwright, navigateur systeme |
 | `config.py` | chargement et validation du TOML (`[cesar]`, `[watcher]`, `[schedule]`, `[notifications]`, `[updates]`, `[selectors]`) |
@@ -111,7 +111,10 @@ En mode HTTP, la detection lit les attributs JSON du calendrier dans la reponse
 CESAR. La signature reste toujours rejouee dans Chrome avec la meme session :
 le cookie `PHPSESSID` est injecte dans le contexte Playwright juste avant la
 signature. Le transport `browser` reste disponible et sert de repli automatique
-si le HTTP echoue, est bloque ou renvoie une page inattendue.
+si le HTTP echoue, est bloque ou renvoie une page inattendue. Ce chemin demande
+une réponse fraîche à chaque navigation, bloque les images, polices, médias et
+domaines d'analytics, tout en conservant CSS et scripts. Des arguments Chromium
+suppriment aussi le GPU, l'audio et les tâches réseau d'arrière-plan.
 
 ## Etat et deduplication
 
