@@ -1,0 +1,49 @@
+{
+  "0.7.0": {
+    "version": "0.7.0",
+    "importance": "important",
+    "title": "Mise à jour terminée.",
+    "summary": "CheckMate surveille tes émargements avec beaucoup moins de ressources, sans changer la façon de signer.",
+    "metrics": [
+      {
+        "value": "2,3×",
+        "label": "plus rapide",
+        "detail": "284 ms contre 657 ms pour une détection"
+      },
+      {
+        "value": "15×",
+        "label": "plus léger",
+        "detail": "43 Mo contre 634 Mo de mémoire"
+      },
+      {
+        "value": "0",
+        "label": "Chrome pendant l'attente",
+        "detail": "Il s'ouvre seulement pour signer"
+      }
+    ],
+    "features": [
+      {
+        "title": "Moins de travail en arrière-plan",
+        "description": "La détection passe par une connexion HTTP légère. Chrome reste fermé pendant la surveillance et ne s'ouvre qu'au moment de signer."
+      },
+      {
+        "title": "Tes absences sont mieux gérées",
+        "description": "Si tu réponds que tu es absent, CheckMate arrête le créneau en cours et reprend au suivant, même après un redémarrage."
+      },
+      {
+        "title": "Des corrections plus rapides",
+        "description": "Les sélecteurs de CESAR peuvent être corrigés à distance. En cas de panne réseau, CheckMate utilise le cache local."
+      },
+      {
+        "title": "Une signature toujours dans Chrome",
+        "description": "La détection est plus légère, mais la signature reste rejouée sur le canvas pour préserver le comportement et la session CESAR."
+      },
+      {
+        "title": "Un navigateur de secours plus léger",
+        "description": "Quand le HTTP échoue, le navigateur demande une page fraîche et bloque images, polices, médias et analytics, tout en gardant le CSS."
+      }
+    ],
+    "measurement": "Mesures locales sur émulateur, 5 cycles : 284 ms contre 657 ms, 43 Mo contre 634 Mo. Les résultats peuvent varier selon le PC et CESAR.",
+    "url": "https://github.com/MattiaPARRINELLO/autologin/releases/tag/watcher-v0.7.0"
+  }
+}
