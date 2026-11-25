@@ -75,10 +75,13 @@ GTK 3 et WebKit2 sont installés. Sinon, il s'ouvre dans le navigateur.
 ## Pendant un cours
 
 - CheckMate vérifie CESAR toutes les 10 secondes, uniquement dans les créneaux.
-- Dès que le bouton d'émargement apparaît, une notification s'affiche.
+  La detection se fait en HTTP leger, sans garder Chromium ouvert.
+- Dès que l'émargement apparaît, une notification s'affiche.
 - Une fenêtre demande "Je suis présent" ou "Absent".
-- Sur "Je suis présent", un navigateur visible s'ouvre, signe, affiche la
-  confirmation deux secondes, puis se referme.
+- Sur "Je suis présent", un navigateur visible s'ouvre avec la même session CESAR,
+  signe, affiche la confirmation deux secondes, puis se referme.
+- Si la detection HTTP échoue ou rencontre un blocage, CheckMate prévient et
+  repasse automatiquement sur le navigateur pour le reste du créneau.
 - Une fois signé sur un créneau, CheckMate ne vérifie plus rien jusqu'au créneau
   suivant.
 
@@ -112,6 +115,18 @@ Pour changer le mot de passe seul :
 ```bash
 checkmate-watcher set-password
 ```
+
+Le transport de detection se configure dans `[watcher]` :
+
+```toml
+[watcher]
+transport = "http"
+http_cookies_file = "~/.local/share/checkmate-watcher/http-cookies.json"
+```
+
+`http` est le mode par défaut. `browser` force l'ancien fonctionnement avec
+Chromium ouvert pendant la surveillance. Le fichier de cookies HTTP contient la
+session CESAR : ne le partage pas et ne le supprime pas pendant un créneau.
 
 Pour créer une archive de diagnostic sans secret :
 
