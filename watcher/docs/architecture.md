@@ -97,6 +97,7 @@ boucle toutes les poll_interval secondes
   |     - HTTP -> ouvrir Chrome et injecter PHPSESSID
   |     - eventuellement bascule en navigateur visible
   |     - trace, validation, lecture de la confirmation
+  |     - overlay visuel non interactif retire avant validation
   |     - HTTP -> refermer Chrome apres la signature
   |
   |-- succes -> state.mark(), compteurs, notification
