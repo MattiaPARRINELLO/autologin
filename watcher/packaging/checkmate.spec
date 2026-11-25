@@ -12,8 +12,9 @@ SRC = PROJECT / "src"
 
 playwright_datas, playwright_binaries, playwright_hidden = collect_all("playwright")
 webview_datas, webview_binaries, webview_hidden = collect_all("webview")
+curl_datas, curl_binaries, curl_hidden = collect_all("curl_cffi")
 
-hiddenimports = playwright_hidden + webview_hidden + [
+hiddenimports = playwright_hidden + webview_hidden + curl_hidden + [
     "keyring",
     "keyring.backends.Windows",
     "keyring.backends.SecretService",
@@ -45,8 +46,8 @@ else:
 a = Analysis(
     [str(PROJECT / "packaging" / "entrypoint.py")],
     pathex=[str(SRC)],
-    binaries=playwright_binaries + webview_binaries,
-    datas=playwright_datas + webview_datas,
+    binaries=playwright_binaries + webview_binaries + curl_binaries,
+    datas=playwright_datas + webview_datas + curl_datas,
     hiddenimports=hiddenimports,
     hookspath=[],
     runtime_hooks=[],
