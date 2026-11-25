@@ -115,28 +115,36 @@ def _install_linux(archive: Path, cleanup: Path) -> None:
         ) from exc
 
 
+def _systemd_update_command(runner, script, unit):
+    return [
+        runner,
+        "--user",
+        "--collect",
+        "--quiet",
+        f"--unit={unit}",
+        "--description=Installation d'une mise a jour CheckMate",
+        "--setenv=CHECKMATE_UPDATE_DETACHED=1",
+        "/bin/bash",
+        script,
+    ]
+
+
+def _detached_options() -> dict:
+    return {
+        "close_fds": True,
+        "stdin": subprocess.DEVNULL,
+        "stdout": subprocess.DEVNULL,
+        "stderr": subprocess.DEVNULL,
+    }
+
+
 def _try_systemd_run(script, unit):
     runner = shutil.which("systemd-run")
     if runner is None:
         return False
     try:
-        subprocess.Popen(
-            [
-                runner,
-                "--user",
-                "--collect",
-                "--quiet",
-                f"--unit={unit}",
-                "--description=Installation d'une mise a jour CheckMate",
-                "--setenv=CHECKMATE_UPDATE_DETACHED=1",
-                "/bin/bash",
-                script,
-            ],
-            close_fds=True,
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
+        command = _systemd_update_command(runner, script, unit)
+        subprocess.Popen(command, **_detached_options())
     except OSError:
         logger.warning("systemd-run indisponible, installation non detachee")
         return False
@@ -169,26 +177,22 @@ def _quote(value: str) -> str:
     return "'" + value.replace("'", "'\\''") + "'"
 
 
+def _transient_unit_state(unit: str) -> str | None:
+    command = ("systemctl", "--user", "show", "--property=ActiveState", "--value", unit)
+    try:
+        result = subprocess.run(
+            command, capture_output=True, text=True, timeout=2, check=False
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return result.stdout.strip()
+
+
 def _transient_unit_active(unit: str, attempts: int = 5) -> bool:
     for attempt in range(attempts):
-        try:
-            result = subprocess.run(
-                [
-                    "systemctl",
-                    "--user",
-                    "show",
-                    "--property=ActiveState",
-                    "--value",
-                    unit,
-                ],
-                capture_output=True,
-                text=True,
-                timeout=2,
-                check=False,
-            )
-        except (OSError, subprocess.SubprocessError):
+        state = _transient_unit_state(unit)
+        if state is None:
             return False
-        state = result.stdout.strip()
         if state in {"active", "activating"}:
             return True
         if state in {"inactive", "failed"} and attempt >= 1:

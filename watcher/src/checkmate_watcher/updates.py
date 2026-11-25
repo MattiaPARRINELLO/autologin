@@ -334,6 +334,14 @@ def _download_update_asset(release, platform):
     return asset
 
 
+def _download_checksums(release: Release, directory: Path) -> dict[str, str]:
+    asset = release.asset(CHECKSUMS_NAME)
+    if asset is None:
+        raise UpdateError("sommes de controle absentes de la release")
+    path = download(asset.url, directory / CHECKSUMS_NAME)
+    return parse_checksums(path.read_text(encoding="utf-8"))
+
+
 def download_update(
     release: Release, directory: Path, *, platform: str | None = None
 ) -> Path:
@@ -342,9 +350,5 @@ def download_update(
     asset = _download_update_asset(release, platform)
     target = directory / asset.name
     download(asset.url, target)
-    checksums_asset = release.asset(CHECKSUMS_NAME)
-    if checksums_asset is None:
-        raise UpdateError("sommes de controle absentes de la release")
-    sums_path = download(checksums_asset.url, directory / CHECKSUMS_NAME)
-    verify_checksum(target, parse_checksums(sums_path.read_text(encoding="utf-8")))
+    verify_checksum(target, _download_checksums(release, directory))
     return target

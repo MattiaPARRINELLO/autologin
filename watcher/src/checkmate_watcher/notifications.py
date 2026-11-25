@@ -68,8 +68,17 @@ def send_linux(
     return _send_gdbus(title, message, app_name=app_name, icon=icon)
 
 
+def _subprocess_options(timeout: int, env=None) -> dict:
+    return {
+        "timeout": timeout,
+        "capture_output": True,
+        "text": True,
+        "env": env,
+    }
+
+
 def _notify_send_command(binary, title, message, *, app_name, icon, urgency):
-    return [
+    return (
         binary,
         "--app-name",
         app_name,
@@ -79,18 +88,13 @@ def _notify_send_command(binary, title, message, *, app_name, icon, urgency):
         icon,
         title,
         message,
-    ]
+    )
 
 
 def _run_notify_send(command):
     try:
         return subprocess.run(
-            command,
-            check=False,
-            timeout=15,
-            capture_output=True,
-            text=True,
-            env=_clean_env(),
+            command, check=False, **_subprocess_options(15, _clean_env())
         )
     except (OSError, subprocess.SubprocessError) as exc:
         logger.warning("notify-send a echoue : %s", exc)
@@ -109,20 +113,20 @@ def _send_notify_send(title, message, *, app_name, icon, urgency):
     binary = shutil.which("notify-send")
     if not binary:
         return False
-    result = _run_notify_send(
-        _notify_send_command(
-            binary, title, message, app_name=app_name, icon=icon, urgency=urgency
-        )
+    command = _notify_send_command(
+        binary, title, message, app_name=app_name, icon=icon, urgency=urgency
     )
-    if result is None or result.returncode != 0:
-        if result is not None:
-            _log_notify_send_failure(result)
+    result = _run_notify_send(command)
+    if result is None:
+        return False
+    if result.returncode != 0:
+        _log_notify_send_failure(result)
         return False
     return True
 
 
 def _gdbus_command(binary, app_name, icon, title, message):
-    return [
+    return (
         binary,
         "call",
         "--session",
@@ -140,18 +144,13 @@ def _gdbus_command(binary, app_name, icon, title, message):
         "[]",
         "{}",
         "5000",
-    ]
+    )
 
 
 def _run_gdbus(command):
     try:
         return subprocess.run(
-            command,
-            check=False,
-            timeout=15,
-            capture_output=True,
-            text=True,
-            env=_clean_env(),
+            command, check=False, **_subprocess_options(15, _clean_env())
         )
     except (OSError, subprocess.SubprocessError) as exc:
         logger.warning("gdbus a echoue : %s", exc)
@@ -163,11 +162,10 @@ def _send_gdbus(title, message, *, app_name, icon):
     if not binary:
         return False
     result = _run_gdbus(_gdbus_command(binary, app_name, icon, title, message))
-    if result is None or result.returncode != 0:
-        if result is not None:
-            logger.warning(
-                "gdbus code %s : %s", result.returncode, result.stderr.strip()
-            )
+    if result is None:
+        return False
+    if result.returncode != 0:
+        logger.warning("gdbus code %s : %s", result.returncode, result.stderr.strip())
         return False
     return True
 
@@ -204,13 +202,9 @@ def _toast_command(powershell: str, encoded: str) -> list[str]:
 def _run_toast(powershell, title, message, app_id):
     encoded = base64.b64encode(TOAST_SCRIPT.encode("utf-16-le")).decode("ascii")
     try:
+        options = _subprocess_options(20, _toast_env(title, message, app_id))
         return subprocess.run(
-            _toast_command(powershell, encoded),
-            check=False,
-            timeout=20,
-            capture_output=True,
-            text=True,
-            env=_toast_env(title, message, app_id),
+            _toast_command(powershell, encoded), check=False, **options
         )
     except (OSError, subprocess.SubprocessError) as exc:
         logger.warning("notification Windows echouee : %s", exc)
@@ -240,6 +234,13 @@ def _powershell_binary() -> str | None:
     return shutil.which("powershell") or shutil.which("pwsh")
 
 
+def _windows_fallback(powershell, title, message, app_id):
+    if app_id == POWERSHELL_APP_ID:
+        return False
+    logger.info("AUMID %s refuse, repli sur PowerShell", app_id)
+    return _show_toast(powershell, title, message, POWERSHELL_APP_ID)
+
+
 def send_windows(title, message, *, app_name):
     powershell = _powershell_binary()
     if not powershell:
@@ -248,10 +249,7 @@ def send_windows(title, message, *, app_name):
     app_id = _windows_app_id(app_name)
     if _show_toast(powershell, title, message, app_id):
         return True
-    if app_id == POWERSHELL_APP_ID:
-        return False
-    logger.info("AUMID %s refuse, repli sur PowerShell", app_id)
-    return _show_toast(powershell, title, message, POWERSHELL_APP_ID)
+    return _windows_fallback(powershell, title, message, app_id)
 
 
 def _macos_script(title: str, message: str) -> str:
@@ -264,11 +262,7 @@ def _macos_script(title: str, message: str) -> str:
 def _run_osascript(binary, script):
     try:
         return subprocess.run(
-            [binary, "-e", script],
-            check=False,
-            timeout=15,
-            capture_output=True,
-            text=True,
+            [binary, "-e", script], check=False, **_subprocess_options(15)
         )
     except (OSError, subprocess.SubprocessError) as exc:
         logger.warning("osascript a echoue : %s", exc)
@@ -303,14 +297,8 @@ def _zenity_command(binary, title, text, timeout, ok_label, cancel_label):
 
 def _run_zenity(command, timeout):
     try:
-        return subprocess.run(
-            command,
-            check=False,
-            timeout=timeout + 15,
-            capture_output=True,
-            text=True,
-            env=_clean_env(),
-        )
+        options = _subprocess_options(timeout + 15, _clean_env())
+        return subprocess.run(command, check=False, **options)
     except (OSError, subprocess.SubprocessError) as exc:
         raise DialogUnavailable(f"zenity a echoue : {exc}") from exc
 
@@ -322,11 +310,9 @@ def _zenity_result(result, timeout):
         logger.info("confirmation expiree apres %ss", timeout)
         return None
     stderr = (result.stderr or "").strip()
-    if stderr:
-        raise DialogUnavailable(
-            f"zenity n'a pas pu afficher la confirmation : {stderr}"
-        )
-    return False
+    if not stderr:
+        return False
+    raise DialogUnavailable(f"zenity n'a pas pu afficher la confirmation : {stderr}")
 
 
 def ask_zenity(text, *, timeout, title, ok_label, cancel_label):
@@ -391,6 +377,15 @@ def _run_tk_dialog(root, timeout, close):
     root.mainloop()
 
 
+def _run_tk_confirmation(root, text, timeout, title, ok_label, cancel_label, tk):
+    _configure_tk_root(root, title, tk)
+    answer = {"value": None}
+    close = _make_close(root, answer)
+    _build_tk_dialog(root, text, ok_label, cancel_label, close, tk)
+    _run_tk_dialog(root, timeout, close)
+    return answer["value"]
+
+
 def ask_tkinter(text, *, timeout, title, ok_label, cancel_label):
     tk = _import_tkinter()
     if tk is None:
@@ -398,12 +393,15 @@ def ask_tkinter(text, *, timeout, title, ok_label, cancel_label):
     root = _open_tk_root(tk)
     if root is None:
         return None
-    _configure_tk_root(root, title, tk)
-    answer = {"value": None}
-    close = _make_close(root, answer)
-    _build_tk_dialog(root, text, ok_label, cancel_label, close, tk)
-    _run_tk_dialog(root, timeout, close)
-    return answer["value"]
+    return _run_tk_confirmation(root, text, timeout, title, ok_label, cancel_label, tk)
+
+
+def _ask_linux(text, kwargs):
+    try:
+        return ask_zenity(text, **kwargs)
+    except DialogUnavailable as exc:
+        logger.info("zenity indisponible, repli sur tkinter : %s", exc)
+    return ask_tkinter(text, **kwargs)
 
 
 class Notifier:
@@ -452,8 +450,5 @@ class Notifier:
             "cancel_label": cancel_label,
         }
         if self.platform.startswith("linux"):
-            try:
-                return ask_zenity(text, **kwargs)
-            except DialogUnavailable as exc:
-                logger.info("zenity indisponible, repli sur tkinter : %s", exc)
+            return _ask_linux(text, kwargs)
         return ask_tkinter(text, **kwargs)
