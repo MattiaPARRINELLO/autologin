@@ -33,6 +33,7 @@ active.
 | `http_session.py` | `HttpCesarSession` : login CSRF/CVEC, detection HTTP, cookie partage et signature a la demande |
 | `browser.py` | choix du navigateur : config, Chromium de Playwright, navigateur systeme |
 | `config.py` | chargement et validation du TOML (`[cesar]`, `[watcher]`, `[schedule]`, `[notifications]`, `[updates]`, `[selectors]`) |
+| `remote_selectors.py` | correction des selecteurs CESAR à distance, validation stricte et cache local |
 | `schedule.py` | plages horaires, creneau courant, prochaine ouverture |
 | `signature.py` | lecture, mise a l'echelle et sauvegarde des points de signature |
 | `notifications.py` | notifications bureau et fenetre de confirmation, par plateforme |
@@ -115,6 +116,13 @@ si le HTTP echoue, est bloque ou renvoie une page inattendue. Ce chemin demande
 une réponse fraîche à chaque navigation, bloque les images, polices, médias et
 domaines d'analytics, tout en conservant CSS et scripts. Des arguments Chromium
 suppriment aussi le GPU, l'audio et les tâches réseau d'arrière-plan.
+
+Au demarrage, `remote_selectors.py` charge un fichier JSON HTTPS heberge dans le
+depot. Seules des listes de selecteurs non vides sont acceptees, sans URL ni
+JavaScript. Le fichier valide est mis en cache ; en cas de panne reseau, CheckMate
+utilise ce cache puis les selecteurs locaux. Les valeurs distantes passent avant
+les valeurs locales pour permettre une reprise d'urgence. La variable
+`CHECKMATE_REMOTE_SELECTORS=0` desactive ce mecanisme.
 
 ## Etat et deduplication
 

@@ -21,6 +21,7 @@ from .errors import describe_error
 from .http_session import HttpCesarSession, HttpTransportError
 from .notifications import Notifier
 from .paths import default_config_path
+from .remote_selectors import with_remote_selectors
 from .signature import load_signature
 from .state import StateStore
 from .status_server import (
@@ -390,6 +391,7 @@ async def run_loop(
 ) -> int:
     auto = config.watcher.auto_sign if auto_override is None else auto_override
     config_path = (config_path or default_config_path()).expanduser()
+    config = with_remote_selectors(config)
 
     try:
         points = load_signature(config.signature.file)

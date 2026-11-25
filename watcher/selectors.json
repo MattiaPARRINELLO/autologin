@@ -1,0 +1,33 @@
+{
+  "updated": "2026-11-25",
+  "min_version": "0.6.0",
+  "selectors": {
+    "attendance_button": [
+      "button.buttonPresent",
+      "button[class*='buttonPresent']",
+      "button[data-live-action-param*='present']"
+    ],
+    "signature_canvas": [
+      "canvas[data-written-signature-target='canvas']",
+      "canvas[data-written-signature-target]",
+      ".swal2-container canvas"
+    ],
+    "signature_save": [
+      "button[data-live-action-param='signed']",
+      "button[data-live-action-param*='sign']",
+      ".swal2-container button.btn-primary"
+    ],
+    "confirmation": [
+      ".swal2-html-container"
+    ],
+    "login_username": [
+      "input#username"
+    ],
+    "login_password": [
+      "input#password"
+    ],
+    "login_submit": [
+      "button[type='submit'].btn-primary"
+    ]
+  }
+}
