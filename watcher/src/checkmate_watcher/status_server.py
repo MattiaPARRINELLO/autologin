@@ -24,6 +24,10 @@ from .local_http import LocalError, LocalHandler
 from .local_http import create_server as _create_server
 from .notifications import Notifier
 from .paths import data_dir, default_log_file
+from .release_notes import (
+    CELEBRATED_VERSION_KEY,
+    dismiss_release_celebration,
+)
 from .self_update import update_now
 from .status_data import build_snapshot
 from .status_ui import STATUS_HTML
@@ -76,6 +80,7 @@ ACTIONS = (
         in_tray=True,
     ),
     Action("install-update", "Installer la mise a jour", "install_update"),
+    Action("dismiss-release", "Fermer les nouveautes", "dismiss_release"),
     Action("open-logs", "Ouvrir les logs", "open_logs"),
     Action("set-channel", "Changer de canal", "set_channel"),
     Action("quit", "Quitter", "quit"),
@@ -215,8 +220,14 @@ class StatusSession:
         self.url = ""
         self.blocked: dict | None = None
         self.migration: dict | None = None
+        self.release_note: dict | None = None
 
     def snapshot(self) -> dict:
+        note = self.release_note
+        if note and self.state.get_meta(CELEBRATED_VERSION_KEY) == note.get(
+            "version"
+        ):
+            note = None
         return build_snapshot(
             self.config,
             self.state,
@@ -224,7 +235,19 @@ class StatusSession:
             self.config_path,
             blocked=self.blocked,
             migration=self.migration,
+            release_note=note,
         )
+
+    def set_release_note(self, note: dict | None) -> None:
+        self.release_note = note
+
+    def dismiss_release(self) -> dict:
+        if self.release_note is not None:
+            dismiss_release_celebration(
+                self.state, str(self.release_note.get("version") or "")
+            )
+        self.release_note = None
+        return {"ok": True, "message": "Nouveautes fermees."}
 
     def set_blocked(self, release, migration=None) -> None:
         self.blocked = _blocked_payload(release)

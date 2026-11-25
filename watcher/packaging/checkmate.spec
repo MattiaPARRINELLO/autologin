@@ -43,11 +43,15 @@ else:
     hiddenimports.append("pystray._xorg")
     hiddenimports.append("webview.platforms.gtk")
 
+release_notes_data = [
+    (str(SRC / "checkmate_watcher" / "release_notes.json"), "checkmate_watcher")
+]
+
 a = Analysis(
     [str(PROJECT / "packaging" / "entrypoint.py")],
     pathex=[str(SRC)],
     binaries=playwright_binaries + webview_binaries + curl_binaries,
-    datas=playwright_datas + webview_datas + curl_datas,
+    datas=playwright_datas + webview_datas + curl_datas + release_notes_data,
     hiddenimports=hiddenimports,
     hookspath=[],
     runtime_hooks=[],

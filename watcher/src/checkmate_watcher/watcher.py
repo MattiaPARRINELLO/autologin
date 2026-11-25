@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import threading
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -21,6 +22,7 @@ from .errors import describe_error
 from .http_session import HttpCesarSession, HttpTransportError
 from .notifications import Notifier
 from .paths import default_config_path
+from .release_notes import prepare_release_celebration
 from .signature import load_signature
 from .state import StateStore
 from .status_server import (
@@ -30,6 +32,7 @@ from .status_server import (
 )
 from .tray import TrayController
 from .updates import check_for_update, update_policy
+from .window import open_url
 
 logger = logging.getLogger(__name__)
 
@@ -380,6 +383,16 @@ async def handle_signal(
     return NO_ANSWER
 
 
+def _open_update_celebration(session: StatusSession | None) -> None:
+    if session is None or session.release_note is None or not session.url:
+        return
+    threading.Thread(
+        target=open_url,
+        args=(session.url,),
+        daemon=True,
+    ).start()
+
+
 async def run_loop(
     config: Config,
     *,
@@ -435,6 +448,11 @@ async def run_loop(
                 once,
             )
         _announce_migration(status_session, policy)
+        if status_session is not None and not dry_run:
+            note = prepare_release_celebration(state, __version__)
+            status_session.set_release_note(note)
+            if note is not None:
+                _open_update_celebration(status_session)
         await _check_update(config, state)
         poll_headless = (
             True if config.watcher.visible_on_sign else config.watcher.headless
