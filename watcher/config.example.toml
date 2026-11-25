@@ -21,6 +21,11 @@ days = ["mon", "tue", "wed", "thu", "fri"]
 windows = ["09:00-12:00", "13:30-16:30"]
 
 [watcher]
+# Detection HTTP legere par defaut, sans Chromium pendant l'attente.
+# "browser" force l'ancien fonctionnement avec Chromium ouvert.
+transport = "http"
+# Session HTTP persistante, permissions 600. Ne pas partager ce fichier.
+http_cookies_file = "~/.local/share/checkmate-watcher/http-cookies.json"
 # Le bouton n'apparait qu'apres un rafraichissement : la page est rechargee
 # a chaque cycle. 10 a 15 s = detection rapide, 60 s = plus econome.
 poll_interval = 15

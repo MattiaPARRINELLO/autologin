@@ -6,7 +6,12 @@ from pathlib import Path
 import pytest
 
 from checkmate_watcher import self_update
-from checkmate_watcher.updates import Release, UpdateError, UpdatePolicy, Version
+from checkmate_watcher.updates import (
+    Release,
+    UpdateError,
+    UpdatePolicy,
+    Version,
+)
 
 
 def test_install_refuse_une_archive_absente(tmp_path):
@@ -31,7 +36,9 @@ def _capturer_popen(
 
     monkeypatch.setattr(subprocess, "Popen", fake_popen)
     monkeypatch.setattr(self_update.shutil, "which", lambda _nom: which)
-    monkeypatch.setattr(self_update, "_transient_unit_active", lambda _u: unite_active)
+    monkeypatch.setattr(
+        self_update, "_transient_unit_active", lambda _u: unite_active
+    )
     return appels
 
 
@@ -71,7 +78,9 @@ def test_installation_linux_replie_si_unite_inactive(tmp_path, monkeypatch):
     assert calls[1][1]["start_new_session"] is True
 
 
-def test_install_windows_utilise_les_options_silencieuses(tmp_path, monkeypatch):
+def test_install_windows_utilise_les_options_silencieuses(
+    tmp_path, monkeypatch
+):
     archive = tmp_path / "CheckMate-Setup.exe"
     archive.write_bytes(b"x")
     calls = _capturer_popen(monkeypatch)
@@ -92,7 +101,9 @@ def _policy(latest=None, migration=None) -> UpdatePolicy:
 
 
 def test_prepare_signale_deja_a_jour(monkeypatch):
-    monkeypatch.setattr(self_update, "update_policy", lambda *a, **k: _policy())
+    monkeypatch.setattr(
+        self_update, "update_policy", lambda *a, **k: _policy()
+    )
     with pytest.raises(UpdateError, match="deja a jour"):
         self_update.prepare(_Config())
 
@@ -121,7 +132,9 @@ def _release(tag, version, *, migration=None) -> Release:
 
 
 def test_prepare_installe_d_abord_la_migration(monkeypatch, tmp_path):
-    migration = _release("watcher-v0.7.0", Version(0, 7, 0), migration="format v2")
+    migration = _release(
+        "watcher-v0.7.0", Version(0, 7, 0), migration="format v2"
+    )
     latest = _release("watcher-v0.8.0", Version(0, 8, 0))
     policy = _policy(latest=latest, migration=migration)
     monkeypatch.setattr(self_update, "update_policy", lambda *a, **k: policy)

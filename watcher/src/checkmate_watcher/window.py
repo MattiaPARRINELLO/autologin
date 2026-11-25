@@ -78,7 +78,9 @@ def _create_window(backend: Any, url: str) -> Any:
     )
 
 
-def _start_close_watcher(window: Any, close_event: threading.Event | None) -> None:
+def _start_close_watcher(
+    window: Any, close_event: threading.Event | None
+) -> None:
     if close_event is None:
         return
     threading.Thread(
@@ -91,20 +93,22 @@ def _start_close_watcher(window: Any, close_event: threading.Event | None) -> No
 def _startup_options() -> dict[str, Any]:
     options: dict[str, Any] = {}
     if sys.platform.startswith("linux"):
-        # Force GTK : evite la sonde Qt de pywebview et ses traces au demarrage.
+        # Force GTK pour eviter la sonde Qt et ses traces au demarrage.
         options["gui"] = "gtk"
     return options
 
 
 def show(url: str, *, close_event: threading.Event | None = None) -> bool:
-    """Ouvre une fenetre native, ou rend False si le moteur est indisponible."""
+    """Ouvre une fenetre native, ou rend False si le moteur manque."""
     backend = _load_backend()
     if backend is None:
         return False
     return _run_window(backend, url, close_event)
 
 
-def _run_window(backend: Any, url: str, close_event: threading.Event | None) -> bool:
+def _run_window(
+    backend: Any, url: str, close_event: threading.Event | None
+) -> bool:
     try:
         window = _create_window(backend, url)
         _start_close_watcher(window, close_event)
@@ -128,7 +132,9 @@ def open_url(url: str, *, close_event: threading.Event | None = None) -> bool:
 
     Rend True si une fenetre native a ete utilisee.
     """
-    if os.environ.get(BROWSER_ENV) != "1" and show(url, close_event=close_event):
+    if os.environ.get(BROWSER_ENV) != "1" and show(
+        url, close_event=close_event
+    ):
         return True
     webbrowser.open(url)
     return False

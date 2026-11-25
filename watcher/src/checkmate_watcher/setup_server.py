@@ -45,7 +45,12 @@ from .schedule import (
     parse_windows,
 )
 from .setup_ui import SETUP_HTML
-from .signature import SignatureError, load_signature, parse_points, save_signature
+from .signature import (
+    SignatureError,
+    load_signature,
+    parse_points,
+    save_signature,
+)
 from .window import open_url
 
 logger = logging.getLogger(__name__)
@@ -132,13 +137,16 @@ class SetupSession:
 
     # --- etat ---
 
+    def _schedule_windows(self) -> list[str]:
+        return [str(window) for window in self.config.schedule.windows]
+
     def state(self) -> dict:
         return {
             "username": self.config.cesar.username,
             "base_url": self.config.cesar.base_url,
             "has_signature": self._has_signature(),
             "days": self._active_days(),
-            "windows": [str(window) for window in self.config.schedule.windows],
+            "windows": self._schedule_windows(),
             "notifications": self.config.notifications.enabled,
             "keyring": keyring_available(),
         }
@@ -154,18 +162,26 @@ class SetupSession:
     def _active_days(self) -> list[str]:
         return [
             name
-            for name, index in sorted(DAY_NAMES.items(), key=lambda item: item[1])
+            for name, index in sorted(
+                DAY_NAMES.items(), key=lambda item: item[1]
+            )
             if index in self.config.schedule.days
         ]
 
     # --- validation ---
 
     @staticmethod
-    def _text(payload: dict, key: str, label: str, *, max_length: int = 300) -> str:
+    def _text_value(payload: dict, key: str, label: str) -> str:
         value = payload.get(key)
         if not isinstance(value, str) or not value.strip():
             raise SetupError(f"{label} obligatoire")
-        value = value.strip()
+        return value.strip()
+
+    @staticmethod
+    def _text(
+        payload: dict, key: str, label: str, *, max_length: int = 300
+    ) -> str:
+        value = SetupSession._text_value(payload, key, label)
         if "\n" in value or "\r" in value:
             raise SetupError(f"{label} invalide")
         if len(value) > max_length:
@@ -179,9 +195,15 @@ class SetupSession:
             raise SetupError("mot de passe obligatoire")
         return password
 
-    def _login_inputs(self, payload: dict) -> tuple[str, str, str]:
-        base_url = self._text(payload, "base_url", "adresse du site").rstrip("/")
+    def _credential_identity(self, payload: dict) -> tuple[str, str]:
+        base_url = self._text(payload, "base_url", "adresse du site").rstrip(
+            "/"
+        )
         username = self._text(payload, "username", "identifiant")
+        return base_url, username
+
+    def _login_inputs(self, payload: dict) -> tuple[str, str, str]:
+        base_url, username = self._credential_identity(payload)
         return base_url, username, self._required_password(payload)
 
     def _require_credentials(self) -> None:
@@ -206,7 +228,9 @@ class SetupSession:
     @contextlib.contextmanager
     def _login_guard(self) -> Iterator[None]:
         if not self.login_lock.acquire(blocking=False):
-            raise SetupError("un test de connexion est deja en cours", status=409)
+            raise SetupError(
+                "un test de connexion est deja en cours", status=409
+            )
         try:
             yield
         finally:
@@ -215,7 +239,9 @@ class SetupSession:
     def test_login(self, payload: dict) -> dict:
         base_url, username, password = self._login_inputs(payload)
         with self._login_guard():
-            message = _test_connection(self.config, base_url, username, password)
+            message = _test_connection(
+                self.config, base_url, username, password
+            )
         return {"ok": True, "message": message}
 
     def save_credentials(self, payload: dict) -> dict:
@@ -225,8 +251,7 @@ class SetupSession:
         return {"ok": True, "message": self._credential_message(stored)}
 
     def _credential_fields(self, payload: dict) -> tuple[str, str, str]:
-        base_url = self._text(payload, "base_url", "adresse du site").rstrip("/")
-        username = self._text(payload, "username", "identifiant")
+        base_url, username = self._credential_identity(payload)
         password = self._required_password(payload)
         if "\n" in password or "\r" in password:
             raise SetupError("mot de passe invalide")
@@ -235,9 +260,13 @@ class SetupSession:
     def _store_in_keyring(self, username: str, password: str) -> bool:
         if not prefer_keyring():
             return False
-        return set_password(self.config.cesar.keyring_service, username, password)
+        return set_password(
+            self.config.cesar.keyring_service, username, password
+        )
 
-    def _apply_credentials(self, base_url: str, username: str, password: str) -> None:
+    def _apply_credentials(
+        self, base_url: str, username: str, password: str
+    ) -> None:
         with self.lock:
             self.password = password
             self.credentials_saved = True
@@ -245,7 +274,9 @@ class SetupSession:
             self._persist()
 
     def _config_with_cesar(self, base_url: str, username: str) -> Config:
-        cesar = replace(self.config.cesar, base_url=base_url, username=username)
+        cesar = replace(
+            self.config.cesar, base_url=base_url, username=username
+        )
         return replace(self.config, cesar=cesar)
 
     @staticmethod
@@ -323,7 +354,9 @@ class SetupSession:
             "ok": True,
             "message": message,
             "username": self.config.cesar.username,
-            "windows": [str(window) for window in self.config.schedule.windows],
+            "windows": [
+                str(window) for window in self.config.schedule.windows
+            ],
             "autostart": state,
         }
 
@@ -365,7 +398,9 @@ class SetupSession:
         env_path = default_env_path()
         escaped = _escape_env_value(password)
         env_path.parent.mkdir(parents=True, exist_ok=True)
-        env_path.write_text(f'CHECKMATE_PASSWORD="{escaped}"\n', encoding="utf-8")
+        env_path.write_text(
+            f'CHECKMATE_PASSWORD="{escaped}"\n', encoding="utf-8"
+        )
         env_path.chmod(0o600)
 
 
@@ -408,7 +443,7 @@ def _run_login(candidate: Config) -> None:
 def _test_connection(
     config: Config, base_url: str, username: str, password: str
 ) -> str:
-    """Reproduit la connexion reelle, avec les selecteurs et le flux du watcher."""
+    """Reproduit la connexion reelle avec le flux du watcher."""
     candidate = _with_credentials(config, base_url, username, password)
     _run_login(candidate)
     return "Connexion reussie."
@@ -496,6 +531,9 @@ class _Handler(LocalHandler):
         if path == "/api/finish":
             self.session.finished.set()
 
+    def _test_notification(self, payload: dict[str, Any]) -> Any:
+        return self.session.test_notification()
+
     def _routes(self) -> dict[str, Any]:
         return {
             "/api/test-login": self.session.test_login,
@@ -503,7 +541,7 @@ class _Handler(LocalHandler):
             "/api/signature": self.session.save_signature,
             "/api/import-signature": self.session.import_signature,
             "/api/schedule": self.session.save_schedule,
-            "/api/test-notification": lambda _: self.session.test_notification(),
+            "/api/test-notification": self._test_notification,
             "/api/finish": self.session.finish,
         }
 

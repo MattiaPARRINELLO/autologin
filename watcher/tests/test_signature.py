@@ -47,7 +47,11 @@ def test_parse_points_refuse_une_signature_reduite_a_un_point():
 
 
 def _points_ligne() -> list[Point]:
-    return [Point(0, 0, "start"), Point(100, 50, "move"), Point(200, 100, "end")]
+    return [
+        Point(0, 0, "start"),
+        Point(100, 50, "move"),
+        Point(200, 100, "end"),
+    ]
 
 
 def _assert_dans_bornes(fitted, largeur, hauteur) -> None:
@@ -89,7 +93,10 @@ def test_save_et_load_signature(tmp_path):
     points = [Point(1, 2, "start"), Point(3, 4, "end")]
     save_signature(path, points)
     reloaded = load_signature(path)
-    assert [(p.x, p.y, p.kind) for p in reloaded] == [(1, 2, "start"), (3, 4, "end")]
+    assert [(p.x, p.y, p.kind) for p in reloaded] == [
+        (1, 2, "start"),
+        (3, 4, "end"),
+    ]
     if os.name != "nt":
         assert path.stat().st_mode & 0o777 == 0o600
     assert isinstance(json.loads(path.read_text()), list)

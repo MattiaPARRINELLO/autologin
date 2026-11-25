@@ -76,7 +76,7 @@ class Schedule:
     def situation(
         self, moment: datetime, is_signed: Callable[[str], bool]
     ) -> Situation:
-        """Decrit le creneau courant : desactive, hors plage, signe ou actif."""
+        """Decrit le creneau : desactive, hors plage, signe ou actif."""
         if not self.enabled:
             return Situation("disabled")
         return self._situation_in_window(moment, is_signed)
@@ -97,7 +97,9 @@ class Schedule:
             if day.weekday() in self.days:
                 yield day
 
-    def _first_start_after(self, day: date, moment: datetime) -> datetime | None:
+    def _first_start_after(
+        self, day: date, moment: datetime
+    ) -> datetime | None:
         for window in sorted(self.windows, key=lambda item: item.start):
             candidate = datetime.combine(day, window.start)
             if candidate > moment:
@@ -123,7 +125,9 @@ class Schedule:
     def describe(self) -> str:
         if not self.enabled:
             return "desactivee"
-        days = ",".join(name for name, index in DAY_NAMES.items() if index in self.days)
+        days = ",".join(
+            name for name, index in DAY_NAMES.items() if index in self.days
+        )
         windows = ", ".join(str(window) for window in self.windows)
         return f"{days} {windows}"
 
@@ -134,14 +138,22 @@ def parse_time(value: str) -> time:
         hours, minutes = text.split(":", 1)
         return time(int(hours), int(minutes))
     except (ValueError, TypeError) as exc:
-        raise ScheduleError(f"heure invalide : {value!r} (attendu HH:MM)") from exc
+        raise ScheduleError(
+            f"heure invalide : {value!r} (attendu HH:MM)"
+        ) from exc
+
+
+def _split_window(value: str, text: str) -> tuple[str, str]:
+    if "-" not in text:
+        raise ScheduleError(
+            f"plage invalide : {value!r} (attendu HH:MM-HH:MM)"
+        )
+    return tuple(text.split("-", 1))
 
 
 def parse_window(value: str) -> Window:
     text = str(value).strip()
-    if "-" not in text:
-        raise ScheduleError(f"plage invalide : {value!r} (attendu HH:MM-HH:MM)")
-    start_text, end_text = text.split("-", 1)
+    start_text, end_text = _split_window(value, text)
     start = parse_time(start_text)
     end = parse_time(end_text)
     if end <= start:
@@ -165,7 +177,9 @@ def _sorted_windows(values: list | tuple) -> list[Window]:
 def _reject_overlaps(ordered: list[Window]) -> None:
     for previous, current in pairwise(ordered):
         if current.start < previous.end:
-            raise ScheduleError(f"les plages se chevauchent : {previous} et {current}")
+            raise ScheduleError(
+                f"les plages se chevauchent : {previous} et {current}"
+            )
 
 
 def parse_windows(values: object) -> tuple[Window, ...]:
@@ -183,5 +197,7 @@ def _parse_day(value: object) -> int:
 
 
 def parse_days(values: object) -> tuple[int, ...]:
-    items = _require_sequence(values, "days doit etre une liste non vide de jours")
+    items = _require_sequence(
+        values, "days doit etre une liste non vide de jours"
+    )
     return tuple(sorted({_parse_day(item) for item in items}))

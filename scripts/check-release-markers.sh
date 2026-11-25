@@ -15,14 +15,16 @@ read_value() {
 migration="$(read_value MIGRATION)"
 required="$(read_value REQUIRED)"
 if [ -z "$migration" ] || [ -z "$required" ]; then
-    echo "::error::CHECKMATE-MIGRATION et CHECKMATE-REQUIRED sont obligatoires (0 si non applicable)"
+    echo "::error::CHECKMATE-MIGRATION et CHECKMATE-REQUIRED " \
+        "sont obligatoires (0 si non applicable)"
     exit 1
 fi
 
 manual=false
 if [ "$migration" != "0" ] || [ "$required" != "0" ]; then
     manual=true
-    echo "::warning::marqueur non nul : verification manuelle obligatoire avant publication"
+    echo "::warning::marqueur non nul : verification manuelle " \
+        "obligatoire avant publication"
 fi
 
 echo "manual=$manual" >> "$GITHUB_OUTPUT"

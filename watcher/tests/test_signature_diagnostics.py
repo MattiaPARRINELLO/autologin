@@ -27,7 +27,11 @@ class FakeCanvas:
                 "inputValue": "",
             }
         if script is diagnostics.READ_RECORDER_JS:
-            return {"total": 145, "trusted": 145, "events": {"pointermove": 140}}
+            return {
+                "total": 145,
+                "trusted": 145,
+                "events": {"pointermove": 140},
+            }
         if script is diagnostics.CANVAS_PNG_JS:
             payload = base64.b64encode(b"png").decode()
             return f"data:image/png;base64,{payload}"
@@ -84,7 +88,9 @@ def test_une_capture_ecrit_diagnostic_canvas_et_page(tmp_path):
     attempt = tracker.attempt_dir
     assert (attempt / "canvas.png").read_bytes() == b"png"
     assert (attempt / "page.png").read_bytes() == b"page"
-    payload = json.loads((attempt / "diagnostic.json").read_text(encoding="utf-8"))
+    payload = json.loads(
+        (attempt / "diagnostic.json").read_text(encoding="utf-8")
+    )
     assert payload["steps"][0]["label"] == "avant le trace"
     assert payload["steps"][1]["ink"] == INK
     assert payload["steps"][1]["events"]["total"] == 145

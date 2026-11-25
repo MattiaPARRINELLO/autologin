@@ -93,16 +93,22 @@ class TrayController:
         self._stop = threading.Event()
         self._shown: tuple[str, str] | None = None
 
+    def _start_xembed(self) -> bool:
+        if pystray is None or Image is None:
+            logger.info(
+                "icone de notification indisponible sur cette plateforme"
+            )
+            return False
+        self._thread = threading.Thread(target=self._run, daemon=True)
+        self._thread.start()
+        return True
+
     def start(self) -> None:
         if self._start_sni():
             self._start_watcher()
             return
-        if pystray is None or Image is None:
-            logger.info("icone de notification indisponible sur cette plateforme")
-            return
-        self._thread = threading.Thread(target=self._run, daemon=True)
-        self._thread.start()
-        self._start_watcher()
+        if self._start_xembed():
+            self._start_watcher()
 
     def _start_watcher(self) -> None:
         self._watcher = threading.Thread(target=self._watch, daemon=True)
@@ -171,7 +177,9 @@ class TrayController:
     def _safe(self, action) -> None:
         try:
             result = action()
-            message = result.get("message") if isinstance(result, dict) else None
+            message = (
+                result.get("message") if isinstance(result, dict) else None
+            )
             if message:
                 self._notify(message)
         except Exception as exc:
@@ -212,7 +220,9 @@ class TrayController:
 
     def _refresh_sni(self, title: str, mode: str, label: str) -> bool:
         try:
-            self.sni.update(title, status_pixmaps(mode), status_level(mode), label)
+            self.sni.update(
+                title, status_pixmaps(mode), status_level(mode), label
+            )
             self._shown = (mode, label)
             return True
         except Exception:

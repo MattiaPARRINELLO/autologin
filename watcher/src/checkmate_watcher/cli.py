@@ -38,7 +38,12 @@ from .notifications import Notifier
 from .paths import default_config_path, default_log_file
 from .self_update import update_now
 from .setup_server import run_setup
-from .signature import SignatureError, load_signature, parse_points, save_signature
+from .signature import (
+    SignatureError,
+    load_signature,
+    parse_points,
+    save_signature,
+)
 from .state import StateStore
 from .status_server import read_runtime, status_alive
 from .support import build_support_bundle
@@ -58,13 +63,17 @@ CAPTURE_HTML = """
 <title>CheckMate - capture de signature</title>
 <style>
   body { margin: 0; min-height: 100vh; display: grid; place-items: center;
-         background: #0f172a; color: #e2e8f0; font-family: system-ui, sans-serif; }
-  .card { background: #1e293b; padding: 28px; border-radius: 18px; box-shadow: 0 20px 60px rgba(0,0,0,.45); }
+         background: #0f172a; color: #e2e8f0;
+         font-family: system-ui, sans-serif; }
+  .card { background: #1e293b; padding: 28px; border-radius: 18px;
+    box-shadow: 0 20px 60px rgba(0,0,0,.45); }
   h1 { margin: 0 0 6px; font-size: 20px; }
   p { margin: 0 0 18px; color: #94a3b8; font-size: 14px; }
-  canvas { background: #fff; border-radius: 12px; cursor: crosshair; touch-action: none; display: block; }
+  canvas { background: #fff; border-radius: 12px; cursor: crosshair;
+    touch-action: none; display: block; }
   .actions { display: flex; gap: 12px; margin-top: 16px; }
-  button { flex: 1; padding: 12px; border-radius: 10px; border: 0; font-weight: 700; cursor: pointer; font-size: 15px; }
+  button { flex: 1; padding: 12px; border-radius: 10px; border: 0;
+    font-weight: 700; cursor: pointer; font-size: 15px; }
   #save { background: #22c55e; color: #04220f; }
   #clear { background: #334155; color: #e2e8f0; }
 </style>
@@ -163,6 +172,7 @@ CAPTURE_HTML = """
 
 
 HELP_NO_BROWSER = "setup : ne pas ouvrir le navigateur automatiquement"
+DRY_RUN_HELP = "detecte sans notifier ni signer"
 HELP_NOTIFY = "self-test : envoie aussi une notification reelle"
 
 COMMANDS = (
@@ -193,11 +203,13 @@ def _add_common_args(parser: argparse.ArgumentParser) -> None:
 
 
 def _add_run_args(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("--once", action="store_true", help="un seul cycle puis sortie")
     parser.add_argument(
-        "--dry-run", action="store_true", help="detecte sans notifier ni signer"
+        "--once", action="store_true", help="un seul cycle puis sortie"
     )
-    parser.add_argument("--auto", action="store_true", help="signe sans confirmation")
+    parser.add_argument("--dry-run", action="store_true", help=DRY_RUN_HELP)
+    parser.add_argument(
+        "--auto", action="store_true", help="signe sans confirmation"
+    )
 
 
 def _add_update_args(parser: argparse.ArgumentParser) -> None:
@@ -214,9 +226,13 @@ def _add_update_args(parser: argparse.ArgumentParser) -> None:
 
 
 def _add_command_args(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("--output", help="support-bundle : chemin de l'archive")
+    parser.add_argument(
+        "--output", help="support-bundle : chemin de l'archive"
+    )
     parser.add_argument("--file", help="import-signature : fichier JSON")
-    parser.add_argument("--no-browser", action="store_true", help=HELP_NO_BROWSER)
+    parser.add_argument(
+        "--no-browser", action="store_true", help=HELP_NO_BROWSER
+    )
     parser.add_argument("--notify", action="store_true", help=HELP_NOTIFY)
 
 
@@ -229,16 +245,26 @@ def _add_meta_args(parser: argparse.ArgumentParser) -> None:
     )
 
 
-def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
+def _build_parser() -> argparse.ArgumentParser:
+    return argparse.ArgumentParser(
         prog="checkmate-watcher",
-        description="Surveille CESAR Emineo et propose de signer l'emargement.",
+        description=(
+            "Surveille CESAR Emineo et propose de signer l'emargement."
+        ),
     )
+
+
+def _configure_parser(parser: argparse.ArgumentParser) -> None:
     _add_common_args(parser)
     _add_run_args(parser)
     _add_update_args(parser)
     _add_command_args(parser)
     _add_meta_args(parser)
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = _build_parser()
+    _configure_parser(parser)
     return parser
 
 
@@ -261,6 +287,7 @@ def _afficher_watcher(config: Config) -> None:
     print(f"  Deduplication  : {config.watcher.dedupe_ttl}s")
     print(f"  Confirmation   : {config.watcher.confirm_timeout}s")
     print(f"  Nouvelle demande : {config.watcher.prompt_retry}s")
+    print(f"  Transport      : {config.watcher.transport}")
     print(f"  Auto-signature : {config.watcher.auto_sign}")
     print(f"  Visible a la signature : {config.watcher.visible_on_sign}")
     print(f"  Plages         : {config.schedule.describe()}")
@@ -312,7 +339,9 @@ def _statut_signature(fichier: Path) -> tuple[str, object]:
 
 def command_check_config(config: Config) -> int:
     statut = _statut_signature(config.signature.file)
-    tools_status = [(tool, shutil.which(tool)) for tool in ("notify-send", "zenity")]
+    tools_status = [
+        (tool, shutil.which(tool)) for tool in ("notify-send", "zenity")
+    ]
     _afficher_check_config(config, statut, tools_status)
     return 0
 
@@ -326,7 +355,9 @@ async def command_capture(config: Config) -> int:
             playwright.chromium, config.watcher.executable_path
         ).as_kwargs()
         try:
-            browser = await playwright.chromium.launch(headless=False, **options)
+            browser = await playwright.chromium.launch(
+                headless=False, **options
+            )
         except Exception as exc:
             if "Executable doesn't exist" in str(exc):
                 print(missing_browser_message())
@@ -336,7 +367,8 @@ async def command_capture(config: Config) -> int:
         await page.set_content(CAPTURE_HTML)
         try:
             await page.wait_for_function(
-                "window.__signatureCapture && window.__signatureCapture.done === true",
+                "window.__signatureCapture && "
+                "window.__signatureCapture.done === true",
                 timeout=300_000,
             )
             raw = await page.evaluate("window.__signatureCapture.points")
@@ -353,7 +385,10 @@ async def command_capture(config: Config) -> int:
         return 1
 
     save_signature(config.signature.file, points)
-    print(f"Signature enregistree ({len(points)} points) dans {config.signature.file}")
+    print(
+        f"Signature enregistree ({len(points)} points) "
+        f"dans {config.signature.file}"
+    )
     return 0
 
 
@@ -390,7 +425,9 @@ def _afficher_set_password(etape: str, service: str = "") -> None:
     if etape == "vide":
         print("mot de passe vide, rien n'a ete enregistre")
     elif etape == "pas_trousseau":
-        print("trousseau systeme indisponible : utilise password_env ou password")
+        print(
+            "trousseau systeme indisponible : utilise password_env ou password"
+        )
     elif etape == "echec":
         print("enregistrement dans le trousseau impossible")
     else:
@@ -411,7 +448,9 @@ def _enregistrer_set_password(config: Config, password: str) -> int:
 
 
 def command_set_password(config: Config) -> int:
-    return _enregistrer_set_password(config, getpass.getpass("Mot de passe CESAR : "))
+    return _enregistrer_set_password(
+        config, getpass.getpass("Mot de passe CESAR : ")
+    )
 
 
 def _afficher_self_test(checks: list[tuple[str, bool, str]]) -> None:
@@ -556,6 +595,13 @@ def _charger_points_signature(path: Path) -> tuple[list | None, object | None]:
         return None, exc
 
 
+def _enregistrer_points_import(config: Config, points: list) -> None:
+    save_signature(config.signature.file, points)
+    _afficher_import_signature(
+        points=len(points), fichier=config.signature.file
+    )
+
+
 def command_import_signature(config: Config, file_path: str | None) -> int:
     if not file_path:
         _afficher_import_signature(manquant=True)
@@ -564,8 +610,7 @@ def command_import_signature(config: Config, file_path: str | None) -> int:
     if erreur:
         _afficher_import_signature(erreur=erreur)
         return 1
-    save_signature(config.signature.file, points)
-    _afficher_import_signature(points=len(points), fichier=config.signature.file)
+    _enregistrer_points_import(config, points)
     return 0
 
 
@@ -618,7 +663,9 @@ def command_status(config: Config, config_path: Path) -> int:
     return 1
 
 
-def _afficher_compteurs(starts: int, detections: int, signed: int, errors: int) -> None:
+def _afficher_compteurs(
+    starts: int, detections: int, signed: int, errors: int
+) -> None:
     print(f"  Demarrages        : {starts}")
     print(f"  Detections        : {detections}")
     print(f"  Signatures        : {signed}")
@@ -658,7 +705,9 @@ def _lire_telechargements() -> tuple[int | None, str | None, object]:
     try:
         releases = fetch_releases()
         downloads = sum(release.downloads for release in releases)
-        latest_tag = max(releases, key=lambda r: r.version).tag if releases else None
+        latest_tag = (
+            max(releases, key=lambda r: r.version).tag if releases else None
+        )
     except Exception as exc:
         return None, None, exc
     return downloads, latest_tag, None
@@ -668,7 +717,9 @@ def command_stats(config: Config) -> int:
     state = StateStore(config.watcher.state_file)
     starts, detections, signed, errors = _lire_compteurs(state)
     downloads, latest_tag, erreur = _lire_telechargements()
-    _afficher_stats(starts, detections, signed, errors, downloads, latest_tag, erreur)
+    _afficher_stats(
+        starts, detections, signed, errors, downloads, latest_tag, erreur
+    )
     return 0
 
 
@@ -686,15 +737,22 @@ def _afficher_check_update(channel, policy, erreur=None) -> None:
 
 
 def _afficher_migration(release) -> None:
-    print(f"Migration a passer d'abord : {release.tag} ({release.migration_reason})")
+    print(
+        f"Migration a passer d'abord : {release.tag} "
+        f"({release.migration_reason})"
+    )
 
 
-def _release_status(config: Config) -> tuple[object, object]:
+def _load_release_policy(config: Config) -> tuple[object, object]:
     try:
         policy = update_policy(__version__, channel=config.updates.channel)
     except Exception as exc:
         return None, exc
     return policy, None
+
+
+def _release_status(config: Config) -> tuple[object, object]:
+    return _load_release_policy(config)
 
 
 def command_check_update(config: Config) -> int:
@@ -743,10 +801,9 @@ def _afficher_demander_confirmation(reponse: list[str]) -> None:
 
 
 def _release_pour_update(config: Config):
-    try:
-        policy = update_policy(__version__, channel=config.updates.channel)
-    except Exception as exc:
-        return None, exc
+    policy, erreur = _load_release_policy(config)
+    if erreur is not None:
+        return None, erreur
     return policy.install_target, None
 
 
@@ -796,7 +853,9 @@ def _installer_si_confirme(config: Config, assume_yes: bool) -> int:
     return _installer_update(config)
 
 
-def command_update(config: Config, *, check_only: bool, assume_yes: bool) -> int:
+def command_update(
+    config: Config, *, check_only: bool, assume_yes: bool
+) -> int:
     release, code = _release_ou_code(config)
     if code is not None:
         return code
@@ -810,8 +869,13 @@ def _afficher_autostart_install_echec() -> None:
     print("installation du demarrage automatique impossible")
 
 
-def _afficher_autostart_installe(executable: object, config_path: Path) -> None:
-    print(f"demarrage automatique installe : {executable} --config {config_path} run")
+def _afficher_autostart_installe(
+    executable: object, config_path: Path
+) -> None:
+    print(
+        f"demarrage automatique installe : {executable} "
+        f"--config {config_path} run"
+    )
 
 
 def _afficher_autostart_uninstall_echec() -> None:
@@ -886,6 +950,12 @@ def _charger_config(args) -> Config | int:
         return 2
 
 
+def _dispatch_update(config: Config, args) -> int | None:
+    if args.command != "update":
+        return None
+    return command_update(config, check_only=args.check, assume_yes=args.yes)
+
+
 def _dispatch_actions(config: Config, args) -> int | None:
     if args.command == "set-password":
         return command_set_password(config)
@@ -893,9 +963,7 @@ def _dispatch_actions(config: Config, args) -> int | None:
         return command_self_test(config, notify=args.notify)
     if args.command == "import-signature":
         return command_import_signature(config, args.file)
-    if args.command == "update":
-        return command_update(config, check_only=args.check, assume_yes=args.yes)
-    return None
+    return _dispatch_update(config, args)
 
 
 def _dispatch_inspection(config: Config, args) -> int | None:
@@ -919,7 +987,11 @@ def _dispatch_support(config: Config, args) -> int | None:
 
 
 def _dispatch_config(config: Config, args) -> int | None:
-    for dispatch in (_dispatch_inspection, _dispatch_actions, _dispatch_support):
+    for dispatch in (
+        _dispatch_inspection,
+        _dispatch_actions,
+        _dispatch_support,
+    ):
         result = dispatch(config, args)
         if result is not None:
             return result

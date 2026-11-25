@@ -33,7 +33,9 @@ class _State:
 def sent(monkeypatch):
     events: list[str] = []
     monkeypatch.setattr(analytics, "install_id", lambda path=None: "abc123")
-    monkeypatch.setattr(analytics, "_send", lambda config, event: events.append(event))
+    monkeypatch.setattr(
+        analytics, "_send", lambda config, event: events.append(event)
+    )
     monkeypatch.delenv(analytics.DISABLE_ENV, raising=False)
     return events
 
@@ -44,7 +46,9 @@ def test_install_id_is_stable(tmp_path: Path, monkeypatch):
     second = analytics.install_id(tmp_path / "install-id")
     assert first == second
     assert len(first) == 32
-    assert (tmp_path / "install-id").read_text(encoding="utf-8").strip() == first
+    assert (tmp_path / "install-id").read_text(
+        encoding="utf-8"
+    ).strip() == first
     monkeypatch.setattr(analytics, "_install_id", None)
 
 
@@ -89,8 +93,14 @@ def _unique_install_id(path=None):
 
 def _capture_urlopen(captured: list[dict]):
     def fake_urlopen(request, timeout=0):
-        headers = {name.lower(): value for name, value in request.header_items()}
-        parts = {"url": request.full_url, "body": request.data, "headers": headers}
+        headers = {
+            name.lower(): value for name, value in request.header_items()
+        }
+        parts = {
+            "url": request.full_url,
+            "body": request.data,
+            "headers": headers,
+        }
         captured.append(parts)
         return _response()
 
@@ -102,7 +112,9 @@ def test_payload_has_no_identity(monkeypatch):
     urlopen = _capture_urlopen(captured)
     monkeypatch.setattr(analytics.urllib.request, "urlopen", urlopen)
     monkeypatch.setattr(analytics, "install_id", _unique_install_id)
-    analytics._post(analytics.DEFAULT_ENDPOINT, {"install": "abc", "event": "install"})
+    analytics._post(
+        analytics.DEFAULT_ENDPOINT, {"install": "abc", "event": "install"}
+    )
     assert captured[0]["url"] == analytics.DEFAULT_ENDPOINT
     assert b"install" in captured[0]["body"]
     assert analytics.INGEST_HEADER.lower() in captured[0]["headers"]

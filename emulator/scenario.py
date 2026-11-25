@@ -96,7 +96,9 @@ def _scenario_harness(root: Path, manifest: dict, close_delay_ms: int) -> str:
     return harness.replace(CLOSE_DELAY_TOKEN, str(max(0, close_delay_ms)))
 
 
-def _build_scenario(root: Path, manifest: dict, close_delay_ms: int) -> Scenario:
+def _build_scenario(
+    root: Path, manifest: dict, close_delay_ms: int
+) -> Scenario:
     assets = read_text(manifest, "assets", "assets")
     return Scenario(
         name=read_text(manifest, "name", root.name),
@@ -112,16 +114,22 @@ def load_scenario(directory: Path, close_delay_ms: int = 0) -> Scenario:
     return _build_scenario(root, read_manifest(root), close_delay_ms)
 
 
-def read_manifest(root: Path) -> dict:
-    path = root / MANIFEST_NAME
+def _read_manifest_json(path: Path) -> object:
     try:
-        data = json.loads(path.read_text("utf-8"))
+        return json.loads(path.read_text("utf-8"))
     except FileNotFoundError as exc:
         raise ScenarioError(f"manifeste absent : {path}") from exc
     except json.JSONDecodeError as exc:
         raise ScenarioError(f"manifeste illisible ({path}) : {exc}") from exc
+
+
+def read_manifest(root: Path) -> dict:
+    path = root / MANIFEST_NAME
+    data = _read_manifest_json(path)
     if not isinstance(data, dict):
-        raise ScenarioError(f"manifeste invalide ({path}) : objet JSON attendu")
+        raise ScenarioError(
+            f"manifeste invalide ({path}) : objet JSON attendu"
+        )
     return data
 
 
@@ -139,7 +147,10 @@ def read_text_file(root: Path, relative: object, label: str) -> str:
 def parse_pages(root: Path, raw: object) -> dict[str, Page]:
     if not isinstance(raw, dict) or not raw:
         raise ScenarioError("pages : objet non vide attendu (route -> page)")
-    return {route: parse_page(root, route, value) for route, value in raw.items()}
+    return {
+        route: parse_page(root, route, value)
+        for route, value in raw.items()
+    }
 
 
 def _page_files(root: Path, route: str, raw: dict) -> dict:
@@ -148,7 +159,9 @@ def _page_files(root: Path, route: str, raw: dict) -> dict:
         for state, value in raw.items()
     }
     if DEFAULT_STATE not in files:
-        raise ScenarioError(f"pages{route} : etat {DEFAULT_STATE!r} obligatoire")
+        raise ScenarioError(
+            f"pages{route} : etat {DEFAULT_STATE!r} obligatoire"
+        )
     return files
 
 

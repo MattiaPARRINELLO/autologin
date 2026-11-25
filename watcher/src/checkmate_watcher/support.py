@@ -21,22 +21,29 @@ MAX_LOG_LINES = 400
 MAX_DIAGNOSTIC_BYTES = 5_000_000
 
 
+def _contains_secret(line: str) -> bool:
+    lowered = line.lower()
+    markers = ("password", "passwd", "mot de passe")
+    return any(marker in lowered for marker in markers)
+
+
+def _redact_line(line: str) -> str:
+    if _contains_secret(line):
+        return "[ligne masquee]"
+    return line
+
+
 def _redact(text: str) -> str:
-    lines = []
-    for line in text.splitlines():
-        lowered = line.lower()
-        if "password" in lowered or "passwd" in lowered or "mot de passe" in lowered:
-            lines.append("[ligne masquee]")
-        else:
-            lines.append(line)
-    return "\n".join(lines)
+    return "\n".join(_redact_line(line) for line in text.splitlines())
 
 
 def _log_tail(log_file: Path) -> str:
     if not log_file.is_file():
         return f"[aucun log dans {log_file}]"
     try:
-        lines = log_file.read_text(encoding="utf-8", errors="replace").splitlines()
+        lines = log_file.read_text(
+            encoding="utf-8", errors="replace"
+        ).splitlines()
     except OSError as exc:
         return f"[lecture des logs impossible : {exc}]"
     return _redact("\n".join(lines[-MAX_LOG_LINES:]))
@@ -114,8 +121,12 @@ def _bundle_texts(config: Config, config_path: Path) -> Texts:
     return Texts(config_text, log_text, diagnostics(config, config_path))
 
 
-def _write_archive(target: Path, texts: Texts, diagnostics_dir: Path | None) -> None:
-    with zipfile.ZipFile(target, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+def _write_archive(
+    target: Path, texts: Texts, diagnostics_dir: Path | None
+) -> None:
+    with zipfile.ZipFile(
+        target, "w", compression=zipfile.ZIP_DEFLATED
+    ) as archive:
         archive.writestr("diagnostic.txt", texts.summary + "\n")
         archive.writestr("config-sans-secrets.toml", texts.config)
         archive.writestr("logs.txt", texts.log + "\n")

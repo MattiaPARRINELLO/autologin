@@ -95,7 +95,12 @@ def install_id(path: Path | None = None) -> str:
 
 
 def _enabled(config) -> bool:
-    if os.environ.get(DISABLE_ENV, "").strip().lower() in {"0", "false", "non", "off"}:
+    if os.environ.get(DISABLE_ENV, "").strip().lower() in {
+        "0",
+        "false",
+        "non",
+        "off",
+    }:
         return False
     return bool(getattr(config.analytics, "enabled", True))
 

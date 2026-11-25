@@ -60,28 +60,34 @@ exit "$status"
 """
 
 
-def install(archive: Path, *, cleanup: Path | None = None) -> None:
-    """Lance l'installation en arriere-plan puis rend la main."""
-    if not archive.is_file():
-        raise UpdateError("paquet de mise a jour introuvable")
+def _install_for_platform(archive: Path, cleanup: Path | None) -> None:
     if sys.platform.startswith("win"):
         _install_windows(archive)
     elif sys.platform.startswith("linux"):
         _install_linux(archive, cleanup or archive.parent)
     else:
-        raise UpdateError("mise a jour automatique indisponible sur ce systeme")
+        raise UpdateError(
+            "mise a jour automatique indisponible sur ce systeme"
+        )
+
+
+def install(archive: Path, *, cleanup: Path | None = None) -> None:
+    """Lance l'installation en arriere-plan puis rend la main."""
+    if not archive.is_file():
+        raise UpdateError("paquet de mise a jour introuvable")
+    _install_for_platform(archive, cleanup)
 
 
 def _install_windows(archive: Path) -> None:
-    flags = 0x00000008 | 0x00000200  # DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP
+    # DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP.
+    flags = 0x00000008 | 0x00000200
     try:
-        subprocess.Popen(
-            [str(archive), *WINDOWS_FLAGS],
-            close_fds=True,
-            creationflags=flags,
-        )
+        options = {"close_fds": True, "creationflags": flags}
+        subprocess.Popen([str(archive), *WINDOWS_FLAGS], **options)
     except OSError as exc:
-        raise UpdateError(f"lancement de l'installeur impossible : {exc}") from exc
+        raise UpdateError(
+            f"lancement de l'installeur impossible : {exc}"
+        ) from exc
 
 
 def _fill_update_script(handle, archive, cleanup):
@@ -115,18 +121,50 @@ def _install_linux(archive: Path, cleanup: Path) -> None:
         ) from exc
 
 
-def _try_systemd_run(script, unit):
-    # fmt: off
-    runner = shutil.which("systemd-run")
-    if runner is None: return False
+def _systemd_update_command(runner, script, unit):
+    return [runner, "--user", "--collect", "--quiet", f"--unit={unit}"] + [
+        "--description=Installation d'une mise a jour CheckMate",
+        "--setenv=CHECKMATE_UPDATE_DETACHED=1",
+        "/bin/bash",
+        script,
+    ]
+
+
+def _detached_options() -> dict:
+    return {
+        "close_fds": True,
+        "stdin": subprocess.DEVNULL,
+        "stdout": subprocess.DEVNULL,
+        "stderr": subprocess.DEVNULL,
+    }
+
+
+def _spawn_systemd_update(runner, script, unit) -> bool:
     try:
-        subprocess.Popen([runner, "--user", "--collect", "--quiet", f"--unit={unit}", "--description=Installation d'une mise a jour CheckMate", "--setenv=CHECKMATE_UPDATE_DETACHED=1", "/bin/bash", script], close_fds=True, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        command = _systemd_update_command(runner, script, unit)
+        subprocess.Popen(command, **_detached_options())
     except OSError:
-        logger.warning("systemd-run indisponible, installation non detachee"); return False
-    if _transient_unit_active(unit): return True
-    logger.warning("unite %s inactive, installation dans le cgroup du service", unit)
+        logger.warning("systemd-run indisponible, installation non detachee")
+        return False
+    return True
+
+
+def _systemd_unit_ready(unit: str) -> bool:
+    if _transient_unit_active(unit):
+        return True
+    logger.warning(
+        "unite %s inactive, installation dans le cgroup du service", unit
+    )
     return False
-    # fmt: on
+
+
+def _try_systemd_run(script, unit):
+    runner = shutil.which("systemd-run")
+    if runner is None:
+        return False
+    if not _spawn_systemd_update(runner, script, unit):
+        return False
+    return _systemd_unit_ready(unit)
 
 
 def _spawn_detached(argv: list[str]) -> None:
@@ -152,23 +190,43 @@ def _quote(value: str) -> str:
     return "'" + value.replace("'", "'\\''") + "'"
 
 
+def _systemctl_state_command(unit: str) -> tuple[str, ...]:
+    return (
+        "systemctl",
+        "--user",
+        "show",
+        "--property=ActiveState",
+        "--value",
+        unit,
+    )
+
+
+def _transient_unit_state(unit: str) -> str | None:
+    command = _systemctl_state_command(unit)
+    try:
+        result = subprocess.run(
+            command, capture_output=True, text=True, timeout=2, check=False
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return result.stdout.strip()
+
+
 def _transient_unit_active(unit: str, attempts: int = 5) -> bool:
-    # fmt: off
     for attempt in range(attempts):
-        try:
-            result = subprocess.run(["systemctl", "--user", "show", "--property=ActiveState", "--value", unit], capture_output=True, text=True, timeout=2, check=False)
-        except (OSError, subprocess.SubprocessError):
+        state = _transient_unit_state(unit)
+        if state is None:
             return False
-        state = result.stdout.strip()
-        if state in {"active", "activating"}: return True
-        if state in {"inactive", "failed"} and attempt >= 1: return False
+        if state in {"active", "activating"}:
+            return True
+        if state in {"inactive", "failed"} and attempt >= 1:
+            return False
         time.sleep(0.2)
     return False
-    # fmt: on
 
 
 def prepare(config) -> tuple[Release, Path]:
-    """Telecharge la migration a passer en priorite, sinon la derniere version."""
+    """Telecharge la migration prioritaire ou la derniere version."""
     policy = update_policy(__version__, channel=config.updates.channel)
     release = policy.install_target
     if release is None:
@@ -179,7 +237,7 @@ def prepare(config) -> tuple[Release, Path]:
 
 
 def update_now(config) -> str:
-    """Prepare puis lance l'installation. Rend le numero de version installe."""
+    """Prepare l'installation et rend le numero de version cible."""
     release, archive = prepare(config)
     install(archive)
     return release.version_text

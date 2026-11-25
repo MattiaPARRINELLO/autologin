@@ -45,7 +45,7 @@ supprime aussi.
 | Identifiant CESAR | configuration | en clair, fichier lisible par toi seul |
 | Mot de passe | trousseau du système ou fichier env | voir ci-dessous |
 | Signature | `signature.json` | points du tracé, pas une image |
-| Session CESAR | profil Chromium local | cookies du navigateur |
+| Session CESAR | profil Chromium local et `http-cookies.json` | cookies du navigateur et de la detection HTTP, permissions `600` pour le fichier HTTP |
 | Planning et état | configuration et `state.json` | créneaux et émargements traités |
 | Logs | dossier de logs | horodatés, sans mot de passe |
 

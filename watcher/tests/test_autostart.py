@@ -26,7 +26,10 @@ def test_unite_systemd_generee():
         Path("/home/eleve/.config/checkmate-watcher/config.toml"),
     )
     assert 'ExecStart="/opt/check mate/checkmate-watcher"' in unit
-    assert "--config /home/eleve/.config/checkmate-watcher/config.toml run" in unit
+    assert (
+        "--config /home/eleve/.config/checkmate-watcher/config.toml run"
+        in unit
+    )
     assert f"EnvironmentFile=-{default_env_path()}" in unit
     assert "Restart=always" in unit
     assert "WantedBy=graphical-session.target" in unit
@@ -88,7 +91,9 @@ def test_activation_windows(monkeypatch):
     fake = windows_env(monkeypatch)
     assert enable_autostart(
         Path("C:\\Program Files\\CheckMate\\CheckMate.exe"),
-        Path("C:\\Users\\eleve\\AppData\\Roaming\\checkmate-watcher\\config.toml"),
+        Path(
+            "C:\\Users\\eleve\\AppData\\Roaming\\checkmate-watcher\\config.toml"
+        ),
     )
     value = fake.values[(RUN_KEY, RUN_VALUE)]
     assert "CheckMate.exe" in value

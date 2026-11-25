@@ -81,7 +81,9 @@ def _base(ctx: _Context) -> dict:
         "build": BUILD,
         "started_at": _iso(ctx.started_at),
         "now": _iso(ctx.moment),
-        "uptime_seconds": max(0, int((ctx.moment - ctx.started_at).total_seconds())),
+        "uptime_seconds": max(
+            0, int((ctx.moment - ctx.started_at).total_seconds())
+        ),
     }
 
 
@@ -128,7 +130,9 @@ def _restart_required(config_path: Path, started_at: datetime) -> bool:
         return False
 
 
-def _build_context(config, state, started_at, config_path, now, blocked, migration):
+def _build_context(
+    config, state, started_at, config_path, now, blocked, migration
+):
     moment = now or datetime.now()
     schedule = config.schedule
     args = (config, state, started_at, config_path, moment, schedule)

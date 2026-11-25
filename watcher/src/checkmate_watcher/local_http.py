@@ -60,15 +60,23 @@ class LocalHandler(BaseHTTPRequestHandler):
         token = (parse_qs(parsed.query).get("token") or [""])[0]
         return token == self.session.token
 
-    def _serve_page(self, template: str, values: dict[str, str] | None = None) -> None:
-        if not self._query_authorized():
-            self._send(403, b"Jeton invalide", "text/plain; charset=utf-8")
-            return
+    def _render_page(
+        self, template: str, values: dict[str, str] | None
+    ) -> str:
         html = template.replace("__TOKEN__", self.session.token).replace(
             "__VERSION__", version_label()
         )
         for key, value in (values or {}).items():
             html = html.replace(f"__{key}__", value)
+        return html
+
+    def _serve_page(
+        self, template: str, values: dict[str, str] | None = None
+    ) -> None:
+        if not self._query_authorized():
+            self._send(403, b"Jeton invalide", "text/plain; charset=utf-8")
+            return
+        html = self._render_page(template, values)
         self._send(200, html.encode("utf-8"), "text/html; charset=utf-8")
 
     def _favicon(self) -> None:
@@ -88,7 +96,9 @@ class LocalHandler(BaseHTTPRequestHandler):
         return data
 
 
-def create_server(session: Any, handler: type[LocalHandler]) -> ThreadingHTTPServer:
+def create_server(
+    session: Any, handler: type[LocalHandler]
+) -> ThreadingHTTPServer:
     bound = type("LocalSessionHandler", (handler,), {"session": session})
     server = ThreadingHTTPServer(("127.0.0.1", 0), bound)
     server.daemon_threads = True

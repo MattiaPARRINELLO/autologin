@@ -21,8 +21,9 @@ checkmate-watcher check-config
 ```
 
 Sur Windows, ouvre `%LOCALAPPDATA%\checkmate-watcher\Logs\checkmate-watcher.log`.
-Les lignes utiles contiennent `bouton d'emargement detecte`, `connexion
-reussie`, `signature` ou `ERREUR`.
+Les lignes utiles contiennent `emargement HTTP detecte`, `bouton d'emargement
+detecte`, `transport HTTP indisponible`, `connexion reussie`, `signature` ou
+`ERREUR`.
 
 ## Aucune notification
 
@@ -52,9 +53,19 @@ reussie`, `signature` ou `ERREUR`.
    checkmate-watcher run --once --dry-run -v
    ```
 4. Si la connexion échoue, vérifie le mot de passe avec `set-password`.
-5. Si CESAR a changé son interface, les logs affichent `aucun bouton
-   d'emargement visible`. Les sélecteurs sont configurables dans
-   `[selectors]`, mais il faut généralement mettre à jour CheckMate.
+5. En mode HTTP, un calendrier absent, un challenge ou une erreur 403/429/5xx
+   déclenche le repli navigateur. Si les logs affichent `transport HTTP
+   indisponible`, vérifie la connexion et la session CESAR.
+6. Si CESAR a changé son interface, les logs affichent `aucun bouton
+   d'emargement visible` ou `calendrier CESAR absent`. Les sélecteurs navigateur
+   restent configurables dans `[selectors]`, mais une mise à jour est souvent
+   nécessaire.
+7. Pour forcer l'ancien fonctionnement et comparer :
+
+   ```toml
+   [watcher]
+   transport = "browser"
+   ```
 
 ## Le service ne tourne pas
 
@@ -200,4 +211,4 @@ C'est ce qu'il faut pour reproduire un cas où la signature part de travers.
 Envoie aussi la sortie de `self-test`.
 
 Ne partage jamais `~/.config/checkmate-watcher/env`, `%LOCALAPPDATA%\checkmate-watcher\config.toml`
-s'il contient `password`, ni le dossier du profil Chromium.
+s'il contient `password`, `http-cookies.json` ni le dossier du profil Chromium.

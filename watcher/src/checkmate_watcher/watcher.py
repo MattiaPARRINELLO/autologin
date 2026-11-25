@@ -18,11 +18,16 @@ from .cesar import (
 )
 from .config import Config
 from .errors import describe_error
+from .http_session import HttpCesarSession, HttpTransportError
 from .notifications import Notifier
 from .paths import default_config_path
 from .signature import load_signature
 from .state import StateStore
-from .status_server import StatusSession, start_status_server, stop_status_server
+from .status_server import (
+    StatusSession,
+    start_status_server,
+    stop_status_server,
+)
 from .tray import TrayController
 from .updates import check_for_update, update_policy
 
@@ -75,13 +80,20 @@ def _notifier(config: Config) -> Notifier:
 
 
 async def _send(
-    config: Config, title: str, message: str, *, icon: str, urgency: str = "critical"
+    config: Config,
+    title: str,
+    message: str,
+    *,
+    icon: str,
+    urgency: str = "critical",
 ) -> bool:
     if not config.notifications.enabled:
         logger.debug("notification desactivee : %s", title)
         return False
     notifier = _notifier(config)
-    return await asyncio.to_thread(notifier.send, title, message, urgency=urgency)
+    return await asyncio.to_thread(
+        notifier.send, title, message, urgency=urgency
+    )
 
 
 @dataclass(frozen=True)
@@ -98,8 +110,25 @@ def _pause_reason(schedule, state, now: datetime) -> Pause | None:
     if situation.reason not in {"outside", "signed"}:
         return None
     resume = now + timedelta(seconds=schedule.seconds_until_next(now))
-    label = "hors plage" if situation.reason == "outside" else "creneau deja signe"
+    label = (
+        "hors plage" if situation.reason == "outside" else "creneau deja signe"
+    )
     return Pause(label, resume, situation.key)
+
+
+def _log_next_open(pause: Pause) -> None:
+    logger.info(
+        "%s, prochaine ouverture %s",
+        pause.reason,
+        pause.resume.strftime("%d/%m %H:%M"),
+    )
+
+
+def _once_pause(pause: Pause, once: bool) -> bool:
+    if not once:
+        return False
+    _log_next_open(pause)
+    return True
 
 
 async def _wait_for_new_window(
@@ -212,12 +241,51 @@ def _announce_migration(status_session, policy) -> None:
     status_session.set_migration(policy.migration)
 
 
+def _new_session(config: Config) -> CesarSession | HttpCesarSession:
+    if config.watcher.transport == "http":
+        return HttpCesarSession(config)
+    return CesarSession(config)
+
+
+async def _browser_fallback(
+    config: Config,
+    session: CesarSession | HttpCesarSession,
+    headless: bool,
+    error: HttpTransportError,
+) -> CesarSession:
+    await session.close()
+    logger.warning(
+        "transport HTTP indisponible (%s), bascule navigateur", error
+    )
+    await _send(
+        config,
+        "Detection CESAR",
+        "Transport HTTP indisponible, passage au navigateur.",
+        icon="dialog-warning",
+        urgency="normal",
+    )
+    browser = CesarSession(config)
+    await browser.open(headless=headless)
+    return browser
+
+
+async def _open_session(
+    config: Config, headless: bool
+) -> CesarSession | HttpCesarSession:
+    session = _new_session(config)
+    try:
+        await session.open(headless=headless)
+    except HttpTransportError as exc:
+        return await _browser_fallback(config, session, headless, exc)
+    return session
+
+
 async def sign_with_visibility(
     config: Config,
-    session: CesarSession,
+    session: CesarSession | HttpCesarSession,
     points: list,
 ) -> str:
-    """Signe en mode invisible, ou en ouvrant une fenetre uniquement pour signer."""
+    """Signe en mode invisible ou avec une fenetre de signature."""
     if not config.watcher.visible_on_sign:
         return await session.sign(points)
 
@@ -255,7 +323,9 @@ async def handle_signal(
         logger.info("[dry-run] emargement detecte : %s", signal.label)
         return DRY_RUN
 
-    await _send(config, "Emargement ouvert", message, icon=config.notifications.icon)
+    await _send(
+        config, "Emargement ouvert", message, icon=config.notifications.icon
+    )
 
     if auto:
         delay = max(0, config.watcher.auto_sign_delay)
@@ -296,11 +366,14 @@ async def handle_signal(
         )
         return ABSENT
 
-    logger.info("aucune reponse a la confirmation, nouvelle tentative plus tard")
+    logger.info(
+        "aucune reponse a la confirmation, nouvelle tentative plus tard"
+    )
     await _send(
         config,
         "Emargement en attente",
-        "Pas de reponse. Une nouvelle demande sera faite dans quelques minutes.",
+        "Pas de reponse. Une nouvelle demande sera faite "
+        "dans quelques minutes.",
         icon=config.notifications.icon,
         urgency="normal",
     )
@@ -325,11 +398,15 @@ async def run_loop(
             logger.error("signature indisponible : %s", exc)
             logger.error("lance 'checkmate-watcher capture' pour en creer une")
             return 2
-        logger.warning("signature indisponible (%s), dry-run sans signature", exc)
+        logger.warning(
+            "signature indisponible (%s), dry-run sans signature", exc
+        )
         points = []
 
     started_at = datetime.now()
-    state = StateStore(config.watcher.state_file, ttl=config.watcher.dedupe_ttl)
+    state = StateStore(
+        config.watcher.state_file, ttl=config.watcher.dedupe_ttl
+    )
     state.increment("stats.starts")
     if not dry_run:
         analytics.record_startup(config, state)
@@ -359,7 +436,6 @@ async def run_loop(
             )
         _announce_migration(status_session, policy)
         await _check_update(config, state)
-        session = CesarSession(config)
         poll_headless = (
             True if config.watcher.visible_on_sign else config.watcher.headless
         )
@@ -367,12 +443,7 @@ async def run_loop(
 
         pause = _pause_reason(schedule, state, datetime.now())
         if pause is not None:
-            if once:
-                logger.info(
-                    "%s, prochaine ouverture %s",
-                    pause.reason,
-                    pause.resume.strftime("%d/%m %H:%M"),
-                )
+            if _once_pause(pause, once):
                 return 0
             logger.info(
                 "%s (%s), reprise vers %s",
@@ -384,7 +455,7 @@ async def run_loop(
 
         if stop_event is not None and stop_event.is_set():
             return 0
-        await session.open(headless=poll_headless)
+        session = await _open_session(config, poll_headless)
 
         consecutive_errors = 0
         prompt_cooldowns: dict[str, float] = {}
@@ -399,12 +470,7 @@ async def run_loop(
                 now = datetime.now()
                 pause = _pause_reason(schedule, state, now)
                 if pause is not None:
-                    if once:
-                        logger.info(
-                            "%s, prochaine ouverture %s",
-                            pause.reason,
-                            pause.resume.strftime("%d/%m %H:%M"),
-                        )
+                    if _once_pause(pause, once):
                         return 0
                     logger.info(
                         "%s, pause jusqu'a %s",
@@ -412,8 +478,10 @@ async def run_loop(
                         pause.resume.strftime("%d/%m %H:%M"),
                     )
                     await session.close()
-                    await _wait_for_new_window(schedule, pause.window_key, stop_event)
-                    await session.open(headless=poll_headless)
+                    await _wait_for_new_window(
+                        schedule, pause.window_key, stop_event
+                    )
+                    session = await _open_session(config, poll_headless)
                     continue
 
                 window_key = schedule.window_key(now)
@@ -421,7 +489,8 @@ async def run_loop(
                     window = schedule.active_window(now)
                     if window is not None:
                         logger.info(
-                            "surveillance active sur le creneau %s (toutes les %ss)",
+                            "surveillance active sur le creneau %s "
+                            "(toutes les %ss)",
                             window,
                             config.watcher.poll_interval,
                         )
@@ -435,9 +504,12 @@ async def run_loop(
                     if signal is None:
                         logger.debug("rien a signer")
                         if asyncio.get_running_loop().time() >= next_heartbeat:
-                            logger.info("surveillance active, aucun emargement detecte")
+                            logger.info(
+                                "surveillance active, aucun emargement detecte"
+                            )
                             next_heartbeat = (
-                                asyncio.get_running_loop().time() + HEARTBEAT_SECONDS
+                                asyncio.get_running_loop().time()
+                                + HEARTBEAT_SECONDS
                             )
                     elif state.seen(signal.key):
                         logger.debug("emargement deja traite : %s", signal.key)
@@ -445,7 +517,9 @@ async def run_loop(
                         prompt_cooldowns.get(signal.key, 0)
                         > asyncio.get_running_loop().time()
                     ):
-                        logger.debug("nouvelle demande en attente pour %s", signal.key)
+                        logger.debug(
+                            "nouvelle demande en attente pour %s", signal.key
+                        )
                     else:
                         state.increment("stats.detections")
                         state.set_meta("last_detection_at", _now_iso())
@@ -491,7 +565,9 @@ async def run_loop(
                                 if window_key:
                                     state.mark_window(window_key)
                                 if is_success_confirmation(confirmation):
-                                    logger.info("presence signee : %s", confirmation)
+                                    logger.info(
+                                        "presence signee : %s", confirmation
+                                    )
                                     await _send(
                                         config,
                                         "Presence pointee",
@@ -500,7 +576,8 @@ async def run_loop(
                                     )
                                 else:
                                     logger.warning(
-                                        "confirmation inattendue : %s", confirmation
+                                        "confirmation inattendue : %s",
+                                        confirmation,
                                     )
                                     await _send(
                                         config,
@@ -509,6 +586,14 @@ async def run_loop(
                                         icon="dialog-warning",
                                     )
 
+                except HttpTransportError as exc:
+                    state.increment("stats.errors")
+                    _record_error(state, exc)
+                    session = await _browser_fallback(
+                        config, session, poll_headless, exc
+                    )
+                    consecutive_errors = 0
+                    continue
                 except StopRequested:
                     return 0
                 except Exception as exc:
@@ -525,7 +610,9 @@ async def run_loop(
                             await session.restart()
                             consecutive_errors = 0
                         except Exception as restart_exc:
-                            logger.error("redemarrage impossible : %s", restart_exc)
+                            logger.error(
+                                "redemarrage impossible : %s", restart_exc
+                            )
                             return 1
 
                 if once:

@@ -1,5 +1,7 @@
 """Interface web locale de l'onboarding."""
 
+from .ui_shared import API_JS
+
 SETUP_HTML = """<!doctype html>
 <html lang="fr">
 <head>
@@ -21,7 +23,26 @@ SETUP_HTML = """<!doctype html>
     --ok: #2f6f4f;
     --err: #b3261e;
     --ease: cubic-bezier(0.22, 1, 0.36, 1);
-    --pen-cursor: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20'%3E%3Cpath d='M10 3v4M10 13v4M3 10h4M13 10h4' stroke='%23ffffff' stroke-width='4' stroke-linecap='round'/%3E%3Cpath d='M10 3v4M10 13v4M3 10h4M13 10h4' stroke='%231f1b16' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E") 10 10, crosshair;
+    --pen-cursor: url("data:image/svg+xml;charset=utf-8,%3Csvg\
+ xmlns='http://www.w3.org/2000/svg'\
+ width='20'\
+ height='20'%3E%3Cpath\
+ d='M10\
+ 3v4M10\
+ 13v4M3\
+ 10h4M13\
+ 10h4'\
+ stroke='%23ffffff'\
+ stroke-width='4'\
+ stroke-linecap='round'/%3E%3Cpath\
+ d='M10\
+ 3v4M10\
+ 13v4M3\
+ 10h4M13\
+ 10h4'\
+ stroke='%231f1b16'\
+ stroke-width='1.5'\
+ stroke-linecap='round'/%3E%3C/svg%3E") 10 10, crosshair;
   }
   * { box-sizing: border-box; }
   body {
@@ -29,7 +50,8 @@ SETUP_HTML = """<!doctype html>
     min-height: 100vh;
     background: var(--paper);
     color: var(--ink);
-    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    sans-serif;
     font-size: 15px;
     line-height: 1.55;
     -webkit-font-smoothing: antialiased;
@@ -87,7 +109,8 @@ SETUP_HTML = """<!doctype html>
     font-size: 11px;
     color: var(--muted);
   }
-  .step-check { display: none; width: 14px; height: 14px; color: var(--accent); }
+  .step-check { display: none; width: 14px; height: 14px; color: var(--accent);
+  }
   .steps li.done .step-num { display: none; }
   .steps li.done .step-check { display: block; }
   .steps li.active .step-num { color: var(--ink); }
@@ -182,12 +205,15 @@ SETUP_HTML = """<!doctype html>
     flex-direction: column;
     gap: 10px;
   }
-  .facts li { display: flex; gap: 10px; align-items: flex-start; color: var(--ink-2); font-size: 14px; }
-  .facts svg { width: 16px; height: 16px; color: var(--muted); flex: none; margin-top: 2px; }
+  .facts li { display: flex; gap: 10px; align-items: flex-start; color:
+  var(--ink-2); font-size: 14px; }
+  .facts svg { width: 16px; height: 16px; color: var(--muted); flex: none;
+  margin-top: 2px; }
 
   .field { margin-top: 20px; }
   .field:first-of-type { margin-top: 0; }
-  label { display: block; font-size: 13px; color: var(--ink-2); margin-bottom: 8px; }
+  label { display: block; font-size: 13px; color: var(--ink-2); margin-bottom:
+  8px; }
   input[type=text], input[type=password], input[type=url] {
     width: 100%;
     height: 44px;
@@ -198,7 +224,8 @@ SETUP_HTML = """<!doctype html>
     color: var(--ink);
     font: inherit;
     font-size: 15px;
-    transition: border-color 150ms var(--ease), background-color 150ms var(--ease);
+    transition: border-color 150ms var(--ease), background-color 150ms
+    var(--ease);
   }
   input[type=text]:hover, input[type=password]:hover, input[type=url]:hover {
     border-color: rgba(31, 27, 22, 0.24);
@@ -245,18 +272,21 @@ SETUP_HTML = """<!doctype html>
     font-size: 15px;
     font-weight: 500;
     cursor: pointer;
-    transition: background-color 150ms var(--ease), border-color 150ms var(--ease),
+    transition: background-color 150ms var(--ease), border-color 150ms
+    var(--ease),
                 color 150ms var(--ease), transform 120ms var(--ease);
   }
   button:active { transform: scale(0.98); }
   button:disabled { opacity: 0.45; cursor: not-allowed; }
   .primary { background: var(--accent); color: var(--paper); }
   .primary:hover:not(:disabled) { background: var(--accent-hover); }
-  .secondary { background: var(--card); border-color: var(--line); color: var(--ink); }
+  .secondary { background: var(--card); border-color: var(--line); color:
+  var(--ink); }
   .secondary:hover:not(:disabled) { background: var(--raised); }
 
   .days-field { border: 0; padding: 0; margin: 24px 0 0; }
-  .days-field legend { padding: 0; font-size: 13px; color: var(--ink-2); margin-bottom: 8px; }
+  .days-field legend { padding: 0; font-size: 13px; color: var(--ink-2);
+  margin-bottom: 8px; }
   .days { display: flex; flex-wrap: wrap; gap: 8px; }
   .days label {
     margin: 0;
@@ -273,7 +303,8 @@ SETUP_HTML = """<!doctype html>
     font-size: 14px;
     cursor: pointer;
     user-select: none;
-    transition: background-color 150ms var(--ease), border-color 150ms var(--ease);
+    transition: background-color 150ms var(--ease), border-color 150ms
+    var(--ease);
   }
   .days input { position: absolute; opacity: 0; pointer-events: none; }
   .days label:has(input:checked) {
@@ -282,7 +313,8 @@ SETUP_HTML = """<!doctype html>
     color: var(--ink);
   }
 
-  .sig-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+  .sig-head { display: flex; align-items: center; justify-content:
+  space-between; gap: 16px; }
   .sig-existing {
     display: inline-flex;
     align-items: center;
@@ -360,7 +392,8 @@ SETUP_HTML = """<!doctype html>
   .checkline input { width: 16px; height: 16px; accent-color: var(--accent); }
 
   .done { padding: 16px 0 0; }
-  .done-check { width: 44px; height: 44px; color: var(--accent); margin-bottom: 20px; }
+  .done-check { width: 44px; height: 44px; color: var(--accent); margin-bottom:
+  20px; }
   .done h2 { margin-bottom: 8px; }
   .done .lede { margin-bottom: 0; }
   .summary {
@@ -402,11 +435,14 @@ SETUP_HTML = """<!doctype html>
   <aside class="rail">
     <div class="brand">
       <svg class="mark" viewBox="0 0 32 32" fill="none" aria-hidden="true">
-        <rect x="3.5" y="5.5" width="25" height="21" rx="5" stroke="currentColor" stroke-width="1.8"/>
+        <rect x="3.5" y="5.5" width="25" height="21" rx="5"
+        stroke="currentColor" stroke-width="1.8"/>
         <path d="M3.5 11.5h25" stroke="currentColor" stroke-width="1.8"/>
         <rect x="8" y="15" width="7" height="3" rx="1.5" fill="currentColor"/>
-        <rect x="8" y="21" width="10" height="3" rx="1.5" fill="currentColor" opacity="0.4"/>
-        <path d="M19.5 18.5l2.6 2.6 4.4-5.2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <rect x="8" y="21" width="10" height="3" rx="1.5" fill="currentColor"
+        opacity="0.4"/>
+        <path d="M19.5 18.5l2.6 2.6 4.4-5.2" stroke="currentColor"
+        stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
       </svg>
       <div class="brand-text">
         <span class="wordmark">CheckMate</span>
@@ -415,19 +451,42 @@ SETUP_HTML = """<!doctype html>
     </div>
 
     <ol class="steps" id="steps">
-      <li class="active"><span class="step-mark"><span class="step-num">1</span><svg class="step-check" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 8.5l3 3 7-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span>Mise en route</span></li>
-      <li><span class="step-mark"><span class="step-num">2</span><svg class="step-check" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 8.5l3 3 7-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span>Connexion</span></li>
-      <li><span class="step-mark"><span class="step-num">3</span><svg class="step-check" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 8.5l3 3 7-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span>Signature</span></li>
-      <li><span class="step-mark"><span class="step-num">4</span><svg class="step-check" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 8.5l3 3 7-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span>Planning</span></li>
-      <li><span class="step-mark"><span class="step-num">5</span><svg class="step-check" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 8.5l3 3 7-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span>Finition</span></li>
+      <li class="active"><span class="step-mark"><span
+      class="step-num">1</span><svg class="step-check" viewBox="0 0 16 16"
+      fill="none" aria-hidden="true"><path d="M3 8.5l3 3 7-7"
+      stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+      stroke-linejoin="round"/></svg></span><span>Mise en route</span></li>
+      <li><span class="step-mark"><span class="step-num">2</span><svg
+      class="step-check" viewBox="0 0 16 16" fill="none"
+      aria-hidden="true"><path d="M3 8.5l3 3 7-7" stroke="currentColor"
+      stroke-width="1.8" stroke-linecap="round"
+      stroke-linejoin="round"/></svg></span><span>Connexion</span></li>
+      <li><span class="step-mark"><span class="step-num">3</span><svg
+      class="step-check" viewBox="0 0 16 16" fill="none"
+      aria-hidden="true"><path d="M3 8.5l3 3 7-7" stroke="currentColor"
+      stroke-width="1.8" stroke-linecap="round"
+      stroke-linejoin="round"/></svg></span><span>Signature</span></li>
+      <li><span class="step-mark"><span class="step-num">4</span><svg
+      class="step-check" viewBox="0 0 16 16" fill="none"
+      aria-hidden="true"><path d="M3 8.5l3 3 7-7" stroke="currentColor"
+      stroke-width="1.8" stroke-linecap="round"
+      stroke-linejoin="round"/></svg></span><span>Planning</span></li>
+      <li><span class="step-mark"><span class="step-num">5</span><svg
+      class="step-check" viewBox="0 0 16 16" fill="none"
+      aria-hidden="true"><path d="M3 8.5l3 3 7-7" stroke="currentColor"
+      stroke-width="1.8" stroke-linecap="round"
+      stroke-linejoin="round"/></svg></span><span>Finition</span></li>
     </ol>
 
     <div class="timetable">
       <p class="timetable-label">Créneaux surveillés</p>
-      <div class="slot" data-slot="0"><span class="time">09:00–12:00</span><span class="slot-state"></span></div>
-      <div class="slot" data-slot="1"><span class="time">13:30–16:30</span><span class="slot-state"></span></div>
+      <div class="slot" data-slot="0"><span
+      class="time">09:00–12:00</span><span class="slot-state"></span></div>
+      <div class="slot" data-slot="1"><span
+      class="time">13:30–16:30</span><span class="slot-state"></span></div>
     </div>
-    <p class="rail-foot">CheckMate __VERSION__<br>Identifiants et signature restent sur cet ordinateur.</p>
+    <p class="rail-foot">CheckMate __VERSION__<br>Identifiants et signature
+    restent sur cet ordinateur.</p>
   </aside>
 
   <main class="panel">
@@ -439,38 +498,56 @@ SETUP_HTML = """<!doctype html>
 
     <section class="active" data-step="0">
       <h2>Mise en route</h2>
-      <p class="lede">CheckMate surveille CESAR pendant tes créneaux et te propose de signer dès que l'émargement s'ouvre. Aucune fenêtre pendant l'attente, une fenêtre uniquement pour signer.</p>
+      <p class="lede">CheckMate surveille CESAR pendant tes créneaux et te
+      propose de signer dès que l'émargement s'ouvre. Aucune fenêtre pendant
+      l'attente, une fenêtre uniquement pour signer.</p>
       <ul class="facts">
-        <li><svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 8.5l3 3 7-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Les identifiants restent sur cet ordinateur.</span></li>
-        <li><svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 8.5l3 3 7-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Le mot de passe va dans le trousseau du système quand c'est possible.</span></li>
-        <li><svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 8.5l3 3 7-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Aucune donnée n'est envoyée à un serveur tiers.</span></li>
+        <li><svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3
+        8.5l3 3 7-7" stroke="currentColor" stroke-width="1.8"
+        stroke-linecap="round" stroke-linejoin="round"/></svg><span>Les
+        identifiants restent sur cet ordinateur.</span></li>
+        <li><svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3
+        8.5l3 3 7-7" stroke="currentColor" stroke-width="1.8"
+        stroke-linecap="round" stroke-linejoin="round"/></svg><span>Le mot de
+        passe va dans le trousseau du système quand c'est possible.</span></li>
+        <li><svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3
+        8.5l3 3 7-7" stroke="currentColor" stroke-width="1.8"
+        stroke-linecap="round" stroke-linejoin="round"/></svg><span>Aucune
+        donnée n'est envoyée à un serveur tiers.</span></li>
       </ul>
       <div class="actions">
         <div class="actions-spacer"></div>
-        <button type="button" class="primary" onclick="go(1)">Configurer</button>
+        <button type="button" class="primary"
+        onclick="go(1)">Configurer</button>
       </div>
     </section>
 
     <section data-step="1">
       <h2>Connexion CESAR</h2>
-      <p class="lede">Utilise les mêmes identifiants que sur le site. Le test ouvre un navigateur invisible et vérifie que la connexion fonctionne.</p>
+      <p class="lede">Utilise les mêmes identifiants que sur le site. Le test
+      ouvre un navigateur invisible et vérifie que la connexion fonctionne.</p>
       <div class="field">
         <label for="baseUrl">Adresse du site</label>
-        <input id="baseUrl" type="url" value="https://cesar.emineo-education.fr">
+        <input id="baseUrl" type="url"
+        value="https://cesar.emineo-education.fr">
       </div>
       <div class="field">
         <label for="username">Identifiant</label>
-        <input id="username" type="text" autocomplete="username" placeholder="ton identifiant">
+        <input id="username" type="text" autocomplete="username"
+        placeholder="ton identifiant">
       </div>
       <div class="field">
         <label for="password">Mot de passe</label>
-        <input id="password" type="password" autocomplete="current-password" placeholder="ton mot de passe">
+        <input id="password" type="password" autocomplete="current-password"
+        placeholder="ton mot de passe">
       </div>
       <div class="status" id="loginStatus" aria-live="polite"></div>
       <div class="actions">
-        <button type="button" class="secondary" onclick="testLogin()" id="testBtn">Tester la connexion</button>
+        <button type="button" class="secondary" onclick="testLogin()"
+        id="testBtn">Tester la connexion</button>
         <div class="actions-spacer"></div>
-        <button type="button" class="primary" onclick="saveCredentials()" id="loginNext" disabled>Continuer</button>
+        <button type="button" class="primary" onclick="saveCredentials()"
+        id="loginNext" disabled>Continuer</button>
       </div>
       <p class="hint">Le bouton Continuer s'active après un test réussi.</p>
     </section>
@@ -479,30 +556,39 @@ SETUP_HTML = """<!doctype html>
       <div class="sig-head">
         <h2>Signature</h2>
         <span class="sig-existing" id="signatureBadge" hidden>
-          <svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 8.5l3 3 7-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3
+          8.5l3 3 7-7" stroke="currentColor" stroke-width="1.8"
+          stroke-linecap="round" stroke-linejoin="round"/></svg>
           Signature enregistrée
         </span>
       </div>
-      <p class="lede">Dessine ta signature à la souris ou au doigt. Elle sera rejouée telle quelle dans le canvas de CESAR.</p>
-      <canvas id="pad" width="640" height="240" aria-label="Zone de signature"></canvas>
+      <p class="lede">Dessine ta signature à la souris ou au doigt. Elle sera
+      rejouée telle quelle dans le canvas de CESAR.</p>
+      <canvas id="pad" width="640" height="240" aria-label="Zone de
+      signature"></canvas>
       <div class="import-line">
         <span>Signature deja existante ?</span>
         <label class="file-button" for="signatureFile">Importer le JSON
-          <input id="signatureFile" type="file" accept=".json,application/json">
+          <input id="signatureFile" type="file"
+          accept=".json,application/json">
         </label>
       </div>
       <div class="status" id="signatureStatus" aria-live="polite"></div>
       <div class="actions">
-        <button type="button" class="secondary" onclick="clearPad()">Effacer</button>
-        <button type="button" class="secondary" onclick="saveSignature()" id="signatureBtn">Enregistrer la signature</button>
+        <button type="button" class="secondary"
+        onclick="clearPad()">Effacer</button>
+        <button type="button" class="secondary" onclick="saveSignature()"
+        id="signatureBtn">Enregistrer la signature</button>
         <div class="actions-spacer"></div>
-        <button type="button" class="primary" onclick="go(3)" id="signatureNext" disabled>Continuer</button>
+        <button type="button" class="primary" onclick="go(3)"
+        id="signatureNext" disabled>Continuer</button>
       </div>
     </section>
 
     <section data-step="3">
       <h2>Planning</h2>
-      <p class="lede">CheckMate ne surveille que pendant ces créneaux. Une fois signé sur un créneau, il ne vérifie plus rien jusqu'au suivant.</p>
+      <p class="lede">CheckMate ne surveille que pendant ces créneaux. Une fois
+      signé sur un créneau, il ne vérifie plus rien jusqu'au suivant.</p>
       <fieldset class="days-field">
         <legend>Jours</legend>
         <div class="days" id="days">
@@ -517,24 +603,31 @@ __DAYS__
       <div class="status" id="scheduleStatus" aria-live="polite"></div>
       <div class="actions">
         <div class="actions-spacer"></div>
-        <button type="button" class="primary" onclick="saveSchedule()">Continuer</button>
+        <button type="button" class="primary"
+        onclick="saveSchedule()">Continuer</button>
       </div>
     </section>
 
     <section data-step="4">
       <h2>Finition</h2>
-      <p class="lede">Vérifie que la notification s'affiche, puis installe le démarrage automatique pour ne plus y penser.</p>
+      <p class="lede">Vérifie que la notification s'affiche, puis installe le
+      démarrage automatique pour ne plus y penser.</p>
       <div class="notice">
         <strong>Coupe le mode silencieux</strong>
-        <p>Désactive le mode silencieux ou "Ne pas déranger" avant de tester. Vérifie aussi que "CheckMate" est activé dans Paramètres > Système > Notifications. Sinon la notification peut ne pas s'afficher, même si CheckMate l'a bien envoyée.</p>
+        <p>Désactive le mode silencieux ou "Ne pas déranger" avant de tester.
+        Vérifie aussi que "CheckMate" est activé dans Paramètres > Système >
+        Notifications. Sinon la notification peut ne pas s'afficher, même si
+        CheckMate l'a bien envoyée.</p>
       </div>
       <div class="actions">
-        <button type="button" class="secondary" onclick="testNotification()" id="notifyBtn">Tester la notification</button>
+        <button type="button" class="secondary" onclick="testNotification()"
+        id="notifyBtn">Tester la notification</button>
       </div>
       <div class="status" id="notifyStatus" aria-live="polite"></div>
       <label class="checkline">
         <input type="checkbox" id="notificationsSeen">
-        <span>J'ai vérifié que la notification s'affiche, mode silencieux désactivé</span>
+        <span>J'ai vérifié que la notification s'affiche, mode silencieux
+        désactivé</span>
       </label>
       <label class="checkline">
         <input type="checkbox" id="autostart" checked>
@@ -543,15 +636,19 @@ __DAYS__
       <div class="status" id="finishStatus" aria-live="polite"></div>
       <div class="actions">
         <div class="actions-spacer"></div>
-        <button type="button" class="primary" onclick="finish()" id="finishBtn" disabled>Terminer</button>
+        <button type="button" class="primary" onclick="finish()" id="finishBtn"
+        disabled>Terminer</button>
       </div>
     </section>
 
     <section data-step="5">
       <div class="done">
-        <svg class="done-check" viewBox="0 0 44 44" fill="none" aria-hidden="true">
-          <circle cx="22" cy="22" r="20" stroke="currentColor" stroke-width="1.6" opacity="0.35"/>
-          <path d="M13 22.5l6 6 12-13" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+        <svg class="done-check" viewBox="0 0 44 44" fill="none"
+        aria-hidden="true">
+          <circle cx="22" cy="22" r="20" stroke="currentColor"
+          stroke-width="1.6" opacity="0.35"/>
+          <path d="M13 22.5l6 6 12-13" stroke="currentColor" stroke-width="2.4"
+          stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
         <h2>Configuration terminée</h2>
         <p class="lede" id="doneText">CheckMate est configuré.</p>
@@ -569,19 +666,11 @@ __DAYS__
 <script>
 const TOKEN = "__TOKEN__";
 const state = { credentialsSaved: false, signatureSaved: false };
-const STEP_LABELS = ["Mise en route", "Connexion", "Signature", "Planning", "Finition"];
+const STEP_LABELS = [
+  "Mise en route", "Connexion", "Signature", "Planning", "Finition"
+];
 
-async function api(path, body) {
-  const options = { method: body ? "POST" : "GET", headers: { "X-CheckMate-Token": TOKEN } };
-  if (body) {
-    options.headers["Content-Type"] = "application/json";
-    options.body = JSON.stringify(body);
-  }
-  const response = await fetch(path, options);
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data.error || ("erreur " + response.status));
-  return data;
-}
+__API_JS__
 
 function go(step) {
   document.querySelectorAll("section").forEach((section) => {
@@ -600,7 +689,8 @@ function go(step) {
     meta.style.display = "none";
   } else {
     meta.style.display = "flex";
-    document.getElementById("stepLabel").textContent = `Étape ${step + 1} sur 5`;
+    document.getElementById("stepLabel").textContent =
+      `Étape ${step + 1} sur 5`;
   }
 
   if (step === 2) loadState();
@@ -742,7 +832,11 @@ function pointsExtent(list) {
 
 async function saveSignature() {
   if (points.length < 2 || pointsExtent(points) < 2) {
-    setStatus("signatureStatus", "Dessine d'abord une vraie signature.", "err");
+    setStatus(
+      "signatureStatus",
+      "Dessine d'abord une vraie signature.",
+      "err"
+    );
     return;
   }
   try {
@@ -756,7 +850,8 @@ async function saveSignature() {
   }
 }
 
-document.getElementById("signatureFile").addEventListener("change", async (event) => {
+document.getElementById("signatureFile")
+  .addEventListener("change", async (event) => {
   const file = event.target.files[0];
   if (!file) return;
   const raw = await file.text();
@@ -774,7 +869,8 @@ document.getElementById("signatureFile").addEventListener("change", async (event
 });
 
 async function saveSchedule() {
-  const days = [...document.querySelectorAll("#days input:checked")].map((box) => box.value);
+  const days = [...document.querySelectorAll("#days input:checked")]
+    .map((box) => box.value);
   const windows = document.getElementById("windows").value
     .split(",")
     .map((item) => item.trim())
@@ -795,7 +891,9 @@ async function testNotification() {
     await api("/api/test-notification", {});
     setStatus(
       "notifyStatus",
-      "Notification envoyée. Si tu ne la vois pas, coupe le mode silencieux et vérifie l'interrupteur \"CheckMate\" dans les notifications système, puis relance le test.",
+      "Notification envoyée. Si tu ne la vois pas, coupe le mode " +
+      `silencieux et vérifie l'interrupteur "CheckMate" dans les ` +
+      "notifications système, puis relance le test.",
       "ok"
     );
   } catch (error) {
@@ -815,8 +913,13 @@ async function finish() {
     });
     document.getElementById("doneText").textContent = data.message;
     document.getElementById("doneUser").textContent = data.username || "—";
-    document.getElementById("doneWindows").textContent = (data.windows || []).join(" · ") || "—";
-    const autostartLabels = { installed: "Installé", disabled: "Désactivé", failed: "Échec" };
+    document.getElementById("doneWindows").textContent =
+      (data.windows || []).join(" · ") || "—";
+    const autostartLabels = {
+      installed: "Installé",
+      disabled: "Désactivé",
+      failed: "Échec",
+    };
     document.getElementById("doneAutostart").textContent =
       autostartLabels[data.autostart] || "—";
     go(5);
@@ -836,7 +939,8 @@ function updateTimetable() {
     : -1;
   document.querySelectorAll("[data-slot]").forEach((slot, index) => {
     slot.classList.toggle("active", index === active);
-    slot.querySelector(".slot-state").textContent = index === active ? "en cours" : "";
+    slot.querySelector(".slot-state").textContent =
+      index === active ? "en cours" : "";
   });
 }
 
@@ -852,4 +956,4 @@ loadState();
 </script>
 </body>
 </html>
-"""
+""".replace("__API_JS__", API_JS)

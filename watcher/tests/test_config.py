@@ -41,12 +41,14 @@ def test_charge_les_valeurs_par_defaut(tmp_path):
     assert config.cesar.base_url == "https://cesar.example.fr"
     assert config.cesar.login_url == "https://cesar.example.fr/connexion"
     assert config.watcher.poll_interval == 60
+    assert config.watcher.transport == "http"
     assert config.watcher.auto_sign is False
     assert config.selectors.attendance_button[0] == "button.buttonPresent"
 
 
 def test_les_chemins_par_defaut_viennent_de_paths(tmp_path):
     from checkmate_watcher.paths import (
+        default_http_cookies_file,
         default_profile_dir,
         default_signature_path,
         default_state_file,
@@ -55,6 +57,7 @@ def test_les_chemins_par_defaut_viennent_de_paths(tmp_path):
     config = load_config(write_config(tmp_path))
     assert config.watcher.profile_dir == default_profile_dir()
     assert config.watcher.state_file == default_state_file()
+    assert config.watcher.http_cookies_file == default_http_cookies_file()
     assert config.signature.file == default_signature_path()
 
 
@@ -72,7 +75,9 @@ def _surcharge_watcher_et_signature() -> str:
 
 
 def test_surcharge_les_valeurs(tmp_path):
-    config = load_config(write_config(tmp_path, _surcharge_watcher_et_signature()))
+    config = load_config(
+        write_config(tmp_path, _surcharge_watcher_et_signature())
+    )
     assert config.watcher.poll_interval == 30
     assert config.watcher.auto_sign is True
     assert config.watcher.headless is True
@@ -84,7 +89,13 @@ def _config_personnalisee() -> Config:
     return replace(
         config,
         cesar=replace(config.cesar, username="eleve", password="secret"),
-        watcher=replace(config.watcher, executable_path="/opt/chrome", auto_sign=True),
+        watcher=replace(
+            config.watcher,
+            executable_path="/opt/chrome",
+            auto_sign=True,
+            transport="browser",
+            http_cookies_file=Path("/tmp/checkmate-cookies.json"),
+        ),
         notifications=replace(config.notifications, enabled=False),
         updates=replace(config.updates, channel="beta"),
     )
@@ -100,6 +111,13 @@ def test_save_puis_reload_conserve_toute_la_configuration(tmp_path):
 def test_refuse_un_intervalle_trop_court(tmp_path):
     with pytest.raises(ConfigError):
         load_config(write_config(tmp_path, "[watcher]\npoll_interval = 5"))
+
+
+def test_refuse_un_transport_inconnu(tmp_path):
+    with pytest.raises(ConfigError, match="transport doit valoir"):
+        load_config(
+            write_config(tmp_path, '[watcher]\ntransport = "websocket"')
+        )
 
 
 def _fail_once(monkeypatch, method: str, error: Exception):
@@ -118,7 +136,9 @@ def _fail_once(monkeypatch, method: str, error: Exception):
 
 def test_save_config_retente_apres_verrou(tmp_path, monkeypatch):
     path = tmp_path / "config.toml"
-    calls = _fail_once(monkeypatch, "replace", PermissionError("fichier verrouille"))
+    calls = _fail_once(
+        monkeypatch, "replace", PermissionError("fichier verrouille")
+    )
     save_config(path, default_config(), password_env="CHECKMATE_PASSWORD")
     assert calls["count"] >= 2
     assert path.is_file()
@@ -164,7 +184,9 @@ def test_lit_le_canal_beta(tmp_path):
 
 
 def test_alias_include_prerelease(tmp_path):
-    config = load_config(write_config(tmp_path, "[updates]\ninclude_prerelease = true"))
+    config = load_config(
+        write_config(tmp_path, "[updates]\ninclude_prerelease = true")
+    )
     assert config.updates.channel == "beta"
     config = load_config(
         write_config(tmp_path, "[updates]\ninclude_prerelease = false")

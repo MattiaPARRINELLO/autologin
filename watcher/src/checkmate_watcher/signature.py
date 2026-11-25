@@ -7,10 +7,12 @@ import math
 from dataclasses import dataclass
 from pathlib import Path
 
+from .file_io import write_private_json
+
 VALID_KINDS = ("start", "move", "end")
 MIN_PADDING_RATIO = 0.1
 MAX_PADDING_RATIO = 1.0
-# En dessous de cette etendue, le trace n'est qu'un point (clic sans mouvement).
+# Sous cette etendue, le trace n'est qu'un point (clic sans mouvement).
 MIN_EXTENT = 2.0
 
 
@@ -75,9 +77,11 @@ def load_signature(path: Path) -> list[Point]:
 
 def save_signature(path: Path, points: list[Point]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    payload = [{"x": round(p.x, 2), "y": round(p.y, 2), "type": p.kind} for p in points]
-    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
-    path.chmod(0o600)
+    payload = [
+        {"x": round(p.x, 2), "y": round(p.y, 2), "type": p.kind}
+        for p in points
+    ]
+    write_private_json(path, payload)
 
 
 def _point_coords(raw: object) -> tuple[float, float]:
@@ -102,15 +106,22 @@ def _coerce_point(raw: object) -> Point:
     return Point(x=x, y=y, kind=_point_kind(raw))
 
 
-def _require_fit_inputs(points, width: float, height: float, padding: float) -> None:
+def _require_padding(padding: float) -> None:
+    if padding < MIN_PADDING_RATIO or padding > MAX_PADDING_RATIO:
+        raise SignatureError(
+            f"padding_ratio doit etre entre {MIN_PADDING_RATIO} "
+            f"et {MAX_PADDING_RATIO}"
+        )
+
+
+def _require_fit_inputs(
+    points, width: float, height: float, padding: float
+) -> None:
     if not points:
         raise SignatureError("aucun point a mettre a l'echelle")
     if width <= 0 or height <= 0:
         raise SignatureError("dimensions de canvas invalides")
-    if padding < MIN_PADDING_RATIO or padding > MAX_PADDING_RATIO:
-        raise SignatureError(
-            f"padding_ratio doit etre entre {MIN_PADDING_RATIO} et {MAX_PADDING_RATIO}"
-        )
+    _require_padding(padding)
 
 
 def _bounds(points) -> tuple[float, float, float, float]:
@@ -141,7 +152,7 @@ def _fit_point(point, min_x, min_y, offset_x, offset_y, scale, width, height):
 
 
 def fit_points(points, width, height, padding_ratio=0.9) -> list[FittedPoint]:
-    """Centre et met a l'echelle la signature dans un canvas de taille CSS donnee."""
+    """Centre et met a l'echelle la signature dans le canvas CSS."""
     _require_fit_inputs(points, width, height, padding_ratio)
     min_x, max_x, min_y, max_y = _bounds(points)
     offset_x, offset_y, scale = _fit_offsets(

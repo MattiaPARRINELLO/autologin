@@ -10,9 +10,11 @@ Le watcher est un processus unique qui :
 
 1. charge la configuration TOML et la signature ;
 2. decide si la surveillance est autorisee par le planning ;
-3. pilote un Chromium headless avec Playwright pour interroger CESAR ;
+3. detecte les emargements en HTTP leger avec `curl_cffi`, ou dans Chromium en
+   repli ;
 4. demande confirmation a l'utilisateur quand un emargement apparait ;
-5. signe, memorise l'emargement traite et attend le cycle suivant ;
+5. ouvre Chrome uniquement pour signer, memorise l'emargement traite et attend
+   le cycle suivant ;
 6. expose un tableau de bord local (HTTP sur `127.0.0.1`) et une icone de
    notification tant qu'il tourne.
 
@@ -28,6 +30,7 @@ active.
 | `cli.py` | point d'entree `checkmate-watcher` : commandes `run`, `setup`, `status`, `capture`, `self-test`, `update`, `support-bundle`, etc. |
 | `watcher.py` | boucle de surveillance `run_loop`, orchestration des decisions et des signatures |
 | `cesar.py` | `CesarSession` : navigation Playwright, connexion, detection de l'emargement, trace de la signature |
+| `http_session.py` | `HttpCesarSession` : login CSRF/CVEC, detection HTTP, cookie partage et signature a la demande |
 | `browser.py` | choix du navigateur : config, Chromium de Playwright, navigateur systeme |
 | `config.py` | chargement et validation du TOML (`[cesar]`, `[watcher]`, `[schedule]`, `[notifications]`, `[updates]`, `[selectors]`) |
 | `schedule.py` | plages horaires, creneau courant, prochaine ouverture |
@@ -65,18 +68,21 @@ run_loop() [watcher.py]
   |-- planning : hors plage ou creneau deja signe ?
   |     oui -> attendre la prochaine ouverture (tranches de 5 s)
   |
-  |-- CesarSession.open(headless=...) [cesar.py + browser.py]
+  |-- session = HttpCesarSession ou CesarSession [transport]
+  |     HTTP -> login curl_cffi, cookie persistant, aucun Chromium
+  |     navigateur -> CesarSession.open(headless=...)
   |
   v
 boucle toutes les poll_interval secondes
   |
   |-- planning : fin de plage ou creneau deja signe ?
-  |     oui -> fermer le navigateur, attendre, rouvrir
+  |     oui -> fermer la session, attendre, rouvrir
   |
   |-- session.check()  -> AttendanceSignal | None
-  |     - rechargement du tableau de bord
-  |     - recherche du bouton d'emargement
-  |     - identifiant stable de l'emargement
+  |     HTTP -> GET du tableau de bord, parsing des attributs calendrier
+  |     navigateur -> rechargement et recherche du bouton
+  |     erreur HTTP -> notification et repli navigateur
+  |     identifiant stable de l'emargement
   |
   |-- aucun signal -> attendre le cycle suivant
   |
@@ -88,8 +94,11 @@ boucle toutes les poll_interval secondes
   |     SANS REPONSE -> reessayer apres prompt_retry
   |
   |-- sign_with_visibility() : session.sign(points)
+  |     - HTTP -> ouvrir Chrome et injecter PHPSESSID
   |     - eventuellement bascule en navigateur visible
   |     - trace, validation, lecture de la confirmation
+  |     - overlay visuel non interactif retire avant validation
+  |     - HTTP -> refermer Chrome apres la signature
   |
   |-- succes -> state.mark(), compteurs, notification
   |-- erreur Cesar -> compteur d'erreurs, nouvelle tentative plus tard
@@ -98,9 +107,11 @@ boucle toutes les poll_interval secondes
 attendre poll_interval puis recommencer
 ```
 
-Chaque cycle repart d'une page rechargee : c'est ce rafraichissement qui fait
-apparaitre le bouton d'emargement. La detection arrive donc au pire un
-`poll_interval` apres l'ouverture par le formateur.
+En mode HTTP, la detection lit les attributs JSON du calendrier dans la reponse
+CESAR. La signature reste toujours rejouee dans Chrome avec la meme session :
+le cookie `PHPSESSID` est injecte dans le contexte Playwright juste avant la
+signature. Le transport `browser` reste disponible et sert de repli automatique
+si le HTTP echoue, est bloque ou renvoie une page inattendue.
 
 ## Etat et deduplication
 
@@ -179,6 +190,8 @@ configuration exacte des environnements est documentee dans
 
 - Le mot de passe ne passe jamais dans les logs ; il vient du trousseau ou de
   `CHECKMATE_PASSWORD`.
+- Le fichier `http-cookies.json` contient la session CESAR, est limite aux
+  permissions `600` et n'est jamais affiche dans les logs ou les notifications.
 - Les serveurs locaux n'ecoutent que sur `127.0.0.1` et exigent un jeton.
 - La signature est stockee en points, pas en image.
 - Aucun secret n'est ecrit dans la configuration par defaut.

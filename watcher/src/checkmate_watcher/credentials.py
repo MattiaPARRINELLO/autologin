@@ -11,14 +11,16 @@ DEFAULT_SERVICE = "checkmate-watcher"
 
 
 def prefer_keyring() -> bool:
-    """Le trousseau est fiable sur Windows et macOS ; Linux passe par le fichier env."""
+    """Le trousseau est fiable sur Windows/macOS, Linux utilise env."""
     return sys.platform.startswith(("win", "darwin"))
 
 
 def _keyring_module():
     try:
         import keyring
-    except ImportError as exc:  # pragma: no cover - dependance toujours installee
+    except (
+        ImportError
+    ) as exc:  # pragma: no cover - dependance toujours installee
         logger.warning("keyring indisponible : %s", exc)
         return None
     return keyring

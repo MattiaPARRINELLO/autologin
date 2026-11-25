@@ -10,7 +10,9 @@ from checkmate_watcher.support import build_support_bundle
 
 
 def _config_avec_compte(config: Config, tmp_path: Path) -> Config:
-    cesar = replace(config.cesar, username="eleve", password="secret-du-compte")
+    cesar = replace(
+        config.cesar, username="eleve", password="secret-du-compte"
+    )
     signature = replace(config.signature, file=tmp_path / "signature.json")
     return replace(config, cesar=cesar, signature=signature)
 
@@ -38,7 +40,8 @@ def _lire_archive(bundle: Path) -> tuple[list[str], str]:
     with zipfile.ZipFile(bundle) as archive:
         names = archive.namelist()
         content = "\n".join(
-            archive.read(name).decode("utf-8", errors="replace") for name in names
+            archive.read(name).decode("utf-8", errors="replace")
+            for name in names
         )
     return names, content
 

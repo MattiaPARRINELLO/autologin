@@ -62,7 +62,9 @@ def _page_sans_token(base: str) -> int:
 
 
 def _page_avec_token(base: str, token: str, *, timeout: int = 5) -> str:
-    with urllib.request.urlopen(f"{base}/?token={token}", timeout=timeout) as response:
+    with urllib.request.urlopen(
+        f"{base}/?token={token}", timeout=timeout
+    ) as response:
         return response.read().decode()
 
 
@@ -81,7 +83,9 @@ def _attendre_arret(session, *, delai: int = 2) -> bool:
 def _session(tmp_path) -> StatusSession:
     state = StateStore(tmp_path / "state.json")
     config = default_config()
-    return StatusSession(config, tmp_path / "config.toml", state, datetime.now())
+    return StatusSession(
+        config, tmp_path / "config.toml", state, datetime.now()
+    )
 
 
 def _arreter(server, thread) -> None:
@@ -125,7 +129,9 @@ def _verifier_statut(base: str, token: str) -> None:
 
 
 def _verifier_notification(base: str, session) -> None:
-    setattr(session, "test_notification", lambda: {"ok": True, "message": "test"})
+    setattr(
+        session, "test_notification", lambda: {"ok": True, "message": "test"}
+    )
     statut, resultat = _action(base, session.token, "test-notification")
     assert statut == 200
     assert resultat["message"] == "test"

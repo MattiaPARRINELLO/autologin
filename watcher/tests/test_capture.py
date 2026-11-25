@@ -31,7 +31,9 @@ def test_rewrite_assets_resout_les_chemins_relatifs():
 
 
 def test_normalize_login_action_ramene_le_formulaire_sur_connexion():
-    html = '<form id="f" action="https://cesar.fr/login/do" method="post"></form>'
+    html = (
+        '<form id="f" action="https://cesar.fr/login/do" method="post"></form>'
+    )
 
     result = capture.normalize_login_action(html)
 
@@ -46,7 +48,9 @@ def test_rewrite_css_urls_resout_les_chemins_relatifs():
         "https://cesar.fr/f.woff2": "assets/002-f.woff2",
     }
 
-    result = capture.rewrite_css_urls(css, "https://cesar.fr/css/app.css", mapping)
+    result = capture.rewrite_css_urls(
+        css, "https://cesar.fr/css/app.css", mapping
+    )
 
     assert 'url("/assets/001-fond.png")' in result
     assert 'url("/assets/002-f.woff2")' in result
@@ -82,7 +86,9 @@ HAR_RESPONSE = {
 def _har_entree_nettoyee(tmp_path):
     entries = [{"request": HAR_REQUEST, "response": HAR_RESPONSE}]
     path = tmp_path / "network.har"
-    path.write_text(json.dumps({"log": {"entries": entries}}), encoding="utf-8")
+    path.write_text(
+        json.dumps({"log": {"entries": entries}}), encoding="utf-8"
+    )
     capture.strip_har_secrets(path)
     cleaned = json.loads(path.read_text(encoding="utf-8"))
     return cleaned["log"]["entries"][0]
@@ -138,7 +144,9 @@ def test_build_pages_refuse_une_capture_vide():
 
 
 def test_asset_name_neutre_les_caracteres_suspects():
-    name = capture.asset_name("https://cesar.fr/static/img/logo%20ecole.png", 3)
+    name = capture.asset_name(
+        "https://cesar.fr/static/img/logo%20ecole.png", 3
+    )
 
     assert name == "003-logo-20ecole.png"
 
@@ -233,7 +241,9 @@ def test_write_scenario_ecrit_manifeste_et_harness(tmp_path):
 
     capture.write_scenario(tmp_path, "demo")
 
-    manifest = json.loads((tmp_path / "scenario.json").read_text(encoding="utf-8"))
+    manifest = json.loads(
+        (tmp_path / "scenario.json").read_text(encoding="utf-8")
+    )
     assert manifest["name"] == "demo"
     assert manifest["pages"] == {"/connexion": "pages/connexion.html"}
     assert manifest["harness"] == "harness.js"
@@ -245,8 +255,12 @@ def test_write_scenario_ne_remplace_pas_un_harness_existant(tmp_path):
     (tmp_path / "pages" / "connexion.html").write_text(
         "<html></html>", encoding="utf-8"
     )
-    (tmp_path / "harness.js").write_text("// ecrit a la main", encoding="utf-8")
+    (tmp_path / "harness.js").write_text(
+        "// ecrit a la main", encoding="utf-8"
+    )
 
     capture.write_scenario(tmp_path, "demo")
 
-    assert (tmp_path / "harness.js").read_text(encoding="utf-8") == "// ecrit a la main"
+    assert (tmp_path / "harness.js").read_text(
+        encoding="utf-8"
+    ) == "// ecrit a la main"

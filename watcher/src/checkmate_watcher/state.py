@@ -1,4 +1,4 @@
-"""Etat persistant pour eviter de notifier plusieurs fois le meme emargement."""
+"""Etat persistant pour eviter les notifications repetees."""
 
 from __future__ import annotations
 
@@ -23,7 +23,11 @@ def _parse_number_map(value: object) -> dict[str, float]:
 def _parse_meta_map(value: object) -> dict[str, str]:
     if not isinstance(value, dict):
         return {}
-    return {str(key): str(item) for key, item in value.items() if isinstance(item, str)}
+    return {
+        str(key): str(item)
+        for key, item in value.items()
+        if isinstance(item, str)
+    }
 
 
 class StateStore:

@@ -18,12 +18,82 @@ from .signature_diagnostics import SignatureDiagnostics, diagnostics_directory
 
 logger = logging.getLogger(__name__)
 
-SUCCESS_KEYWORDS = ("presence", "prise en compte", "present", "signe", "enregistr")
+SUCCESS_KEYWORDS = (
+    "presence",
+    "prise en compte",
+    "present",
+    "signe",
+    "enregistr",
+)
 
 READY_SELECTORS = (
     ".toastui-calendar-day-view",
     "div.toastui-calendar-layout",
 )
+
+CALENDAR_IDENTITY_JS = """
+() => {
+    const calendar = document.querySelector(
+        '[data-tui-calendar-event-lesson-schedules-value]'
+    );
+    if (!calendar) return {};
+    try {
+        const student = JSON.parse(calendar.getAttribute(
+            'data-tui-calendar-student-registration-value'
+        ) || '{}');
+        const courses = JSON.parse(calendar.getAttribute(
+            'data-tui-calendar-event-lesson-schedules-value'
+        ) || '[]');
+        const maxMinutes = Number(calendar.getAttribute(
+            'data-tui-calendar-max-time-attendance-value'
+        ));
+        const serverNow = Number(calendar.getAttribute(
+            'data-tui-calendar-time-server-value'
+        ));
+        const find = (node, course) => {
+            if (Array.isArray(node)) {
+                for (const item of node) {
+                    const found = find(item, course);
+                    if (found) return found;
+                }
+                return null;
+            }
+            if (!node || typeof node !== 'object') return null;
+            if (Array.isArray(node.attendanceSheetLines)) {
+                for (const line of node.attendanceSheetLines) {
+                    const registration = line.planningGroupSubscription
+                        ?.studentRegistration;
+                    const signed = line.signature?.signed === true
+                        || line.attendanceWithoutSignature === true;
+                    const secondsLeft = Math.round((
+                        line.createdAt + maxMinutes * 60000 - serverNow * 1000
+                    ) / 1000);
+                    if (registration?.uuid === student.uuid
+                        && line.signingOff === true && !signed
+                        && secondsLeft > 0) {
+                        return {
+                            course_uuid: course?.uuid || '',
+                            line_uuid: line.uuid || '',
+                        };
+                    }
+                }
+            }
+            for (const value of Object.values(node)) {
+                const found = find(value, course);
+                if (found) return found;
+            }
+            return null;
+        };
+        for (const course of courses) {
+            const found = find(course, course);
+            if (found) return found;
+        }
+    } catch (error) {
+        return {};
+    }
+    return {};
+}
+"""
 
 # En dessous de ce ratio sur un des deux axes, le trace n'a pas la forme d'une
 # signature, point (clic sans mouvement) ou ligne (canvas mesure pendant une
@@ -44,7 +114,11 @@ INK_SNAPSHOT_JS = """
   if (!width || !height) return false;
   try {
     const data = context.getImageData(0, 0, width, height).data;
-    window.__checkmateInk = { data: new Uint8ClampedArray(data), width, height };
+    window.__checkmateInk = {
+      data: new Uint8ClampedArray(data),
+      width,
+      height,
+    };
     return true;
   } catch (error) {
     return false;
@@ -57,7 +131,10 @@ INK_DIFF_JS = """
   const snapshot = window.__checkmateInk;
   const context = canvas.getContext('2d');
   if (!snapshot || !context) return null;
-  if (canvas.width !== snapshot.width || canvas.height !== snapshot.height) return null;
+  if (
+    canvas.width !== snapshot.width ||
+    canvas.height !== snapshot.height
+  ) return null;
   let data;
   try {
     data = context.getImageData(0, 0, snapshot.width, snapshot.height).data;
@@ -110,6 +187,260 @@ CANVAS_HITTABLE_JS = """
 }
 """
 
+SIGNATURE_OVERLAY_SHOW_JS = """
+(canvas) => {
+  const styleId = 'checkmate-signature-overlay-style';
+  const overlayId = 'checkmate-signature-overlay';
+  if (!document.getElementById(styleId)) {
+    const style = document.createElement('style');
+    style.id = styleId;
+    style.textContent = `
+      #${overlayId} {
+        position: fixed;
+        inset: 0;
+        z-index: 2147483647;
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity 0.35s ease;
+        background:
+          radial-gradient(
+            1200px 600px at 10% 10%, rgba(124,58,237,.20), transparent 60%
+          ),
+          radial-gradient(
+            900px 500px at 90% 90%, rgba(167,139,250,.16), transparent 60%
+          ),
+          repeating-linear-gradient(
+            45deg, rgba(139,92,246,.04) 0 18px, transparent 18px 36px
+          );
+        overflow: hidden;
+      }
+      #${overlayId}.cm-visible { opacity: 1; }
+      #${overlayId} .cm-particles { position: absolute; inset: 0; }
+      #${overlayId} .cm-particle {
+        position: absolute;
+        font-size: 22px;
+        color: rgba(167,139,250,.20);
+        animation: cm-float 7s ease-in-out infinite;
+        user-select: none;
+      }
+      @keyframes cm-float {
+        0%, 100% { transform: translate(0,0) rotate(0deg); opacity: .18; }
+        50% { transform: translate(12px,-18px) rotate(18deg); opacity: .34; }
+      }
+      #${overlayId} .cm-badge {
+        position: absolute;
+        right: 22px;
+        bottom: 22px;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 14px 18px;
+        border-radius: 18px;
+        background: linear-gradient(
+          135deg, rgba(30,20,60,.90), rgba(49,46,129,.82)
+        );
+        border: 1px solid rgba(167,139,250,.55);
+        color: #f5f3ff;
+        font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+        backdrop-filter: blur(10px);
+        box-shadow: 0 12px 40px rgba(88,28,135,.45);
+        animation: cm-badge-float 2.2s ease-in-out infinite;
+      }
+      @keyframes cm-badge-float {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-7px); }
+      }
+      #${overlayId} .cm-board-wrap {
+        position: relative;
+        width: 46px;
+        height: 46px;
+        border-radius: 12px;
+        background: #4c1d95;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 0 18px rgba(124,58,237,.45);
+      }
+      #${overlayId} .cm-board {
+        position: relative;
+        width: 34px;
+        height: 34px;
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        grid-template-rows: repeat(4, 1fr);
+        border-radius: 6px;
+        overflow: hidden;
+        background: #241443;
+      }
+      #${overlayId} .cm-cell { background: #35205f; }
+      #${overlayId} .cm-cell.light { background: #4b2c83; }
+      #${overlayId} .cm-cell.lit { background: #c4b5fd; }
+      #${overlayId} .cm-piece {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 25%;
+        height: 25%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 11px;
+        line-height: 1;
+        color: #fff;
+        text-shadow: 0 1px 2px rgba(0,0,0,.55);
+        z-index: 2;
+        will-change: transform;
+      }
+      #${overlayId} .cm-piece.done { color: #f5d0fe; }
+      #${overlayId} .cm-text {
+        display: flex;
+        flex-direction: column;
+        line-height: 1.15;
+        gap: 2px;
+      }
+      #${overlayId} .cm-title {
+        font-size: 15px;
+        font-weight: 700;
+        background: linear-gradient(90deg, #f5f3ff, #c4b5fd);
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+      }
+      #${overlayId} .cm-sub { font-size: 11px; color: #c4b5fd; }
+      #${overlayId} .cm-progress {
+        width: 100%;
+        height: 3px;
+        border-radius: 2px;
+        background: rgba(255,255,255,.12);
+        overflow: hidden;
+        margin-top: 6px;
+      }
+      #${overlayId} .cm-progress-bar {
+        height: 100%;
+        width: 0;
+        background: #c4b5fd;
+        transition: width 0.08s linear;
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #${overlayId}, #${overlayId} * { animation: none !important; }
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  let overlay = document.getElementById(overlayId);
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = overlayId;
+    const pieces = ['♟','♞','♝','♜','♛'];
+    let particles = '';
+    for (let index = 0; index < 14; index += 1) {
+      const left = Math.round(Math.random() * 100);
+      const top = Math.round(Math.random() * 100);
+      const delay = (Math.random() * 5).toFixed(2);
+      particles += `<span class="cm-particle" style="left:${left}%;` +
+        `top:${top}%;animation-delay:${delay}s">` +
+        `${pieces[index % pieces.length]}</span>`;
+    }
+    let cells = '';
+    for (let index = 0; index < 16; index += 1) {
+      const row = Math.floor(index / 4);
+      const col = index % 4;
+      cells += `<span class="cm-cell${
+        (row + col) % 2 ? ' light' : ''}"></span>`;
+    }
+    overlay.innerHTML = `
+      <div class="cm-particles">${particles}</div>
+      <div class="cm-badge">
+        <div class="cm-board-wrap">
+          <div class="cm-board">${cells}<span class="cm-piece">♞</span></div>
+        </div>
+        <div class="cm-text">
+          <span class="cm-title">CheckMate</span>
+          <span class="cm-sub">Signature en cours…</span>
+          <div class="cm-progress"><div class="cm-progress-bar"></div></div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    requestAnimationFrame(() => overlay.classList.add('cm-visible'));
+  }
+
+  const cutout = () => {
+    const rect = canvas.getBoundingClientRect();
+    const margin = 24;
+    const x1 = Math.max(0, rect.left - margin);
+    const y1 = Math.max(0, rect.top - margin);
+    const x2 = Math.min(window.innerWidth, rect.right + margin);
+    const y2 = Math.min(window.innerHeight, rect.bottom + margin);
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+    overlay.style.clipPath =
+      `polygon(evenodd, 0 0, ${width}px 0, ` +
+      `${width}px ${height}px, 0 ${height}px, 0 0, ` +
+      `${x1}px ${y1}px, ${x1}px ${y2}px, ` +
+      `${x2}px ${y2}px, ${x2}px ${y1}px, ${x1}px ${y1}px)`;
+  };
+  cutout();
+  window.__checkmateSignatureCutout = cutout;
+
+  let lastIndex = -1;
+  const path = [
+    [0,3],[1,3],[2,3],[3,3],
+    [3,2],[2,2],[1,2],[0,2],
+    [0,1],[1,1],[2,1],[3,1],
+    [3,0],[2,0],[1,0],[0,0],
+  ];
+  window.__checkmateSignatureProgress = (value) => {
+    const progress = Math.max(0, Math.min(1, value));
+    const index = Math.min(15, Math.floor(progress * 16));
+    const piece = overlay.querySelector('.cm-piece');
+    const cells = overlay.querySelectorAll('.cm-cell');
+    const bar = overlay.querySelector('.cm-progress-bar');
+    const sub = overlay.querySelector('.cm-sub');
+    if (bar) bar.style.width = `${progress * 100}%`;
+    if (sub) {
+      sub.textContent = progress >= 1
+        ? 'Signature jouée'
+        : `Signature en cours… ${Math.round(progress * 100)} %`;
+    }
+    if (!piece || !cells.length) return;
+    if (index !== lastIndex) {
+      lastIndex = index;
+      const [col, row] = path[index];
+      piece.style.transform = `translate(${col * 100}%, ${row * 100}%)`;
+      cells.forEach((cell, cellIndex) => {
+        cell.classList.toggle('lit', cellIndex <= index);
+      });
+    }
+    if (progress >= 1) {
+      piece.textContent = '♛';
+      piece.classList.add('done');
+    }
+  };
+  return true;
+}
+"""
+
+SIGNATURE_OVERLAY_PROGRESS_JS = """
+(progress) => {
+  if (window.__checkmateSignatureProgress) {
+    window.__checkmateSignatureProgress(progress);
+  }
+  return true;
+}
+"""
+
+SIGNATURE_OVERLAY_REMOVE_JS = """
+() => {
+  window.__checkmateSignatureProgress = null;
+  window.__checkmateSignatureCutout = null;
+  document.getElementById('checkmate-signature-overlay')?.remove();
+  document.getElementById('checkmate-signature-overlay-style')?.remove();
+  return true;
+}
+"""
+
 EVENT_DRAW_JS = """
 async (canvas, coordinates) => {
   const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -127,7 +458,10 @@ async (canvas, coordinates) => {
     };
     for (const [key, value] of Object.entries(values)) {
       try {
-        Object.defineProperty(event, key, { configurable: true, get: () => value });
+        Object.defineProperty(event, key, {
+          configurable: true,
+          get: () => value,
+        });
       } catch (error) {
         // Certaines implementations verrouillent deja ces proprietes.
       }
@@ -149,7 +483,9 @@ async (canvas, coordinates) => {
       buttons,
     };
     const names = { down: 'mousedown', move: 'mousemove', up: 'mouseup' };
-    canvas.dispatchEvent(withOffsets(new MouseEvent(names[kind], options), x, y));
+    canvas.dispatchEvent(
+      withOffsets(new MouseEvent(names[kind], options), x, y)
+    );
     try {
       canvas.dispatchEvent(
         withOffsets(
@@ -170,14 +506,20 @@ async (canvas, coordinates) => {
   };
 
   const first = coordinates[0];
+  const progress = window.__checkmateSignatureProgress;
+  if (progress) progress(0);
   fire('down', first[0], first[1], 1);
   for (let index = 1; index < coordinates.length; index += 1) {
     await delay(8);
     fire('move', coordinates[index][0], coordinates[index][1], 1);
+    if (progress) {
+      progress(index / Math.max(1, coordinates.length - 1));
+    }
   }
   await delay(8);
   const last = coordinates[coordinates.length - 1];
   fire('up', last[0], last[1], 0);
+  if (progress) progress(1);
   return true;
 }
 """
@@ -221,13 +563,25 @@ def _ink_ratio(ink: dict, low: str, high: str, size: str) -> float:
     return (ink.get(high, -1) - ink.get(low, 0)) / max(1, ink.get(size, 1))
 
 
-def signal_key(payload: dict[str, str]) -> str:
-    """Cle stable pour dedupliquer un emargement entre deux rafraichissements."""
+def _hash_signal_basis(basis: str) -> str:
+    return hashlib.sha256(basis.encode("utf-8")).hexdigest()[:16]
+
+
+def _fallback_signal_key(payload: dict[str, str]) -> str:
     action = _signal_text(payload.get("action"))
     row = _signal_text(payload.get("row"))
     label = _signal_text(payload.get("label"))
     basis = "|".join([date.today().isoformat(), action or label, row])
-    return hashlib.sha256(basis.encode("utf-8")).hexdigest()[:16]
+    return _hash_signal_basis(basis)
+
+
+def signal_key(payload: dict[str, str]) -> str:
+    """Cle stable pour dedupliquer un emargement entre deux cycles."""
+    course_uuid = _signal_text(payload.get("course_uuid"))
+    line_uuid = _signal_text(payload.get("line_uuid"))
+    if course_uuid and line_uuid:
+        return _hash_signal_basis(f"{course_uuid}|{line_uuid}")
+    return _fallback_signal_key(payload)
 
 
 class CesarSession:
@@ -242,19 +596,23 @@ class CesarSession:
     async def open(self, headless: bool | None = None) -> None:
         from playwright.async_api import async_playwright
 
-        self.headless = self.config.watcher.headless if headless is None else headless
+        self.headless = (
+            self.config.watcher.headless if headless is None else headless
+        )
         self.config.watcher.profile_dir.mkdir(parents=True, exist_ok=True)
         self._playwright = await async_playwright().start()
         options = resolve_launch_options(
             self._playwright.chromium,
             self.config.watcher.executable_path,
         ).as_kwargs()
-        self._context = await self._playwright.chromium.launch_persistent_context(
-            user_data_dir=str(self.config.watcher.profile_dir),
-            headless=self.headless,
-            viewport={"width": 1366, "height": 900},
-            args=["--no-first-run", "--no-default-browser-check"],
-            **options,
+        self._context = (
+            await self._playwright.chromium.launch_persistent_context(
+                user_data_dir=str(self.config.watcher.profile_dir),
+                headless=self.headless,
+                viewport={"width": 1366, "height": 900},
+                args=["--no-first-run", "--no-default-browser-check"],
+                **options,
+            )
         )
         self._context.set_default_timeout(20000)
         pages = self._context.pages
@@ -269,7 +627,8 @@ class CesarSession:
     async def switch_headless(self, headless: bool) -> None:
         """Relance le navigateur dans le mode demande.
 
-        Le profil persistant conserve la session, donc aucunlogin n'est necessaire.
+        Le profil persistant conserve la session, donc aucun login
+        n'est necessaire.
         """
         if self._context is not None and self.headless == headless:
             return
@@ -307,7 +666,9 @@ class CesarSession:
         )
         await self._find_with_wait(selectors, timeout_ms)
 
-    async def _find_with_wait(self, selectors: tuple[str, ...], timeout_ms: int):
+    async def _find_with_wait(
+        self, selectors: tuple[str, ...], timeout_ms: int
+    ):
         if self.page is None:
             return None
         deadline = asyncio.get_running_loop().time() + timeout_ms / 1000
@@ -327,7 +688,9 @@ class CesarSession:
                 if await locator.count() and await locator.is_visible():
                     return locator
             except Exception:
-                logger.debug("selecteur %s non exploitable", selector, exc_info=True)
+                logger.debug(
+                    "selecteur %s non exploitable", selector, exc_info=True
+                )
                 continue
         return None
 
@@ -396,19 +759,29 @@ class CesarSession:
         await self._goto_dashboard()
         await self._ensure_logged_in()
 
-        button = await self._find_with_wait(self.selectors.attendance_button, 1500)
+        button = await self._find_with_wait(
+            self.selectors.attendance_button, 1500
+        )
         if button is None:
-            logger.debug("aucun bouton d'emargement visible apres rafraichissement")
+            logger.debug(
+                "aucun bouton d'emargement visible apres rafraichissement"
+            )
             return None
 
         try:
             payload = await button.evaluate(
                 """(el) => {
                     const attrs = {};
-                    for (const attr of el.attributes) attrs[attr.name] = attr.value;
-                    const row = el.closest('tr, li, .card, [data-course-id], [data-session-id]');
+                    for (const attr of el.attributes) {
+                      attrs[attr.name] = attr.value;
+                    }
+                    const row = el.closest(
+                      'tr, li, .card, [data-course-id], [data-session-id]'
+                    );
                     return {
-                        action: attrs['data-live-action-param'] || attrs['data-course-id'] || attrs['data-session-id'] || '',
+                        action: attrs['data-live-action-param'] ||
+                          attrs['data-course-id'] ||
+                          attrs['data-session-id'] || '',
                         row: row ? (row.innerText || '').slice(0, 300) : '',
                         label: (el.innerText || '').trim(),
                     };
@@ -416,6 +789,14 @@ class CesarSession:
             )
         except Exception:
             payload = {"action": "", "row": "", "label": ""}
+
+        try:
+            identity = await self.page.evaluate(CALENDAR_IDENTITY_JS)
+            payload.update(identity)
+        except Exception:
+            logger.debug(
+                "identifiants calendrier indisponibles", exc_info=True
+            )
 
         label = (payload.get("label") or "").strip() or "Emargement ouvert"
         key = signal_key(payload)
@@ -435,7 +816,9 @@ class CesarSession:
             raise SignError("bouton d'emargement introuvable")
 
         await button.click()
-        canvas = await self._wait_for_selector(self.selectors.signature_canvas, 20000)
+        canvas = await self._wait_for_selector(
+            self.selectors.signature_canvas, 20000
+        )
         try:
             await canvas.scroll_into_view_if_needed(timeout=2000)
         except Exception:
@@ -469,10 +852,13 @@ class CesarSession:
             raise SignError("aucune confirmation affichee apres la signature")
         logger.info("confirmation du site : %s", confirmation)
 
-        hidden = await self._wait_for_hidden(self.selectors.attendance_button, 15000)
+        hidden = await self._wait_for_hidden(
+            self.selectors.attendance_button, 15000
+        )
         elapsed = time.monotonic() - started
         if not hidden:
-            # Sur le vrai CESAR, apres l'enregistrement un nouveau popup s'ouvre
+            # Sur le vrai CESAR, apres l'enregistrement un nouveau
+            # popup s'ouvre
             # et ferme l'ancien sans retirer le bouton d'emargement du DOM. On
             # rafraichit alors la page : si l'emargement a bien ete pris en
             # compte, le bouton n'est plus present.
@@ -489,13 +875,17 @@ class CesarSession:
                     logger.debug("rafraichissement impossible", exc_info=True)
             if self.page is not None:
                 await self.page.wait_for_timeout(500)
-            still_visible = await self._first_visible(self.selectors.attendance_button)
+            still_visible = await self._first_visible(
+                self.selectors.attendance_button
+            )
             if still_visible is not None:
                 raise SignError(
-                    "bouton d'emargement toujours visible 15 s apres la signature"
+                    "bouton d'emargement toujours visible "
+                    "15 s apres la signature"
                 )
             logger.info(
-                "bouton disparu apres rafraichissement, emargement pris en compte"
+                "bouton disparu apres rafraichissement, "
+                "emargement pris en compte"
             )
         logger.info(
             "bouton d'emargement disparu apres %.1f s (confirmation : %s)",
@@ -535,6 +925,19 @@ class CesarSession:
         points: list[Point],
         diagnostics: SignatureDiagnostics,
     ) -> None:
+        await self._signature_overlay(canvas, True)
+        try:
+            await self._draw_checked_inner(canvas, box, points, diagnostics)
+        finally:
+            await self._signature_overlay(canvas, False)
+
+    async def _draw_checked_inner(
+        self,
+        canvas,
+        box: dict,
+        points: list[Point],
+        diagnostics: SignatureDiagnostics,
+    ) -> None:
         """Rejoue la signature puis verifie qu'elle est vraiment dessinee.
 
         Un canvas mesure pendant une animation, ou un enchainement d'evenements
@@ -564,10 +967,15 @@ class CesarSession:
             "trace incomplet sur le canvas CESAR (%s), nouvelle tentative", ink
         )
         retry_box = await self._stable_box(canvas)
-        if retry_box is None or retry_box["width"] <= 0 or retry_box["height"] <= 0:
+        if (
+            retry_box is None
+            or retry_box["width"] <= 0
+            or retry_box["height"] <= 0
+        ):
             raise SignError("canvas de signature sans dimensions")
         await canvas.evaluate(
-            EVENT_DRAW_JS, draw_coordinates(self._fit_points(points, retry_box))
+            EVENT_DRAW_JS,
+            draw_coordinates(self._fit_points(points, retry_box)),
         )
         await self.page.wait_for_timeout(200)
         ink = await canvas.evaluate(INK_DIFF_JS)
@@ -580,11 +988,14 @@ class CesarSession:
                 "(trace reduit a un point ou a une ligne)"
             )
 
-    async def _wait_until_hittable(self, canvas, timeout_ms: int = 3000) -> bool:
+    async def _wait_until_hittable(
+        self, canvas, timeout_ms: int = 3000
+    ) -> bool:
         """Attend que l'animation de la popup decouvre le canvas.
 
         Pendant l'animation, une couche du site peut recouvrir le canvas : les
-        clics de la souris partent alors sur cette couche et le trace est perdu.
+        clics de la souris partent alors sur cette couche et le trace
+        est perdu.
         """
         if self.page is None:
             return await self._canvas_is_hittable(canvas)
@@ -597,7 +1008,9 @@ class CesarSession:
                 return True
             waited = True
             await self.page.wait_for_timeout(100)
-        logger.warning("canvas de signature encore recouvert apres %sms", timeout_ms)
+        logger.warning(
+            "canvas de signature encore recouvert apres %sms", timeout_ms
+        )
         return False
 
     async def _canvas_is_hittable(self, canvas) -> bool:
@@ -630,20 +1043,52 @@ class CesarSession:
         extent_y = _ink_ratio(ink, "minY", "maxY", "height")
         return min(extent_x, extent_y) < MIN_INK_RATIO
 
+    async def _signature_overlay(self, canvas, active: bool) -> None:
+        script = (
+            SIGNATURE_OVERLAY_SHOW_JS
+            if active
+            else SIGNATURE_OVERLAY_REMOVE_JS
+        )
+        try:
+            await canvas.evaluate(script)
+        except Exception:
+            logger.debug("overlay de signature indisponible", exc_info=True)
+
+    async def _signature_overlay_progress(self, progress: float) -> None:
+        if self.page is None:
+            return
+        try:
+            await self.page.evaluate(SIGNATURE_OVERLAY_PROGRESS_JS, progress)
+        except Exception:
+            logger.debug(
+                "progression de l'overlay indisponible", exc_info=True
+            )
+
     async def _draw(self, box: dict, points: list[FittedPoint]) -> None:
         if self.page is None:
             raise SignError("navigateur non demarre")
         first = points[0]
         await self.page.mouse.move(box["x"] + first.x, box["y"] + first.y)
         await self.page.mouse.down()
-        for point in points[1:]:
-            await self.page.mouse.move(box["x"] + point.x, box["y"] + point.y, steps=2)
+        total = max(1, len(points) - 1)
+        last_percent = -1
+        for index, point in enumerate(points[1:], start=1):
+            await self.page.mouse.move(
+                box["x"] + point.x, box["y"] + point.y, steps=2
+            )
             await asyncio.sleep(0.008)
+            percent = index * 100 // total
+            if percent != last_percent:
+                last_percent = percent
+                await self._signature_overlay_progress(percent / 100)
         last = points[-1]
         await self.page.mouse.move(box["x"] + last.x, box["y"] + last.y)
         await self.page.mouse.up()
+        await self._signature_overlay_progress(1.0)
 
-    async def _wait_for_selector(self, selectors: tuple[str, ...], timeout_ms: int):
+    async def _wait_for_selector(
+        self, selectors: tuple[str, ...], timeout_ms: int
+    ):
         if self.page is None:
             raise SignError("navigateur non demarre")
         deadline = asyncio.get_running_loop().time() + timeout_ms / 1000
@@ -653,7 +1098,8 @@ class CesarSession:
                 return locator
             await self.page.wait_for_timeout(250)
         raise SignError(
-            f"element introuvable apres {timeout_ms}ms : {' | '.join(selectors)}"
+            f"element introuvable apres {timeout_ms}ms : "
+            f"{' | '.join(selectors)}"
         )
 
     async def _wait_for_hidden(

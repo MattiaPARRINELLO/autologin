@@ -19,6 +19,7 @@ from urllib.parse import urlparse
 from . import __version__
 from .autostart import current_executable
 from .config import Config, save_updates_channel
+from .file_io import write_private_json
 from .local_http import LocalError, LocalHandler
 from .local_http import create_server as _create_server
 from .notifications import Notifier
@@ -26,11 +27,26 @@ from .paths import data_dir, default_log_file
 from .self_update import update_now
 from .status_data import build_snapshot
 from .status_ui import STATUS_HTML
-from .updates import BETA_CHANNEL, STABLE_CHANNEL, UpdateError, check_for_update
+from .updates import (
+    BETA_CHANNEL,
+    STABLE_CHANNEL,
+    UpdateError,
+    check_for_update,
+)
 
 logger = logging.getLogger(__name__)
 
 RUNTIME_NAME = "runtime.json"
+BETA_MESSAGE = (
+    "Canal beta active. Les mises a jour arrivent souvent et la "
+    "stabilite du projet n'est pas garantie."
+)
+BETA_ON_STABLE_MESSAGE = (
+    "Canal stable active. Tu restes sur cette version beta : les "
+    "prochaines betas ne seront plus proposees, et la prochaine "
+    "version stable te sera proposee."
+)
+STABLE_MESSAGE = "Canal stable active : mises a jour moins frequentes."
 
 
 class StatusError(LocalError):
@@ -69,17 +85,10 @@ ACTIONS_BY_NAME = {action.name: action for action in ACTIONS}
 
 def _channel_message(channel: str) -> str:
     if channel == BETA_CHANNEL:
-        return (
-            "Canal beta active. Les mises a jour arrivent souvent et la "
-            "stabilite du projet n'est pas garantie."
-        )
+        return BETA_MESSAGE
     if "-beta" in __version__:
-        return (
-            "Canal stable active. Tu restes sur cette version beta : les "
-            "prochaines betas ne seront plus proposees, et la prochaine "
-            "version stable te sera proposee."
-        )
-    return "Canal stable active : mises a jour moins frequentes."
+        return BETA_ON_STABLE_MESSAGE
+    return STABLE_MESSAGE
 
 
 def _update_payload(release, reason) -> dict:
@@ -141,8 +150,7 @@ def _ensure_runtime_dir(path: Path) -> None:
 
 
 def _write_runtime_file(path: Path, payload: dict) -> None:
-    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
-    path.chmod(0o600)
+    write_private_json(path, payload)
 
 
 def write_runtime(session: StatusSession) -> None:
@@ -232,14 +240,18 @@ class StatusSession:
     def _send_test_notification(self, notifier: Notifier) -> bool:
         return notifier.send(
             "CheckMate",
-            "Test de notification. Si tu ne la vois pas, coupe le mode silencieux.",
+            "Test de notification. Si tu ne la vois pas, "
+            "coupe le mode silencieux.",
             urgency="normal",
         )
 
     def _test_notification_result(self) -> dict:
         return {
             "ok": True,
-            "message": "Notification envoyée. Si tu ne la vois pas, coupe le mode silencieux.",
+            "message": (
+                "Notification envoyée. Si tu ne la vois pas, "
+                "coupe le mode silencieux."
+            ),
         }
 
     def test_notification(self) -> dict:
@@ -313,7 +325,9 @@ class StatusSession:
         try:
             subprocess.Popen(self._build_assistant_command(), close_fds=True)
         except OSError as exc:
-            raise StatusError(f"impossible de lancer l'assistant : {exc}") from exc
+            raise StatusError(
+                f"impossible de lancer l'assistant : {exc}"
+            ) from exc
 
     def _assistant_started_response(self) -> dict:
         return {
@@ -330,7 +344,9 @@ class StatusSession:
         try:
             self._launch_log_folder(folder)
         except OSError as exc:
-            raise StatusError(f"impossible d'ouvrir le dossier : {exc}") from exc
+            raise StatusError(
+                f"impossible d'ouvrir le dossier : {exc}"
+            ) from exc
         return {"ok": True, "message": f"Dossier ouvert : {folder}"}
 
     def _log_folder(self):
@@ -356,7 +372,11 @@ class StatusSession:
         if desired not in {STABLE_CHANNEL, BETA_CHANNEL}:
             raise StatusError("canal inconnu")
         self.config = save_updates_channel(self.config_path, desired)
-        return {"ok": True, "channel": desired, "message": _channel_message(desired)}
+        return {
+            "ok": True,
+            "channel": desired,
+            "message": _channel_message(desired),
+        }
 
     def action(self, name: str, payload: dict | None = None) -> dict:
         action = ACTIONS_BY_NAME.get(name)

@@ -48,9 +48,13 @@ def _assert_lignes(out, channel, branch, version, prerelease):
 
 def test_sortie_github(capsys):
     tag = "watcher-v0.7.0-beta.2"
-    _assert_lignes(_sortie_pour_tag(capsys, tag), "beta", "beta", "0.7.0", "true")
+    _assert_lignes(
+        _sortie_pour_tag(capsys, tag), "beta", "beta", "0.7.0", "true"
+    )
     tag = "watcher-v0.7.0"
-    _assert_lignes(_sortie_pour_tag(capsys, tag), "stable", "main", "0.7.0", "false")
+    _assert_lignes(
+        _sortie_pour_tag(capsys, tag), "stable", "main", "0.7.0", "false"
+    )
 
 
 def test_tag_invalide_retourne_une_erreur(capsys):

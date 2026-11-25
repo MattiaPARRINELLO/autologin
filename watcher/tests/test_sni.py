@@ -30,7 +30,9 @@ def test_argb32_ordre_des_canaux():
 
 
 def test_menu_modele_structure():
-    model = sni.MenuModel([("Ouvrir", lambda: None), None, ("Quitter", lambda: None)])
+    model = sni.MenuModel(
+        [("Ouvrir", lambda: None), None, ("Quitter", lambda: None)]
+    )
     revision, layout = model.layout(0)
     assert revision == 1
     root_id, root_properties, children = layout
@@ -45,7 +47,9 @@ def test_menu_modele_structure():
 def test_menu_modele_marshalling():
     from dbus_next._private.marshaller import Marshaller
 
-    model = sni.MenuModel([("Ouvrir", lambda: None), None, ("Quitter", lambda: None)])
+    model = sni.MenuModel(
+        [("Ouvrir", lambda: None), None, ("Quitter", lambda: None)]
+    )
     revision, layout = model.layout(0)
     Marshaller("u(ia{sv}av)", [revision, layout])
     Marshaller("a(ia{sv})", [model.group_properties([])])

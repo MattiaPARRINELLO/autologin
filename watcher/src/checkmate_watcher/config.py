@@ -18,6 +18,7 @@ from .analytics import DEFAULT_ENDPOINT as DEFAULT_ANALYTICS_ENDPOINT
 from .credentials import DEFAULT_SERVICE
 from .credentials import get_password as get_keyring_password
 from .paths import (
+    default_http_cookies_file,
     default_profile_dir,
     default_signature_path,
     default_state_file,
@@ -122,6 +123,7 @@ class WatcherConfig:
     dedupe_ttl: int = 3600
     confirm_timeout: int = 180
     prompt_retry: int = 300
+    transport: str = "http"
     auto_sign: bool = False
     auto_sign_delay: int = 20
     headless: bool = False
@@ -129,6 +131,7 @@ class WatcherConfig:
     executable_path: str | None = None
     profile_dir: Path = field(default_factory=default_profile_dir)
     state_file: Path = field(default_factory=default_state_file)
+    http_cookies_file: Path = field(default_factory=default_http_cookies_file)
 
 
 @dataclass(frozen=True)
@@ -156,7 +159,9 @@ class AnalyticsConfig:
 def _legacy_channel(table: dict) -> str | None:
     if "include_prerelease" not in table:
         return None
-    return BETA_CHANNEL if bool(table["include_prerelease"]) else STABLE_CHANNEL
+    return (
+        BETA_CHANNEL if bool(table["include_prerelease"]) else STABLE_CHANNEL
+    )
 
 
 def _normalize_channel(raw: object) -> str:
@@ -171,7 +176,7 @@ def _validate_channel(channel: str) -> str:
 
 
 def parse_updates_channel(table: dict) -> str:
-    """Lit `[updates] channel`, avec `include_prerelease` en alias historique."""
+    """Lit le canal, avec `include_prerelease` comme alias historique."""
     raw = table.get("channel")
     if raw is None:
         legacy = _legacy_channel(table)
@@ -299,7 +304,9 @@ def _with_secret(data: dict, password=None, password_env=None) -> dict:
     return data
 
 
-def _cesar_to_dict(cesar: CesarConfig, password=None, password_env=None) -> dict:
+def _cesar_to_dict(
+    cesar: CesarConfig, password=None, password_env=None
+) -> dict:
     data = {
         "base_url": cesar.base_url,
         "login_path": cesar.login_path,
@@ -310,19 +317,40 @@ def _cesar_to_dict(cesar: CesarConfig, password=None, password_env=None) -> dict
     return _with_secret(data, password, password_env)
 
 
+WATCHER_SCALARS = (
+    "poll_interval",
+    "dedupe_ttl",
+    "confirm_timeout",
+    "prompt_retry",
+    "transport",
+)
+WATCHER_FLAGS = ("auto_sign", "auto_sign_delay", "headless", "visible_on_sign")
+
+
+def _watcher_paths(watcher: WatcherConfig) -> dict:
+    return {
+        "profile_dir": str(watcher.profile_dir),
+        "state_file": str(watcher.state_file),
+        "http_cookies_file": str(watcher.http_cookies_file),
+    }
+
+
 def _watcher_to_dict(watcher: WatcherConfig) -> dict:
-    scalars = ("poll_interval", "dedupe_ttl", "confirm_timeout", "prompt_retry")
-    flags = ("auto_sign", "auto_sign_delay", "headless", "visible_on_sign")
-    data = {name: getattr(watcher, name) for name in scalars + flags}
-    data["profile_dir"] = str(watcher.profile_dir)
-    data["state_file"] = str(watcher.state_file)
+    data = {
+        name: getattr(watcher, name)
+        for name in WATCHER_SCALARS + WATCHER_FLAGS
+    }
+    data.update(_watcher_paths(watcher))
     if watcher.executable_path:
         data["executable_path"] = watcher.executable_path
     return data
 
 
 def _signature_to_dict(signature: SignatureConfig) -> dict:
-    return {"file": str(signature.file), "padding_ratio": signature.padding_ratio}
+    return {
+        "file": str(signature.file),
+        "padding_ratio": signature.padding_ratio,
+    }
 
 
 def _notifications_to_dict(notifications: NotificationConfig) -> dict:
@@ -354,7 +382,9 @@ def _remaining_sections(config: Config) -> dict:
     }
 
 
-def config_to_dict(config: Config, *, password=None, password_env=None) -> dict:
+def config_to_dict(
+    config: Config, *, password=None, password_env=None
+) -> dict:
     sections = {
         "cesar": _cesar_to_dict(config.cesar, password, password_env),
         "watcher": _watcher_to_dict(config.watcher),
@@ -439,6 +469,12 @@ def _write_config_atomically(target: Path, payload: str) -> Path:
         _discard_temp(temporary)
 
 
+def _prepare_config_target(path: str | Path) -> Path:
+    target = expand_path(str(path))
+    target.parent.mkdir(parents=True, exist_ok=True)
+    return target
+
+
 def save_config(
     path: str | Path,
     config: Config,
@@ -446,16 +482,18 @@ def save_config(
     password: str | None = None,
     password_env: str | None = None,
 ) -> Path:
-    """Ecrit la configuration de facon atomique, lisible par l'utilisateur seul."""
-    target = expand_path(str(path))
-    target.parent.mkdir(parents=True, exist_ok=True)
-    payload = _config_payload(config, password=password, password_env=password_env)
+    target = _prepare_config_target(path)
+    payload = _config_payload(
+        config, password=password, password_env=password_env
+    )
     return _write_config_atomically(target, payload)
 
 
 def _read_toml(config_path: Path) -> dict:
     if not config_path.is_file():
-        raise ConfigError(f"fichier de configuration introuvable : {config_path}")
+        raise ConfigError(
+            f"fichier de configuration introuvable : {config_path}"
+        )
     with config_path.open("rb") as handle:
         return tomllib.load(handle)
 
@@ -469,7 +507,9 @@ def _table(data: dict, name: str) -> dict:
 
 def _http(value: str, name: str, key: str) -> str:
     if not value.startswith(("http://", "https://")):
-        raise ConfigError(f"[{name}] {key} doit commencer par http:// ou https://")
+        raise ConfigError(
+            f"[{name}] {key} doit commencer par http:// ou https://"
+        )
     return value
 
 
@@ -510,25 +550,54 @@ def _load_cesar(data: dict, *, require_password: bool) -> CesarConfig:
     return _build_cesar(table, base_url, username, password, service)
 
 
-def _watcher_timing(table: dict, defaults: WatcherConfig) -> dict:
+def _watcher_auto_config(table: dict, defaults: WatcherConfig) -> dict:
     return {
+        "auto_sign": _bool(table, "auto_sign", defaults.auto_sign),
+        "auto_sign_delay": _int(
+            table, "auto_sign_delay", defaults.auto_sign_delay
+        ),
+    }
+
+
+def _watcher_timing(table: dict, defaults: WatcherConfig) -> dict:
+    data = {
         "poll_interval": _int(table, "poll_interval", defaults.poll_interval),
         "dedupe_ttl": _int(table, "dedupe_ttl", defaults.dedupe_ttl),
-        "confirm_timeout": _int(table, "confirm_timeout", defaults.confirm_timeout),
+        "confirm_timeout": _int(
+            table, "confirm_timeout", defaults.confirm_timeout
+        ),
         "prompt_retry": _int(table, "prompt_retry", defaults.prompt_retry),
-        "auto_sign": _bool(table, "auto_sign", defaults.auto_sign),
-        "auto_sign_delay": _int(table, "auto_sign_delay", defaults.auto_sign_delay),
     }
+    data.update(_watcher_auto_config(table, defaults))
+    return data
+
+
+def _watcher_path_config(table: dict, defaults: WatcherConfig) -> dict:
+    return {
+        "profile_dir": _path(table, "profile_dir", defaults.profile_dir),
+        "state_file": _path(table, "state_file", defaults.state_file),
+        "http_cookies_file": _path(
+            table, "http_cookies_file", defaults.http_cookies_file
+        ),
+    }
+
+
+def _watcher_transport(table: dict, defaults: WatcherConfig) -> str:
+    raw = table.get("transport", defaults.transport)
+    return str(raw).strip().lower()
 
 
 def _watcher_flags(table: dict, defaults: WatcherConfig) -> dict:
-    return {
+    data = {
         "headless": _bool(table, "headless", defaults.headless),
-        "visible_on_sign": _bool(table, "visible_on_sign", defaults.visible_on_sign),
+        "visible_on_sign": _bool(
+            table, "visible_on_sign", defaults.visible_on_sign
+        ),
         "executable_path": _opt_str(table, "executable_path"),
-        "profile_dir": _path(table, "profile_dir", defaults.profile_dir),
-        "state_file": _path(table, "state_file", defaults.state_file),
+        "transport": _watcher_transport(table, defaults),
     }
+    data.update(_watcher_path_config(table, defaults))
+    return data
 
 
 def _load_watcher(data: dict) -> WatcherConfig:
@@ -544,7 +613,9 @@ def _load_signature(data: dict) -> SignatureConfig:
     defaults = SignatureConfig()
     return SignatureConfig(
         file=_path(table, "file", defaults.file),
-        padding_ratio=float(table.get("padding_ratio", defaults.padding_ratio)),
+        padding_ratio=float(
+            table.get("padding_ratio", defaults.padding_ratio)
+        ),
     )
 
 
@@ -600,13 +671,23 @@ def _validate_padding(signature: SignatureConfig) -> None:
         )
 
 
-def _validate_limits(watcher: WatcherConfig, signature: SignatureConfig) -> None:
+def _validate_watcher(watcher: WatcherConfig) -> None:
+    if watcher.transport not in {"browser", "http"}:
+        raise ConfigError(
+            "[watcher] transport doit valoir 'browser' ou 'http'"
+        )
     if watcher.poll_interval < 10:
         raise ConfigError("[watcher] poll_interval doit etre >= 10 secondes")
     if watcher.confirm_timeout < 10:
         raise ConfigError("[watcher] confirm_timeout doit etre >= 10 secondes")
     if watcher.prompt_retry < 30:
         raise ConfigError("[watcher] prompt_retry doit etre >= 30 secondes")
+
+
+def _validate_limits(
+    watcher: WatcherConfig, signature: SignatureConfig
+) -> None:
+    _validate_watcher(watcher)
     _validate_padding(signature)
 
 

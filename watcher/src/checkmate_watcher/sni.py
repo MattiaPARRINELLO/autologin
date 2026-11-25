@@ -19,7 +19,12 @@ logger = logging.getLogger(__name__)
 
 try:
     from dbus_next.constants import PropertyAccess
-    from dbus_next.service import ServiceInterface, dbus_property, method, signal
+    from dbus_next.service import (
+        ServiceInterface,
+        dbus_property,
+        method,
+        signal,
+    )
 
     HAS_DBUS = True
 except Exception:  # dependance optionnelle hors Linux
@@ -76,7 +81,7 @@ def _framed(image, size: int):
 
 
 def pixmaps(image, sizes: tuple[int, ...] = (64, 32)) -> list:
-    """Prepare les pixmaps attendus par IconPixmap : (largeur, hauteur, ARGB32)."""
+    """Prepare les pixmaps IconPixmap : (largeur, hauteur, ARGB32)."""
     return [[size, size, _argb32(_framed(image, size))] for size in sizes]
 
 
@@ -402,18 +407,32 @@ class SniTray:
         await self._bus.request_name(name)
 
         introspection = await self._bus.introspect(WATCHER_NAME, WATCHER_PATH)
-        proxy = self._bus.get_proxy_object(WATCHER_NAME, WATCHER_PATH, introspection)
+        proxy = self._bus.get_proxy_object(
+            WATCHER_NAME, WATCHER_PATH, introspection
+        )
         watcher = proxy.get_interface(WATCHER_NAME)
         await watcher.call_register_status_notifier_item(name)
         logger.info("icone StatusNotifierItem enregistree")
 
-    def update(
-        self, title: str, pixmaps: list, status: str = "Active", label: str = ""
+    def _update_state(
+        self, title: str, pixmaps: list, status: str, label: str
     ) -> None:
         self.state.title = title
         self.state.label = label
         self.state.pixmaps = pixmaps
         self.state.status = status
+
+    def update(
+        self,
+        title: str,
+        pixmaps: list,
+        status: str = "Active",
+        label: str = "",
+    ) -> None:
+        self._update_state(title, pixmaps, status, label)
+        self._schedule_updates()
+
+    def _schedule_updates(self) -> None:
         if self._loop is None or self._item is None:
             return
         self._loop.call_soon_threadsafe(self._emit_updates)

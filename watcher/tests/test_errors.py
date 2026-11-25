@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from checkmate_watcher.cesar import LoginError, SignError
+from checkmate_watcher.cesar import CesarError, LoginError, SignError
 from checkmate_watcher.errors import MAX_MESSAGE, describe_error
 
 
@@ -16,7 +16,9 @@ def test_dns_failure_est_expliquee():
 
 def test_connexion_refusee_est_expliquee():
     kind, message = describe_error(
-        Exception("net::ERR_CONNECTION_REFUSED at https://cesar.emineo-education.fr/")
+        Exception(
+            "net::ERR_CONNECTION_REFUSED at https://cesar.emineo-education.fr/"
+        )
     )
     assert kind == "reseau"
     assert "refuse la connexion" in message
@@ -34,14 +36,38 @@ def test_timeout_asyncio():
     assert "trop de temps" in message
 
 
+def test_cause_curl_timeout_est_expliquee():
+    error = CesarError("transport HTTP impossible")
+    error.__cause__ = TimeoutError("curl timed out")
+
+    kind, message = describe_error(error)
+
+    assert kind == "reseau"
+    assert "trop de temps" in message
+
+
+def test_cause_curl_certificat_est_signalee():
+    error = CesarError("transport HTTP impossible")
+    error.__cause__ = ValueError("SSL certificate problem")
+
+    kind, message = describe_error(error)
+
+    assert kind == "securite"
+    assert "certificat" in message
+
+
 def test_echec_de_connexion_cesar():
-    kind, message = describe_error(LoginError("champs de connexion introuvables"))
+    kind, message = describe_error(
+        LoginError("champs de connexion introuvables")
+    )
     assert kind == "connexion"
     assert "champs de connexion introuvables" in message
 
 
 def test_echec_de_signature():
-    kind, message = describe_error(SignError("canvas de signature sans dimensions"))
+    kind, message = describe_error(
+        SignError("canvas de signature sans dimensions")
+    )
     assert kind == "signature"
     assert "signature" in message
 

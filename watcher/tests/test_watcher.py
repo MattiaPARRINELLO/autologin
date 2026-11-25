@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import asyncio
 from datetime import datetime
+from types import SimpleNamespace
 
 from checkmate_watcher import watcher
+from checkmate_watcher.http_session import HttpTransportError
 from checkmate_watcher.schedule import Schedule, parse_windows
 from checkmate_watcher.state import StateStore
 from checkmate_watcher.updates import Release, UpdatePolicy, Version
@@ -103,7 +105,10 @@ def test_pause_sur_creneau_deja_signe(tmp_path):
 
 
 def test_surveillance_active_sur_creneau_libre(tmp_path):
-    assert _pause_reason(SCHEDULE, StateStore(tmp_path / "s.json"), LUNDI_10H) is None
+    assert (
+        _pause_reason(SCHEDULE, StateStore(tmp_path / "s.json"), LUNDI_10H)
+        is None
+    )
 
 
 def test_succes_note_le_retour_a_la_normale(tmp_path):
@@ -125,3 +130,71 @@ def test_succes_repete_ne_reecrit_pas_l_heure(tmp_path):
     state.set_meta("last_ok_at", "2026-11-16T09:05:00")
     _record_success(state)
     assert state.get_meta("last_ok_at") == "2026-11-16T09:05:00"
+
+
+def test_open_session_choisit_le_transport_http(monkeypatch):
+    class FakeHttp:
+        def __init__(self, config):
+            self.config = config
+            self.opened = False
+
+        async def open(self, headless):
+            self.opened = headless
+
+    monkeypatch.setattr(watcher, "HttpCesarSession", FakeHttp)
+    config = SimpleNamespace(watcher=SimpleNamespace(transport="http"))
+
+    session = asyncio.run(watcher._open_session(config, True))
+
+    assert isinstance(session, FakeHttp)
+    assert session.opened is True
+
+
+def test_open_session_choisit_le_transport_navigateur(monkeypatch):
+    class FakeBrowser:
+        def __init__(self, config):
+            self.config = config
+            self.opened = False
+
+        async def open(self, headless):
+            self.opened = headless
+
+    monkeypatch.setattr(watcher, "CesarSession", FakeBrowser)
+    config = SimpleNamespace(watcher=SimpleNamespace(transport="browser"))
+
+    session = asyncio.run(watcher._open_session(config, False))
+
+    assert isinstance(session, FakeBrowser)
+    assert session.opened is False
+
+
+def test_open_session_bascule_sur_navigateur_si_http_echoue(monkeypatch):
+    class FailingHttp:
+        def __init__(self, config):
+            self.closed = False
+
+        async def open(self, headless):
+            raise HttpTransportError("CESAR HTTP 403")
+
+        async def close(self):
+            self.closed = True
+
+    class FakeBrowser:
+        def __init__(self, config):
+            self.opened = False
+
+        async def open(self, headless):
+            self.opened = headless
+
+    async def no_send(*args, **kwargs):
+        return False
+
+    monkeypatch.setattr(watcher, "HttpCesarSession", FailingHttp)
+    monkeypatch.setattr(watcher, "CesarSession", FakeBrowser)
+    monkeypatch.setattr(watcher, "_send", no_send)
+    config = SimpleNamespace(watcher=SimpleNamespace(transport="http"))
+
+    session = asyncio.run(watcher._open_session(config, True))
+
+    assert isinstance(session, FakeBrowser)
+    assert session.opened is True

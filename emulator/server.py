@@ -63,15 +63,20 @@ class Emulator:
         self.lock = threading.Lock()
         self.state = AttendanceState()
 
+    def _reset_attendance_state(self) -> None:
+        self.state.open = True
+        self.state.signed = False
+        self.state.signature_points = 0
+        self.state.signed_at = None
+
     def open_attendance(self) -> AttendanceState:
         with self.lock:
             if not self.state.open:
                 self.state.session_id += 1
-                self.state.opened_at = datetime.now().isoformat(timespec="seconds")
-            self.state.open = True
-            self.state.signed = False
-            self.state.signature_points = 0
-            self.state.signed_at = None
+                self.state.opened_at = datetime.now().isoformat(
+                    timespec="seconds"
+                )
+            self._reset_attendance_state()
             return self.state
 
     def close_attendance(self) -> AttendanceState:
@@ -146,33 +151,46 @@ def scenario_asset(path: str) -> tuple[bytes, str] | None:
 PAGE_STYLE = """
   :root { color-scheme: dark; }
   * { box-sizing: border-box; }
-  body { margin: 0; font-family: system-ui, sans-serif; background: #0f172a; color: #e2e8f0; }
+  body { margin: 0; font-family: system-ui, sans-serif; background: #0f172a;
+  color: #e2e8f0; }
   header { display: flex; justify-content: space-between; align-items: center;
-           padding: 16px 28px; background: #1e293b; border-bottom: 1px solid #334155; }
+           padding: 16px 28px; background: #1e293b; border-bottom: 1px solid
+           #334155; }
   header h1 { font-size: 18px; margin: 0; letter-spacing: .3px; }
-  header nav a { color: #94a3b8; text-decoration: none; margin-left: 18px; font-size: 14px; }
+  header nav a { color: #94a3b8; text-decoration: none; margin-left: 18px;
+  font-size: 14px; }
   header nav a:hover { color: #e2e8f0; }
   main { max-width: 980px; margin: 0 auto; padding: 32px 24px 64px; }
-  .card { background: #1e293b; border: 1px solid #334155; border-radius: 16px; padding: 24px; }
+  .card { background: #1e293b; border: 1px solid #334155; border-radius: 16px;
+  padding: 24px; }
   .muted { color: #94a3b8; font-size: 14px; }
-  button { font: inherit; border: 0; border-radius: 10px; padding: 12px 20px; cursor: pointer; font-weight: 700; }
+  button { font: inherit; border: 0; border-radius: 10px; padding: 12px 20px;
+  cursor: pointer; font-weight: 700; }
   .primary { background: #38bdf8; color: #082f49; }
   .success { background: #22c55e; color: #052e16; }
   .danger { background: #ef4444; color: #450a0a; }
   .ghost { background: #334155; color: #e2e8f0; }
-  .calendar { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-top: 18px; }
+  .calendar { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px;
+  margin-top: 18px; }
   .slot { background: #0f172a; border: 1px solid #334155; border-radius: 10px;
-          padding: 14px 10px; font-size: 13px; color: #94a3b8; min-height: 74px; }
-  .slot strong { display: block; color: #e2e8f0; font-size: 14px; margin-bottom: 4px; }
-  .status { display: inline-block; padding: 6px 12px; border-radius: 999px; font-size: 13px; font-weight: 700; }
+          padding: 14px 10px; font-size: 13px; color: #94a3b8; min-height:
+          74px; }
+  .slot strong { display: block; color: #e2e8f0; font-size: 14px;
+  margin-bottom: 4px; }
+  .status { display: inline-block; padding: 6px 12px; border-radius: 999px;
+  font-size: 13px; font-weight: 700; }
   .status.open { background: #14532d; color: #bbf7d0; }
   .status.closed { background: #334155; color: #cbd5e1; }
   #modal { position: fixed; inset: 0; background: rgba(2, 6, 23, .75);
-           display: none; align-items: center; justify-content: center; padding: 20px; }
+           display: none; align-items: center; justify-content: center;
+           padding: 20px; }
   #modal.visible { display: flex; }
-  .dialog { background: #1e293b; border: 1px solid #334155; border-radius: 18px;
-            padding: 24px; width: 380px; box-shadow: 0 30px 80px rgba(0,0,0,.5); }
-  canvas { background: #fff; border-radius: 12px; display: block; width: 100%; cursor: crosshair; touch-action: none; }
+  .dialog { background: #1e293b; border: 1px solid #334155; border-radius:
+  18px;
+            padding: 24px; width: 380px; box-shadow: 0 30px 80px
+            rgba(0,0,0,.5); }
+  canvas { background: #fff; border-radius: 12px; display: block; width: 100%;
+  cursor: crosshair; touch-action: none; }
   .swal2-html-container { margin-top: 16px; color: #86efac; font-weight: 600; }
 """
 
@@ -317,31 +335,44 @@ LOGIN_TEMPLATE = """
 <main style="max-width:420px;margin-top:12vh">
   <div class="card">
     <h1 style="margin-top:0">CESAR Emineo</h1>
-    <p class="muted">Emulateur local. Identifiants par defaut : demo / demo.</p>
+    <p class="muted">Emulateur local. Identifiants par defaut : demo /
+    demo.</p>
     {error_block}
     <form method="post" action="/connexion">
       <label class="muted" for="username">Identifiant</label>
       <input id="username" name="username" autocomplete="username"
-             style="width:100%;padding:12px;margin:6px 0 16px;border-radius:10px;border:1px solid #334155;background:#0f172a;color:#e2e8f0">
+             style="width:100%;padding:12px;margin:6px 0
+             16px;border-radius:10px;border:1px solid
+             #334155;background:#0f172a;color:#e2e8f0">
       <label class="muted" for="password">Mot de passe</label>
-      <input id="password" name="password" type="password" autocomplete="current-password"
-             style="width:100%;padding:12px;margin:6px 0 20px;border-radius:10px;border:1px solid #334155;background:#0f172a;color:#e2e8f0">
-      <button class="btn-primary primary" type="submit" style="width:100%">Se connecter</button>
+      <input id="password" name="password" type="password"
+      autocomplete="current-password"
+             style="width:100%;padding:12px;margin:6px 0
+             20px;border-radius:10px;border:1px solid
+             #334155;background:#0f172a;color:#e2e8f0">
+      <button class="btn-primary primary" type="submit" style="width:100%">Se
+      connecter</button>
     </form>
   </div>
 </main>
 """
 
 
-def render_page(title: str, body: str, *, script: str = "", style: str = "") -> bytes:
+def _page_values(title: str, body: str, script: str, style: str) -> dict:
     extra_style = f"<style>{style}</style>" if style else ""
-    html = PAGE_TEMPLATE.format(
-        title=title,
-        page_style=PAGE_STYLE,
-        extra_style=extra_style,
-        body=body,
-        script=script,
-    )
+    return {
+        "title": title,
+        "page_style": PAGE_STYLE,
+        "extra_style": extra_style,
+        "body": body,
+        "script": script,
+    }
+
+
+def render_page(
+    title: str, body: str, *, script: str = "", style: str = ""
+) -> bytes:
+    html = PAGE_TEMPLATE.format(**_page_values(title, body, script, style))
     return html.encode("utf-8")
 
 
@@ -360,8 +391,10 @@ OPEN_MODAL = """
   <div class="dialog">
     <h2 style="margin-top:0">Signature de presence</h2>
     <p class="muted">Trace ta signature puis valide.</p>
-    <canvas id="pad" data-written-signature-target="canvas" width="320" height="150"></canvas>
-    <button id="save" data-live-action-param="signed" class="primary" style="margin-top:12px">Enregistrer</button>
+    <canvas id="pad" data-written-signature-target="canvas" width="320"
+    height="150"></canvas>
+    <button id="save" data-live-action-param="signed" class="primary"
+    style="margin-top:12px">Enregistrer</button>
     <div class="swal2-html-container"></div>
   </div>
 </div>
@@ -375,11 +408,13 @@ CLOSED_ATTENDANCE = (
 DASHBOARD_BODY = """
 <header>
   <h1>CESAR Emineo</h1>
-  <nav><a href="/admin">Administration</a><a href="/connexion?logout=1">Deconnexion</a></nav>
+  <nav><a href="/admin">Administration</a><a
+  href="/connexion?logout=1">Deconnexion</a></nav>
 </header>
 <main>
   <div class="card toastui-calendar-day-view">
-    <p class="muted">Tableau de bord de demonstration. Le bouton n'apparait qu'apres
+    <p class="muted">Tableau de bord de demonstration. Le bouton n'apparait
+    qu'apres
     un rafraichissement de la page, comme sur le site reel.</p>
     <div class="calendar">
       <div class="slot"><strong>Lundi</strong>Culture generale</div>
@@ -408,8 +443,10 @@ def _open_attendance(state: AttendanceState, run_id: str) -> str:
     return f"""
 <div class="card">
   <p class="status open">Emargement ouvert</p>
-  <p class="muted">Session {state.session_id}. Le formateur attend ta signature.</p>
-  <button class="buttonPresent success" data-live-action-param="session-{state.session_id}-{run_id}"
+  <p class="muted">Session {state.session_id}. Le formateur attend ta
+  signature.</p>
+  <button class="buttonPresent success"
+  data-live-action-param="session-{state.session_id}-{run_id}"
           style="margin-top:12px">Signer ma presence</button>
 </div>
 """
@@ -437,7 +474,10 @@ def _dashboard_page(state, run_id, close_delay_ms, variants) -> bytes:
     body = DASHBOARD_BODY.format(attendance=attendance, modal=modal)
     script = dashboard_script(close_delay_ms, variants)
     return render_page(
-        "CESAR - tableau de bord", body, script=script, style=modal_style(variants)
+        "CESAR - tableau de bord",
+        body,
+        script=script,
+        style=modal_style(variants),
     )
 
 
@@ -463,7 +503,8 @@ ADMIN_BODY = """
     <p>Etat de l'emargement : {badge}</p>
     <p>Signature : {signed} ({points} points, session {session})</p>
     <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:18px">
-      <button class="success" onclick="action('open')">Ouvrir l'emargement</button>
+      <button class="success" onclick="action('open')">Ouvrir
+      l'emargement</button>
       <button class="ghost" onclick="action('close')">Fermer</button>
       <button class="danger" onclick="action('reset')">Reinitialiser</button>
     </div>
@@ -533,7 +574,9 @@ class Handler(BaseHTTPRequestHandler):
     ) -> None:
         self.send_bytes(payload, "text/html; charset=utf-8", status, headers)
 
-    def send_bytes(self, payload, content_type, status=200, headers=None) -> None:
+    def send_bytes(
+        self, payload, content_type, status=200, headers=None
+    ) -> None:
         self.send_response(status)
         self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(payload)))
@@ -654,7 +697,10 @@ class Handler(BaseHTTPRequestHandler):
 
     def _post_login(self) -> None:
         username, password = self._login_fields()
-        if username != self.emulator.username or password != self.emulator.password:
+        if (
+            username != self.emulator.username
+            or password != self.emulator.password
+        ):
             self.redirect("/connexion?error=1")
             return
         self._send_login_cookie()
@@ -669,23 +715,41 @@ class Handler(BaseHTTPRequestHandler):
         return username, password
 
     def _send_login_cookie(self) -> None:
-        cookie = f"{COOKIE_NAME}={self.emulator.token}; Path=/; HttpOnly; SameSite=Lax"
+        cookie = (
+            f"{COOKIE_NAME}={self.emulator.token}; Path=/; "
+            "HttpOnly; SameSite=Lax"
+        )
         self.send_response(303)
         self.send_header("Location", "/")
         self.send_header("Set-Cookie", cookie)
         self.end_headers()
 
-    def _post_signature(self) -> None:
-        if not self.is_authenticated():
-            return self._reject(401, "Session expiree.")
-        payload = self.read_json()
+    def _signature_points_from_payload(self, payload) -> list | None:
         if payload is None:
-            return self._reject(400, "Corps JSON invalide.")
+            self._reject(400, "Corps JSON invalide.")
+            return None
         points = payload.get("points")
         if not isinstance(points, list) or not points:
-            return self._reject(400, "Signature vide.")
+            self._reject(400, "Signature vide.")
+            return None
+        return points
+
+    def _read_signature_points(self) -> list | None:
+        if not self.is_authenticated():
+            self._reject(401, "Session expiree.")
+            return None
+        payload = self.read_json()
+        return self._signature_points_from_payload(payload)
+
+    def _post_signature(self) -> None:
+        points = self._read_signature_points()
+        if points is None:
+            return
         ok, message = self.emulator.sign(points)
-        self.send_json({"success": ok, "message": message}, status=200 if ok else 409)
+        self.send_json(
+            {"success": ok, "message": message},
+            status=200 if ok else 409,
+        )
 
     def _reject(self, status: int, message: str) -> None:
         self.send_json({"message": message}, status=status)
@@ -719,7 +783,10 @@ def _afficher_port_occupe(args) -> None:
     print("Verifie qui l'occupe :", file=sys.stderr)
     print(f"  ss -ltnp 'sport = :{args.port}'", file=sys.stderr)
     print("Ou prends un autre port :", file=sys.stderr)
-    print(f"  python3 emulator/server.py --port {args.port + 1}", file=sys.stderr)
+    print(
+        f"  python3 emulator/server.py --port {args.port + 1}",
+        file=sys.stderr,
+    )
     print("Ou laisse le systeme en choisir un :", file=sys.stderr)
     print("  python3 emulator/server.py --port 0", file=sys.stderr)
 
@@ -803,7 +870,9 @@ def _add_variant_arg(parser) -> None:
 
 
 def _build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Emulateur local de CESAR Emineo")
+    parser = argparse.ArgumentParser(
+        description="Emulateur local de CESAR Emineo"
+    )
     _add_network_args(parser)
     _add_session_args(parser)
     _add_delay_arg(parser)

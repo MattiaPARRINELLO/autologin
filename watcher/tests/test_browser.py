@@ -28,13 +28,16 @@ def test_la_config_a_la_priorite():
 def test_utilise_le_bundle_quand_il_existe(tmp_path):
     bundled = tmp_path / "chrome"
     bundled.write_text("")
-    options = resolve_launch_options(FakeBrowserType(str(bundled)), platform="linux")
+    options = resolve_launch_options(
+        FakeBrowserType(str(bundled)), platform="linux"
+    )
     assert options == LaunchOptions()
 
 
 def test_bascule_sur_le_chromium_systeme(monkeypatch):
     monkeypatch.setattr(
-        "checkmate_watcher.browser.system_chromium", lambda: "/usr/bin/chromium"
+        "checkmate_watcher.browser.system_chromium",
+        lambda: "/usr/bin/chromium",
     )
     options = resolve_launch_options(
         FakeBrowserType("/absent/chrome"), platform="linux"
@@ -43,7 +46,9 @@ def test_bascule_sur_le_chromium_systeme(monkeypatch):
 
 
 def test_aucun_navigateur_disponible(monkeypatch):
-    monkeypatch.setattr("checkmate_watcher.browser.system_chromium", lambda: None)
+    monkeypatch.setattr(
+        "checkmate_watcher.browser.system_chromium", lambda: None
+    )
     options = resolve_launch_options(
         FakeBrowserType("/absent/chrome"), platform="linux"
     )
@@ -64,8 +69,13 @@ def test_bundled_chromium_path_absent(tmp_path):
 
 
 def test_windows_choisit_edge_ou_chrome():
-    assert platform_channel("win32", lambda path: "Edge" in str(path)) == "msedge"
-    assert platform_channel("win32", lambda path: "Chrome" in str(path)) == "chrome"
+    assert (
+        platform_channel("win32", lambda path: "Edge" in str(path)) == "msedge"
+    )
+    assert (
+        platform_channel("win32", lambda path: "Chrome" in str(path))
+        == "chrome"
+    )
     assert platform_channel("win32", lambda path: False) is None
 
 
@@ -80,4 +90,6 @@ def test_macos_choisit_chrome():
 def test_launch_options_kwargs():
     assert LaunchOptions().as_kwargs() == {}
     assert LaunchOptions(channel="msedge").as_kwargs() == {"channel": "msedge"}
-    assert LaunchOptions(executable_path="/x").as_kwargs() == {"executable_path": "/x"}
+    assert LaunchOptions(executable_path="/x").as_kwargs() == {
+        "executable_path": "/x"
+    }

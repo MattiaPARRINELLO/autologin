@@ -1,6 +1,8 @@
 # dbus-next exige des annotations de signature D-Bus ecrites comme des chaines
 # ("s", "a(iiay)", ...). Ruff les voit comme des noms non definis et veut retirer
 # les guillemets, ce qui casserait l'introspection D-Bus.
+line-length = 79
+
 [lint]
 ignore = ["BLE001", "PLR1716"]
 

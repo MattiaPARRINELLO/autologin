@@ -13,7 +13,9 @@ from pathlib import Path
 from . import __version__
 
 GITHUB_REPO = "MattiaPARRINELLO/autologin"
-RELEASES_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases?per_page=30"
+RELEASES_URL = (
+    f"https://api.github.com/repos/{GITHUB_REPO}/releases?per_page=30"
+)
 TAG_PREFIX = "watcher-"
 STABLE_CHANNEL = "stable"
 BETA_CHANNEL = "beta"
@@ -89,7 +91,7 @@ MARKER_PATTERN = re.compile(
 )
 
 
-def _release_markers(body: object) -> tuple[str | None, str | None, bool]:
+def _marker_values(body: object) -> tuple[dict, set[str]]:
     values = {"MIGRATION": None, "REQUIRED": None}
     seen = set()
     for match in MARKER_PATTERN.finditer(str(body or "")):
@@ -97,7 +99,16 @@ def _release_markers(body: object) -> tuple[str | None, str | None, bool]:
         reason = match.group(2).strip()
         seen.add(kind)
         values[kind] = None if reason == "0" else reason
-    return values["MIGRATION"], values["REQUIRED"], seen == {"MIGRATION", "REQUIRED"}
+    return values, seen
+
+
+def _release_markers(body: object) -> tuple[str | None, str | None, bool]:
+    values, seen = _marker_values(body)
+    return (
+        values["MIGRATION"],
+        values["REQUIRED"],
+        seen == {"MIGRATION", "REQUIRED"},
+    )
 
 
 def parse_version(text: str) -> Version | None:
@@ -125,7 +136,11 @@ def _release_assets(assets):
 
 
 def _release_downloads(assets):
-    return sum(int(a.get("download_count") or 0) for a in assets if isinstance(a, dict))
+    return sum(
+        int(a.get("download_count") or 0)
+        for a in assets
+        if isinstance(a, dict)
+    )
 
 
 def _marker_fields(body) -> dict:
@@ -160,10 +175,14 @@ def parse_release(data: dict) -> Release | None:
     return _build_release(tag, version, data, data.get("assets") or [])
 
 
-def _channel_candidates(releases: list[Release], channel: str) -> list[Release]:
+def _channel_candidates(
+    releases: list[Release], channel: str
+) -> list[Release]:
     accept_prerelease = str(channel).strip().lower() == BETA_CHANNEL
     return [
-        release for release in releases if accept_prerelease or not release.prerelease
+        release
+        for release in releases
+        if accept_prerelease or not release.prerelease
     ]
 
 
@@ -196,7 +215,7 @@ class UpdatePolicy:
 
     @property
     def install_target(self) -> Release | None:
-        """La migration a passer d'abord, sinon la derniere version disponible."""
+        """La migration prioritaire ou la derniere version disponible."""
         return self.migration or (self.latest if self.available else None)
 
 
@@ -237,7 +256,10 @@ def update_policy(current, *, channel=STABLE_CHANNEL, releases=None):
 def _releases_request(timeout: int):
     return urllib.request.Request(
         RELEASES_URL,
-        headers={"Accept": "application/vnd.github+json", "User-Agent": USER_AGENT},
+        headers={
+            "Accept": "application/vnd.github+json",
+            "User-Agent": USER_AGENT,
+        },
     )
 
 
@@ -251,11 +273,14 @@ def fetch_releases(timeout: int = 10) -> list[Release]:
     return [r for r in (parse_release(i) for i in payload) if r is not None]
 
 
-# fmt: off
-def check_for_update(current: str = __version__, *, channel: str = STABLE_CHANNEL, releases: list[Release] | None = None) -> Release | None:
+def check_for_update(
+    current: str = __version__,
+    *,
+    channel: str = STABLE_CHANNEL,
+    releases: list[Release] | None = None,
+) -> Release | None:
     policy = update_policy(current, channel=channel, releases=releases)
     return policy.latest if policy.available else None
-# fmt: on
 
 
 def platform_asset(release: Release, platform: str) -> Asset | None:
@@ -331,16 +356,21 @@ def _download_update_asset(release, platform):
     return asset
 
 
-# fmt: off
-def download_update(release: Release, directory: Path, *, platform: str | None = None) -> Path:
+def _download_checksums(release: Release, directory: Path) -> dict[str, str]:
+    asset = release.asset(CHECKSUMS_NAME)
+    if asset is None:
+        raise UpdateError("sommes de controle absentes de la release")
+    path = download(asset.url, directory / CHECKSUMS_NAME)
+    return parse_checksums(path.read_text(encoding="utf-8"))
+
+
+def download_update(
+    release: Release, directory: Path, *, platform: str | None = None
+) -> Path:
     """Telecharge l'artefact et verifie sa somme. Rend le chemin local."""
     platform = platform or sys.platform
     asset = _download_update_asset(release, platform)
     target = directory / asset.name
     download(asset.url, target)
-    checksums_asset = release.asset(CHECKSUMS_NAME)
-    if checksums_asset is None: raise UpdateError("sommes de controle absentes de la release")
-    sums_path = download(checksums_asset.url, directory / CHECKSUMS_NAME)
-    verify_checksum(target, parse_checksums(sums_path.read_text(encoding="utf-8")))
+    verify_checksum(target, _download_checksums(release, directory))
     return target
-# fmt: on

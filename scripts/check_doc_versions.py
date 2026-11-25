@@ -28,7 +28,9 @@ DOCS = [
 # Un nom d'artefact ne doit jamais coder une version : on ecrit `<version>`.
 ARTIFACT = re.compile(r"CheckMate-(?:Setup|linux)-\d+\.\d+\.\d+")
 # L'etat du projet doit renvoyer au badge, pas figer un numero.
-STABLE_STATE = re.compile(r"Version stable actuelle\s*:\s*\*{0,2}\d+\.\d+\.\d+")
+STABLE_STATE = re.compile(
+    r"Version stable actuelle\s*:\s*\*{0,2}\d+\.\d+\.\d+"
+)
 
 
 def _matches(line: str) -> list[str]:
@@ -61,7 +63,8 @@ def _print_summary(results: list, doc_count: int) -> None:
     if results:
         print(
             "\nRemplace la version par `<version>` et renvoie vers "
-            "`releases/latest` : le README doit rester valable a chaque release.",
+            "`releases/latest` : le README doit rester valable "
+            "a chaque release.",
             file=sys.stderr,
         )
         return
