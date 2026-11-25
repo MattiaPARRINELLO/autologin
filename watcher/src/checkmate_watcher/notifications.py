@@ -78,17 +78,12 @@ def _subprocess_options(timeout: int, env=None) -> dict:
 
 
 def _notify_send_command(binary, title, message, *, app_name, icon, urgency):
-    return (
-        binary,
-        "--app-name",
-        app_name,
-        "--urgency",
-        urgency,
+    return [binary, "--app-name", app_name, "--urgency", urgency] + [
         "--icon",
         icon,
         title,
         message,
-    )
+    ]
 
 
 def _run_notify_send(command):
@@ -109,14 +104,7 @@ def _log_notify_send_failure(result):
     )
 
 
-def _send_notify_send(title, message, *, app_name, icon, urgency):
-    binary = shutil.which("notify-send")
-    if not binary:
-        return False
-    command = _notify_send_command(
-        binary, title, message, app_name=app_name, icon=icon, urgency=urgency
-    )
-    result = _run_notify_send(command)
+def _notify_send_succeeded(result) -> bool:
     if result is None:
         return False
     if result.returncode != 0:
@@ -125,25 +113,22 @@ def _send_notify_send(title, message, *, app_name, icon, urgency):
     return True
 
 
+def _send_notify_send(title, message, *, app_name, icon, urgency):
+    binary = shutil.which("notify-send")
+    if not binary:
+        return False
+    command = _notify_send_command(
+        binary, title, message, app_name=app_name, icon=icon, urgency=urgency
+    )
+    return _notify_send_succeeded(_run_notify_send(command))
+
+
 def _gdbus_command(binary, app_name, icon, title, message):
     return (
-        binary,
-        "call",
-        "--session",
-        "--dest",
-        "org.freedesktop.Notifications",
-        "--object-path",
-        "/org/freedesktop/Notifications",
-        "--method",
-        "org.freedesktop.Notifications.Notify",
-        _gvariant(app_name),
-        "0",
-        _gvariant(icon),
-        _gvariant(title),
-        _gvariant(message),
-        "[]",
-        "{}",
-        "5000",
+        [binary, "call", "--session", "--dest", "org.freedesktop.Notifications"]
+        + ["--object-path", "/org/freedesktop/Notifications", "--method"]
+        + ["org.freedesktop.Notifications.Notify", _gvariant(app_name), "0"]
+        + [_gvariant(icon), _gvariant(title), _gvariant(message), "[]", "{}", "5000"]
     )
 
 
@@ -404,6 +389,15 @@ def _ask_linux(text, kwargs):
     return ask_tkinter(text, **kwargs)
 
 
+def _dialog_kwargs(timeout, title, ok_label, cancel_label) -> dict:
+    return {
+        "timeout": timeout,
+        "title": title,
+        "ok_label": ok_label,
+        "cancel_label": cancel_label,
+    }
+
+
 class Notifier:
     """Notifications et confirmations selon la plateforme."""
 
@@ -442,13 +436,7 @@ class Notifier:
         ok_label="Je suis present",
         cancel_label="Absent",
     ):
-        window_title = title or self.app_name
-        kwargs = {
-            "timeout": timeout,
-            "title": window_title,
-            "ok_label": ok_label,
-            "cancel_label": cancel_label,
-        }
+        kwargs = _dialog_kwargs(timeout, title or self.app_name, ok_label, cancel_label)
         if self.platform.startswith("linux"):
             return _ask_linux(text, kwargs)
         return ask_tkinter(text, **kwargs)

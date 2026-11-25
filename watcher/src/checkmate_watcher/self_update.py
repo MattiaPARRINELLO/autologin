@@ -116,12 +116,7 @@ def _install_linux(archive: Path, cleanup: Path) -> None:
 
 
 def _systemd_update_command(runner, script, unit):
-    return [
-        runner,
-        "--user",
-        "--collect",
-        "--quiet",
-        f"--unit={unit}",
+    return [runner, "--user", "--collect", "--quiet", f"--unit={unit}"] + [
         "--description=Installation d'une mise a jour CheckMate",
         "--setenv=CHECKMATE_UPDATE_DETACHED=1",
         "/bin/bash",
@@ -138,15 +133,21 @@ def _detached_options() -> dict:
     }
 
 
-def _try_systemd_run(script, unit):
-    runner = shutil.which("systemd-run")
-    if runner is None:
-        return False
+def _spawn_systemd_update(runner, script, unit) -> bool:
     try:
         command = _systemd_update_command(runner, script, unit)
         subprocess.Popen(command, **_detached_options())
     except OSError:
         logger.warning("systemd-run indisponible, installation non detachee")
+        return False
+    return True
+
+
+def _try_systemd_run(script, unit):
+    runner = shutil.which("systemd-run")
+    if runner is None:
+        return False
+    if not _spawn_systemd_update(runner, script, unit):
         return False
     if _transient_unit_active(unit):
         return True

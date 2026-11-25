@@ -219,17 +219,20 @@ def _open_line(course: dict, student_uuid: str, max_minutes: int, server_now: in
     return None
 
 
+def _attendance_signal(course: dict, line: dict) -> AttendanceSignal:
+    label = _course_label(course)
+    logger.info("emargement HTTP detecte : %s", label)
+    return AttendanceSignal(_signal_key(course, line, label), label)
+
+
 def _calendar_signal(attrs: dict[str, str]) -> AttendanceSignal | None:
     schedules, student_uuid, max_minutes, server_now = _calendar_settings(attrs)
     for course in schedules:
         if not isinstance(course, dict):
             continue
         line = _open_line(course, student_uuid, max_minutes, server_now)
-        if line is None:
-            continue
-        label = _course_label(course)
-        logger.info("emargement HTTP detecte : %s", label)
-        return AttendanceSignal(_signal_key(course, line, label), label)
+        if line is not None:
+            return _attendance_signal(course, line)
     return None
 
 
@@ -246,28 +249,31 @@ def _cookie_data(cookie: Cookie) -> dict:
     }
 
 
-def _cookie_from_data(data: dict) -> Cookie:
+def _cookie_values(data: dict) -> tuple:
     domain = data["domain"]
-    kwargs = {
-        "version": 0,
-        "name": data["name"],
-        "value": data["value"],
-        "port": None,
-        "port_specified": False,
-        "domain": domain,
-        "domain_specified": True,
-        "domain_initial_dot": domain.startswith("."),
-        "path": data["path"],
-        "path_specified": True,
-        "secure": data["secure"],
-        "expires": data.get("expires"),
-        "discard": data.get("discard", True),
-        "comment": None,
-        "comment_url": None,
-        "rest": data.get("rest") or {},
-        "rfc2109": False,
-    }
-    return Cookie(**kwargs)
+    return (
+        0,
+        data["name"],
+        data["value"],
+        None,
+        False,
+        domain,
+        True,
+        domain.startswith("."),
+        data["path"],
+        True,
+        data["secure"],
+        data.get("expires"),
+        data.get("discard", True),
+        None,
+        None,
+        data.get("rest") or {},
+        False,
+    )
+
+
+def _cookie_from_data(data: dict) -> Cookie:
+    return Cookie(*_cookie_values(data))
 
 
 def _domain_allowed(host: str, domain: str) -> bool:
@@ -296,16 +302,20 @@ def _cookie_strings_valid(item: dict) -> bool:
     )
 
 
+def _cookie_security_valid(item: dict, host: str) -> bool:
+    if not isinstance(item.get("secure"), bool):
+        return False
+    if not item["domain"] or not _domain_allowed(host, item["domain"]):
+        return False
+    return not _cookie_data_expired(item)
+
+
 def _cookie_data_valid(item: dict, host: str) -> bool:
     if not isinstance(item, dict):
         return False
     if not _cookie_strings_valid(item):
         return False
-    if not isinstance(item.get("secure"), bool):
-        return False
-    if not item["domain"] or not _domain_allowed(host, item["domain"]):
-        return False
-    if _cookie_data_expired(item):
+    if not _cookie_security_valid(item, host):
         return False
     return isinstance(item.get("rest", {}), dict)
 
