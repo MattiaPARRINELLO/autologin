@@ -20,12 +20,14 @@ from checkmate_watcher.state import StateStore
         ("0.7.0", "0.8.0", True),
         ("0.9.0", "1.0.0", True),
         ("0.7.0", "0.7.1", False),
-        ("0.7.0-beta.4", "0.7.0", False),
+        ("0.6.9", "0.7.0-beta.1", False),
+        ("0.7.0-beta.4", "0.7.0-beta.5", False),
+        ("0.7.0-beta.4", "0.7.0", True),
         ("0.7.0", "0.6.9", False),
         ("inconnue", "0.7.0", False),
     ],
 )
-def test_seules_les_versions_majeures_ou_mineures_sont_importantes(
+def test_seules_les_releases_stables_importantes_ouvrent_le_popup(
     previous, current, expected
 ):
     assert is_significant_update(previous, current) is expected
@@ -60,6 +62,26 @@ def test_mise_a_jour_importante_avec_resume(tmp_path):
     assert note is not None
     assert note["version"] == "0.7.0"
     assert state.get_meta(LAST_VERSION_KEY) == "0.7.0"
+
+
+def test_beta_sans_popup(tmp_path):
+    state = StateStore(tmp_path / "state.json")
+    state.set_meta(LAST_VERSION_KEY, "0.6.9")
+
+    note = prepare_release_celebration(state, "0.7.0-beta.1")
+
+    assert note is None
+    assert state.get_meta(LAST_VERSION_KEY) == "0.7.0-beta.1"
+
+
+def test_passage_d_une_beta_vers_sa_version_stable(tmp_path):
+    state = StateStore(tmp_path / "state.json")
+    state.set_meta(LAST_VERSION_KEY, "0.7.0-beta.4")
+
+    note = prepare_release_celebration(state, "0.7.0")
+
+    assert note is not None
+    assert note["version"] == "0.7.0"
 
 
 def test_correctif_sans_popup(tmp_path):

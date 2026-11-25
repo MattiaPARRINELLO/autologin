@@ -1,4 +1,4 @@
-"""Resumes versionnes affiches apres les mises a jour importantes."""
+"""Resumes versionnes affiches apres les mises a jour stables importantes."""
 
 from __future__ import annotations
 
@@ -37,8 +37,15 @@ def release_note(version: str) -> dict | None:
 def is_significant_update(previous: str, current: str) -> bool:
     before = parse_version(previous)
     after = parse_version(current)
-    if before is None or after is None or after <= before:
+    if before is None or after is None or after <= before or after.is_beta:
         return False
+    same_target = (before.major, before.minor, before.patch) == (
+        after.major,
+        after.minor,
+        after.patch,
+    )
+    if before.is_beta and same_target:
+        return True
     return (after.major, after.minor) != (before.major, before.minor)
 
 
