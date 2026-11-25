@@ -20,6 +20,7 @@ classifiers = [
 ]
 
 dependencies = [
+  "curl-cffi==0.17.0",
   "dbus-next>=0.2.3 ; sys_platform == 'linux'",
   "keyring>=25.7.0",
   "pillow>=13.0.0",
