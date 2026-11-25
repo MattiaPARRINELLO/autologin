@@ -1,0 +1,8 @@
+version: 2
+
+secret:
+  ignored_matches:
+    - name: dummy password used in Python test fixtures
+      match: secret
+    - name: dummy password used in support redaction tests
+      match: secret-du-compte
