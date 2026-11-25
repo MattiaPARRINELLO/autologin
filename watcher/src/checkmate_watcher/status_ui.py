@@ -28,17 +28,20 @@ STATUS_HTML = """<!doctype html>
     min-height: 100vh;
     background: var(--paper);
     color: var(--ink);
-    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    sans-serif;
     font-size: 15px;
     line-height: 1.5;
   }
   .shell { max-width: 1040px; margin: 0 auto; padding: 32px 24px 48px; }
-  header { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 24px; }
+  header { display: flex; align-items: center; justify-content: space-between;
+  gap: 16px; margin-bottom: 24px; }
   .brand { display: flex; align-items: center; gap: 12px; }
   .mark { width: 32px; height: 32px; color: var(--accent); }
   .wordmark { font-size: 17px; font-weight: 600; }
   .tagline { font-size: 12px; color: var(--muted); }
-  .meta { font-family: ui-monospace, "SFMono-Regular", "Cascadia Mono", monospace; font-size: 12px; color: var(--muted); text-align: right; }
+  .meta { font-family: ui-monospace, "SFMono-Regular", "Cascadia Mono",
+  monospace; font-size: 12px; color: var(--muted); text-align: right; }
   .panel {
     background: var(--card);
     border: 1px solid var(--line);
@@ -54,12 +57,15 @@ STATUS_HTML = """<!doctype html>
   .state-dot.outside { background: var(--warn); }
   .state-dot.signed { background: var(--ink); }
   .state-dot.error { background: var(--err); }
-  .kicker { margin: 0 0 4px; font-family: ui-monospace, "SFMono-Regular", "Cascadia Mono", monospace; font-size: 12px; color: var(--muted); }
-  h1 { margin: 0; font-size: 32px; line-height: 1.15; font-weight: 500; letter-spacing: -0.01em; }
+  .kicker { margin: 0 0 4px; font-family: ui-monospace, "SFMono-Regular",
+  "Cascadia Mono", monospace; font-size: 12px; color: var(--muted); }
+  h1 { margin: 0; font-size: 32px; line-height: 1.15; font-weight: 500;
+  letter-spacing: -0.01em; }
   .detail { margin: 8px 0 0; color: var(--ink-2); max-width: 62ch; }
   .restart {
     margin-top: 20px; padding: 12px 16px; border-radius: 0 8px 8px 0;
-    border-left: 3px solid var(--warn); background: #f3ead9; color: var(--ink-2);
+    border-left: 3px solid var(--warn); background: #f3ead9; color:
+    var(--ink-2);
     font-size: 13px;
   }
   .state-dot.blocked { background: var(--err); }
@@ -77,7 +83,8 @@ STATUS_HTML = """<!doctype html>
   }
   .migration strong { display: block; margin-bottom: 4px; color: var(--warn); }
   .migration span { font-size: 13px; color: var(--ink-2); }
-  .schedule { margin-top: 28px; padding-top: 20px; border-top: 1px solid var(--line); }
+  .schedule { margin-top: 28px; padding-top: 20px; border-top: 1px solid
+  var(--line); }
   .schedule-label { margin: 0 0 8px; font-size: 12px; color: var(--muted); }
   .slots { display: flex; gap: 10px; flex-wrap: wrap; }
   .slot {
@@ -86,34 +93,54 @@ STATUS_HTML = """<!doctype html>
     font-family: ui-monospace, "SFMono-Regular", "Cascadia Mono", monospace;
     font-size: 13px; color: var(--ink-2); font-variant-numeric: tabular-nums;
   }
-  .slot.active { border-color: var(--accent); background: var(--accent-soft); color: var(--ink); }
+  .slot.active { border-color: var(--accent); background: var(--accent-soft);
+  color: var(--ink); }
   .slot .state { font-family: inherit; font-size: 11px; color: var(--muted); }
-  .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-top: 28px; }
+  .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px;
+  margin-top: 28px; }
   .stat { border-top: 1px solid var(--line); padding-top: 12px; }
   .stat span { display: block; font-size: 12px; color: var(--muted); }
-  .stat strong { display: block; margin-top: 6px; font-family: ui-monospace, "SFMono-Regular", "Cascadia Mono", monospace; font-size: 24px; font-weight: 500; font-variant-numeric: tabular-nums; }
+  .stat strong { display: block; margin-top: 6px; font-family: ui-monospace,
+  "SFMono-Regular", "Cascadia Mono", monospace; font-size: 24px; font-weight:
+  500; font-variant-numeric: tabular-nums; }
   .events { margin-top: 24px; border-top: 1px solid var(--line); }
-  .event-row { display: flex; justify-content: space-between; gap: 16px; padding: 10px 0; border-bottom: 1px solid var(--line); font-size: 13px; color: var(--ink-2); }
-  .event-row strong { font-family: ui-monospace, "SFMono-Regular", "Cascadia Mono", monospace; font-weight: 400; color: var(--ink); text-align: right; }
+  .event-row { display: flex; justify-content: space-between; gap: 16px;
+  padding: 10px 0; border-bottom: 1px solid var(--line); font-size: 13px;
+  color: var(--ink-2); }
+  .event-row strong { font-family: ui-monospace, "SFMono-Regular", "Cascadia
+  Mono", monospace; font-weight: 400; color: var(--ink); text-align: right; }
   .actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 28px; }
-  button { font: inherit; font-size: 14px; font-weight: 500; height: 42px; padding: 0 16px; border-radius: 9px; border: 1px solid transparent; cursor: pointer; transition: background-color 150ms var(--ease), border-color 150ms var(--ease); }
+  button { font: inherit; font-size: 14px; font-weight: 500; height: 42px;
+  padding: 0 16px; border-radius: 9px; border: 1px solid transparent; cursor:
+  pointer; transition: background-color 150ms var(--ease), border-color 150ms
+  var(--ease); }
   button:disabled { opacity: 0.45; cursor: not-allowed; }
-  button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px;
+  }
   .primary { background: var(--accent); color: var(--paper); }
   .primary:hover { background: #275c41; }
-  .secondary { background: var(--card); border-color: var(--line); color: var(--ink); }
+  .secondary { background: var(--card); border-color: var(--line); color:
+  var(--ink); }
   .secondary:hover { background: var(--raised); }
   .ghost { background: transparent; color: var(--muted); }
   .ghost:hover { background: var(--raised); color: var(--ink); }
-  .message { min-height: 20px; margin-top: 16px; font-size: 13px; color: var(--ink-2); }
-  .message:not(:empty)::before { content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: currentColor; margin-right: 8px; vertical-align: 1px; }
+  .message { min-height: 20px; margin-top: 16px; font-size: 13px; color:
+  var(--ink-2); }
+  .message:not(:empty)::before { content: ""; display: inline-block; width:
+  6px; height: 6px; border-radius: 50%; background: currentColor; margin-right:
+  8px; vertical-align: 1px; }
   .message.ok { color: var(--accent); }
   .message.err { color: var(--err); }
-  .channel { margin-top: 24px; padding-top: 18px; border-top: 1px solid var(--line); }
-  .channel-toggle { display: flex; align-items: center; gap: 10px; font-size: 14px; cursor: pointer; }
-  .channel-toggle input { width: 18px; height: 18px; accent-color: var(--accent); }
-  .channel-warning { margin: 8px 0 0 28px; font-size: 12px; color: var(--warn); max-width: 62ch; }
-  footer { display: flex; justify-content: space-between; gap: 16px; margin-top: 16px; font-size: 12px; color: var(--muted); }
+  .channel { margin-top: 24px; padding-top: 18px; border-top: 1px solid
+  var(--line); }
+  .channel-toggle { display: flex; align-items: center; gap: 10px; font-size:
+  14px; cursor: pointer; }
+  .channel-toggle input { width: 18px; height: 18px; accent-color:
+  var(--accent); }
+  .channel-warning { margin: 8px 0 0 28px; font-size: 12px; color: var(--warn);
+  max-width: 62ch; }
+  footer { display: flex; justify-content: space-between; gap: 16px;
+  margin-top: 16px; font-size: 12px; color: var(--muted); }
   @media (max-width: 720px) {
     .shell { padding: 20px 14px 32px; }
     .panel { padding: 22px; }
@@ -129,11 +156,14 @@ STATUS_HTML = """<!doctype html>
   <header>
     <div class="brand">
       <svg class="mark" viewBox="0 0 32 32" fill="none" aria-hidden="true">
-        <rect x="3.5" y="5.5" width="25" height="21" rx="5" stroke="currentColor" stroke-width="1.8"/>
+        <rect x="3.5" y="5.5" width="25" height="21" rx="5"
+        stroke="currentColor" stroke-width="1.8"/>
         <path d="M3.5 11.5h25" stroke="currentColor" stroke-width="1.8"/>
         <rect x="8" y="15" width="7" height="3" rx="1.5" fill="currentColor"/>
-        <rect x="8" y="21" width="10" height="3" rx="1.5" fill="currentColor" opacity="0.4"/>
-        <path d="M19.5 18.5l2.6 2.6 4.4-5.2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <rect x="8" y="21" width="10" height="3" rx="1.5" fill="currentColor"
+        opacity="0.4"/>
+        <path d="M19.5 18.5l2.6 2.6 4.4-5.2" stroke="currentColor"
+        stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
       </svg>
       <div>
         <div class="wordmark">CheckMate</div>
@@ -154,7 +184,8 @@ STATUS_HTML = """<!doctype html>
     </div>
 
     <div class="restart" id="restartBanner" hidden>
-      La configuration a changé depuis le démarrage. Quitte CheckMate puis relance-le
+      La configuration a changé depuis le démarrage. Quitte CheckMate puis
+      relance-le
       depuis le menu Démarrer pour appliquer les nouveaux réglages.
     </div>
 
@@ -174,26 +205,40 @@ STATUS_HTML = """<!doctype html>
     </section>
 
     <div class="grid">
-      <div class="stat"><span>Démarrages</span><strong id="statStarts">-</strong></div>
-      <div class="stat"><span>Détections</span><strong id="statDetections">-</strong></div>
-      <div class="stat"><span>Signatures</span><strong id="statSigned">-</strong></div>
-      <div class="stat"><span>Erreurs</span><strong id="statErrors">-</strong></div>
+      <div class="stat"><span>Démarrages</span><strong
+      id="statStarts">-</strong></div>
+      <div class="stat"><span>Détections</span><strong
+      id="statDetections">-</strong></div>
+      <div class="stat"><span>Signatures</span><strong
+      id="statSigned">-</strong></div>
+      <div class="stat"><span>Erreurs</span><strong
+      id="statErrors">-</strong></div>
     </div>
 
     <div class="events">
-      <div class="event-row"><span>Démarré le</span><strong id="startedAt">-</strong></div>
-      <div class="event-row"><span>Dernière détection</span><strong id="lastDetection">-</strong></div>
-      <div class="event-row"><span>Dernière signature</span><strong id="lastSigned">-</strong></div>
-      <div class="event-row"><span>Dernière erreur</span><strong id="lastError">-</strong></div>
+      <div class="event-row"><span>Démarré le</span><strong
+      id="startedAt">-</strong></div>
+      <div class="event-row"><span>Dernière détection</span><strong
+      id="lastDetection">-</strong></div>
+      <div class="event-row"><span>Dernière signature</span><strong
+      id="lastSigned">-</strong></div>
+      <div class="event-row"><span>Dernière erreur</span><strong
+      id="lastError">-</strong></div>
     </div>
 
     <div class="actions">
-      <button type="button" class="primary" data-action="configure">Reconfigurer</button>
-      <button type="button" class="secondary" data-action="test-notification">Tester la notification</button>
-      <button type="button" class="secondary" data-action="check-update">Vérifier les mises à jour</button>
-      <button type="button" class="primary" data-action="install-update" id="updateButton" hidden>Installer la mise à jour</button>
-      <button type="button" class="secondary" data-action="open-logs">Ouvrir les logs</button>
-      <button type="button" class="ghost" data-action="quit">Quitter CheckMate</button>
+      <button type="button" class="primary"
+      data-action="configure">Reconfigurer</button>
+      <button type="button" class="secondary"
+      data-action="test-notification">Tester la notification</button>
+      <button type="button" class="secondary"
+      data-action="check-update">Vérifier les mises à jour</button>
+      <button type="button" class="primary" data-action="install-update"
+      id="updateButton" hidden>Installer la mise à jour</button>
+      <button type="button" class="secondary" data-action="open-logs">Ouvrir
+      les logs</button>
+      <button type="button" class="ghost" data-action="quit">Quitter
+      CheckMate</button>
     </div>
     <section class="channel">
       <label class="channel-toggle">
@@ -220,14 +265,19 @@ let timer = null;
 let stopped = false;
 
 async function api(path, body) {
-  const options = { method: body ? "POST" : "GET", headers: { "X-CheckMate-Token": TOKEN } };
+  const options = {
+    method: body ? "POST" : "GET",
+    headers: { "X-CheckMate-Token": TOKEN },
+  };
   if (body) {
     options.headers["Content-Type"] = "application/json";
     options.body = JSON.stringify(body);
   }
   const response = await fetch(path, options);
   const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data.error || ("erreur " + response.status));
+  if (!response.ok) {
+    throw new Error(data.error || ("erreur " + response.status));
+  }
   return data;
 }
 
@@ -264,7 +314,8 @@ function renderMigration(migration, blocked) {
   document.getElementById("migrationBanner").hidden = !migration;
   if (!migration) return;
   document.getElementById("migrationDetail").textContent =
-    "Installe " + migration.version + " avant les versions suivantes. Raison : " +
+    "Installe " + migration.version +
+    " avant les versions suivantes. Raison : " +
     migration.reason + ".";
   if (blocked) return;
   const button = document.getElementById("updateButton");
@@ -275,7 +326,8 @@ function renderMigration(migration, blocked) {
 function render(snapshot) {
   const dot = document.getElementById("stateDot");
   dot.className = "state-dot " + snapshot.mode;
-  document.getElementById("stateKicker").textContent = snapshot.schedule.enabled
+  const stateKicker = document.getElementById("stateKicker");
+  stateKicker.textContent = snapshot.schedule.enabled
     ? "Surveillance"
     : "Surveillance continue";
   document.getElementById("stateLabel").textContent = snapshot.label;
@@ -289,8 +341,14 @@ function render(snapshot) {
     detail += " ";
   }
   if (snapshot.window) detail += "Créneau " + snapshot.window + ". ";
-  if (snapshot.next_window) detail += "Prochaine ouverture " + formatDate(snapshot.next_window) + ".";
-  if (!snapshot.schedule.enabled) detail = "Le planning est désactivé, la surveillance est continue.";
+  if (snapshot.next_window) {
+    detail += "Prochaine ouverture " +
+      formatDate(snapshot.next_window) + ".";
+  }
+  if (!snapshot.schedule.enabled) {
+    detail = "Le planning est désactivé, " +
+      "la surveillance est continue.";
+  }
   document.getElementById("stateDetail").textContent = detail;
 
   document.getElementById("restartBanner").hidden = !snapshot.restart_required;
@@ -319,13 +377,18 @@ function render(snapshot) {
   });
 
   document.getElementById("statStarts").textContent = snapshot.counters.starts;
-  document.getElementById("statDetections").textContent = snapshot.counters.detections;
+  document.getElementById("statDetections").textContent =
+    snapshot.counters.detections;
   document.getElementById("statSigned").textContent = snapshot.counters.signed;
   document.getElementById("statErrors").textContent = snapshot.counters.errors;
-  document.getElementById("startedAt").textContent = formatDate(snapshot.started_at);
-  document.getElementById("lastDetection").textContent = formatDate(snapshot.last_detection_at);
-  document.getElementById("lastSigned").textContent = formatDate(snapshot.last_signed_at);
-  document.getElementById("lastError").textContent = formatDate(snapshot.last_error_at);
+  document.getElementById("startedAt").textContent =
+    formatDate(snapshot.started_at);
+  document.getElementById("lastDetection").textContent =
+    formatDate(snapshot.last_detection_at);
+  document.getElementById("lastSigned").textContent =
+    formatDate(snapshot.last_signed_at);
+  document.getElementById("lastError").textContent =
+    formatDate(snapshot.last_error_at);
 }
 
 async function refresh() {
@@ -347,7 +410,9 @@ async function refresh() {
 
 async function runAction(action) {
   if (action === "quit") {
-    if (!window.confirm("Quitter CheckMate ? La surveillance sera arretee.")) return;
+    if (!window.confirm(
+      "Quitter CheckMate ? La surveillance sera arretee."
+    )) return;
   }
   if (action === "install-update" && !window.confirm(
     "Installer la mise a jour ? CheckMate va s'arreter puis redemarrer."
@@ -373,8 +438,11 @@ async function runAction(action) {
       document.getElementById("stateDot").className = "state-dot outside";
       document.getElementById("stateLabel").textContent = "CheckMate arrêté";
       document.getElementById("stateDetail").textContent =
-        "Tu peux fermer cette page. Relance CheckMate depuis le menu Démarrer.";
-      document.querySelectorAll("[data-action]").forEach((button) => { button.disabled = true; });
+        "Tu peux fermer cette page. Relance CheckMate " +
+        "depuis le menu Démarrer.";
+      document.querySelectorAll("[data-action]").forEach((button) => {
+        button.disabled = true;
+      });
     } else {
       refresh();
     }
@@ -387,23 +455,29 @@ document.querySelectorAll("[data-action]").forEach((button) => {
   button.addEventListener("click", () => runAction(button.dataset.action));
 });
 
-document.getElementById("betaChannel").addEventListener("change", async (event) => {
+document.getElementById("betaChannel")
+  .addEventListener("change", async (event) => {
   const enabled = event.target.checked;
   if (!enabled && !window.confirm(
-    "Revenir au canal stable ? Tu restes sur cette version beta, mais les prochaines betas ne seront plus proposees."
+    "Revenir au canal stable ? Tu restes sur cette version beta, " +
+    "mais les prochaines betas ne seront plus proposees."
   )) {
     event.target.checked = true;
     return;
   }
   if (enabled && !window.confirm(
-    "Activer le canal beta ? Les mises a jour arrivent souvent et la stabilite n'est pas garantie."
+    "Activer le canal beta ? Les mises a jour arrivent souvent " +
+    "et la stabilite n'est pas garantie."
   )) {
     event.target.checked = false;
     return;
   }
   const channel = enabled ? "beta" : "stable";
   try {
-    const result = await api("/api/action", { action: "set-channel", channel });
+    const result = await api("/api/action", {
+      action: "set-channel",
+      channel,
+    });
     setMessage(result.message || "Canal mis a jour.", "ok");
     refresh();
   } catch (error) {
