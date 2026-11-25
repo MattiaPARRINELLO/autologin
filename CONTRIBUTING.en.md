@@ -183,10 +183,10 @@ Release checklist:
 1. Bump `watcher/src/checkmate_watcher/__init__.py`, `watcher/pyproject.toml`
    and `watcher/uv.lock` together.
 2. Set the two markers for this release.
-3. For a major or minor release, add its summary to
+3. For a stable major or minor release, add its summary to
    `watcher/src/checkmate_watcher/release_notes.json`: title, overview, measured
    gains and accessible explanations. A version without a summary does not open
-   the what's-new popup.
+   the what's-new popup. Betas never open this popup.
 4. Run the local checks.
 5. Tag `beta` for a beta, or `main` for a stable after beta stabilisation.
 6. Follow the `Release` workflow and approve `release-manual` when requested.

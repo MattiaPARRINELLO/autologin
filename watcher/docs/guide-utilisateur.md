@@ -168,9 +168,11 @@ arrière-plan. La configuration et la signature sont conservées.
 
 ### Nouveautés après une mise à jour importante
 
-Après une mise à jour majeure ou mineure, CheckMate ouvre le tableau de bord et
-affiche une fenêtre animée avec les nouveautés. Le résumé explique les changements
-en langage simple et présente les gains mesurés avec leur contexte.
+Après une release stable majeure ou mineure, ou lors du passage d'une beta à sa
+version stable, CheckMate ouvre le tableau de bord et affiche une fenêtre animée
+avec les nouveautés. Le résumé explique les changements en langage simple et
+présente les gains mesurés avec leur contexte. Les betas n'ouvrent pas cette
+fenêtre.
 
 Le résumé est livré avec l'application, pas téléchargé depuis GitHub. Les simples
 correctifs n'ouvrent pas cette fenêtre. Une fois fermée, elle ne réapparaît pas au
