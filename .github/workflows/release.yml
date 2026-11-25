@@ -186,5 +186,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           body=$(gh release view "$GITHUB_REF_NAME" --json body -q .body)
-          { cat .github/release-markers.txt; printf '\n\n%s\n' "$body"; } > release-body.md
+          summary=$(python3 scripts/release-summary.py "$GITHUB_REF_NAME")
+          { cat .github/release-markers.txt; printf '\n%s\n\n%s\n' "$summary" "$body"; } > release-body.md
           gh release edit "$GITHUB_REF_NAME" --notes-file release-body.md
