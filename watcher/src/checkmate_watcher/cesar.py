@@ -31,6 +31,41 @@ READY_SELECTORS = (
     "div.toastui-calendar-layout",
 )
 
+PERFORMANCE_BROWSER_ARGS = (
+    "--disable-gpu",
+    "--disable-dev-shm-usage",
+    "--mute-audio",
+    "--disable-background-networking",
+    "--disable-features=Translate,BackForwardCache",
+)
+BLOCKED_RESOURCE_TYPES = frozenset({"image", "font", "media"})
+BLOCKED_HOST_MARKERS = (
+    "google-analytics.com",
+    "googletagmanager.com",
+    "doubleclick.net",
+    "matomo.",
+    "plausible.io",
+)
+
+
+def _should_block_request(resource_type: str, url: str) -> bool:
+    if resource_type in BLOCKED_RESOURCE_TYPES:
+        return True
+    lowered = url.lower()
+    return any(marker in lowered for marker in BLOCKED_HOST_MARKERS)
+
+
+async def _block_nonessential_request(route) -> None:
+    request = route.request
+    if _should_block_request(request.resource_type, request.url):
+        await route.abort()
+        return
+    headers = request.headers
+    if request.resource_type == "document" and request.is_navigation_request:
+        headers = {**headers, "Cache-Control": "no-cache"}
+    await route.continue_(headers=headers)
+
+
 CALENDAR_IDENTITY_JS = """
 () => {
     const calendar = document.querySelector(
@@ -610,11 +645,16 @@ class CesarSession:
                 user_data_dir=str(self.config.watcher.profile_dir),
                 headless=self.headless,
                 viewport={"width": 1366, "height": 900},
-                args=["--no-first-run", "--no-default-browser-check"],
+                args=[
+                    "--no-first-run",
+                    "--no-default-browser-check",
+                    *PERFORMANCE_BROWSER_ARGS,
+                ],
                 **options,
             )
         )
         self._context.set_default_timeout(20000)
+        await self._context.route("**/*", _block_nonessential_request)
         pages = self._context.pages
         self.page = pages[0] if pages else await self._context.new_page()
         mode = "invisible" if self.headless else "visible"

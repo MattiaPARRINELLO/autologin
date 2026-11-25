@@ -7,7 +7,10 @@ import pytest
 from checkmate_watcher.cesar import (
     CALENDAR_IDENTITY_JS,
     CANVAS_HITTABLE_JS,
+    PERFORMANCE_BROWSER_ARGS,
     CesarSession,
+    _block_nonessential_request,
+    _should_block_request,
     draw_coordinates,
     signal_key,
 )
@@ -57,6 +60,92 @@ def make_session(page: FakePage) -> CesarSession:
     session = CesarSession(make_config())
     session.page = page
     return session
+
+
+class FakeRequest:
+    def __init__(
+        self,
+        resource_type: str,
+        url: str,
+        *,
+        is_navigation_request: bool = False,
+    ) -> None:
+        self.resource_type = resource_type
+        self.url = url
+        self.is_navigation_request = is_navigation_request
+        self.headers = {"Accept": "text/html"}
+
+
+class FakeRoute:
+    def __init__(
+        self,
+        resource_type: str,
+        url: str,
+        *,
+        is_navigation_request: bool = False,
+    ) -> None:
+        self.request = FakeRequest(
+            resource_type,
+            url,
+            is_navigation_request=is_navigation_request,
+        )
+        self.aborted = False
+        self.continued = False
+        self.headers = None
+
+    async def abort(self) -> None:
+        self.aborted = True
+
+    async def continue_(self, headers=None) -> None:
+        self.continued = True
+        self.headers = headers
+
+
+@pytest.mark.parametrize(
+    ("resource_type", "url", "blocked"),
+    [
+        ("image", "https://cesar.example.fr/logo.png", True),
+        ("font", "https://cesar.example.fr/font.woff2", True),
+        ("media", "https://cesar.example.fr/video.mp4", True),
+        ("stylesheet", "https://cesar.example.fr/app.css", False),
+        ("script", "https://cesar.example.fr/app.js", False),
+        ("xhr", "https://google-analytics.com/collect", True),
+        ("fetch", "https://cesar.example.fr/api/status", False),
+    ],
+)
+def test_filtre_des_ressources_non_essentielles(resource_type, url, blocked):
+    assert _should_block_request(resource_type, url) is blocked
+
+
+def test_route_abandonne_les_images_et_conserve_le_css():
+    image = FakeRoute("image", "https://cesar.example.fr/logo.png")
+    stylesheet = FakeRoute("stylesheet", "https://cesar.example.fr/app.css")
+
+    asyncio.run(_block_nonessential_request(image))
+    asyncio.run(_block_nonessential_request(stylesheet))
+
+    assert image.aborted is True
+    assert image.continued is False
+    assert stylesheet.aborted is False
+    assert stylesheet.continued is True
+
+
+def test_navigation_demande_une_reponse_fraiche():
+    route = FakeRoute(
+        "document",
+        "https://cesar.example.fr/",
+        is_navigation_request=True,
+    )
+
+    asyncio.run(_block_nonessential_request(route))
+
+    assert route.continued is True
+    assert route.headers["Cache-Control"] == "no-cache"
+
+
+def test_arguments_de_performance_chromium():
+    assert "--disable-gpu" in PERFORMANCE_BROWSER_ARGS
+    assert "--disable-dev-shm-usage" in PERFORMANCE_BROWSER_ARGS
 
 
 def always_visible(session: CesarSession) -> None:

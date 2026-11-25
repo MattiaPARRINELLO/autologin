@@ -130,6 +130,15 @@ http_cookies_file = "~/.local/share/checkmate-watcher/http-cookies.json"
 Chromium ouvert pendant la surveillance. Le fichier de cookies HTTP contient la
 session CESAR : ne le partage pas et ne le supprime pas pendant un créneau.
 
+Les sélecteurs CESAR peuvent aussi être corrigés à distance depuis un fichier
+JSON HTTPS du dépôt. CheckMate le valide, le met en cache et l'utilise en priorité
+par rapport aux sélecteurs locaux. En cas de panne réseau, le cache local puis
+les valeurs locales sont utilisés. Pour désactiver ce mécanisme :
+
+```bash
+export CHECKMATE_REMOTE_SELECTORS=0
+```
+
 Pour créer une archive de diagnostic sans secret :
 
 ```bash
