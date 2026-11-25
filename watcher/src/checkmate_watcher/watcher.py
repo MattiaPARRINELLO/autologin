@@ -103,6 +103,14 @@ def _pause_reason(schedule, state, now: datetime) -> Pause | None:
     return Pause(label, resume, situation.key)
 
 
+def _log_next_open(pause: Pause) -> None:
+    logger.info(
+        "%s, prochaine ouverture %s",
+        pause.reason,
+        pause.resume.strftime("%d/%m %H:%M"),
+    )
+
+
 async def _wait_for_new_window(
     schedule, current_key: str | None, stop_event=None
 ) -> None:
@@ -405,11 +413,7 @@ async def run_loop(
         pause = _pause_reason(schedule, state, datetime.now())
         if pause is not None:
             if once:
-                logger.info(
-                    "%s, prochaine ouverture %s",
-                    pause.reason,
-                    pause.resume.strftime("%d/%m %H:%M"),
-                )
+                _log_next_open(pause)
                 return 0
             logger.info(
                 "%s (%s), reprise vers %s",
@@ -437,11 +441,7 @@ async def run_loop(
                 pause = _pause_reason(schedule, state, now)
                 if pause is not None:
                     if once:
-                        logger.info(
-                            "%s, prochaine ouverture %s",
-                            pause.reason,
-                            pause.resume.strftime("%d/%m %H:%M"),
-                        )
+                        _log_next_open(pause)
                         return 0
                     logger.info(
                         "%s, pause jusqu'a %s",

@@ -16,6 +16,10 @@ INTERRUPTED_MESSAGE = (
     "La connexion à CESAR a été interrompue. Réessaie dans quelques instants."
 )
 UNREACHABLE_MESSAGE = "CESAR est injoignable pour le moment."
+CERTIFICATE_MESSAGE = (
+    "Le certificat de CESAR n'est pas valide. "
+    "Ne saisis pas tes identifiants tant que le problème persiste."
+)
 
 # Les motifs sont testés dans l'ordre : les plus spécifiques d'abord, les
 # génériques en dernier.
@@ -48,18 +52,12 @@ HINTS = (
     (
         "ERR_CERT_",
         "securite",
-        (
-            "Le certificat de CESAR n'est pas valide. "
-            "Ne saisis pas tes identifiants tant que le problème persiste."
-        ),
+        CERTIFICATE_MESSAGE,
     ),
     (
         "certificate",
         "securite",
-        (
-            "Le certificat de CESAR n'est pas valide. "
-            "Ne saisis pas tes identifiants tant que le problème persiste."
-        ),
+        CERTIFICATE_MESSAGE,
     ),
     (
         "Executable doesn't exist",
