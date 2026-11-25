@@ -582,6 +582,13 @@ def _charger_points_signature(path: Path) -> tuple[list | None, object | None]:
         return None, exc
 
 
+def _enregistrer_points_import(config: Config, points: list) -> None:
+    save_signature(config.signature.file, points)
+    _afficher_import_signature(
+        points=len(points), fichier=config.signature.file
+    )
+
+
 def command_import_signature(config: Config, file_path: str | None) -> int:
     if not file_path:
         _afficher_import_signature(manquant=True)
@@ -590,10 +597,7 @@ def command_import_signature(config: Config, file_path: str | None) -> int:
     if erreur:
         _afficher_import_signature(erreur=erreur)
         return 1
-    save_signature(config.signature.file, points)
-    _afficher_import_signature(
-        points=len(points), fichier=config.signature.file
-    )
+    _enregistrer_points_import(config, points)
     return 0
 
 
@@ -928,6 +932,12 @@ def _charger_config(args) -> Config | int:
         return 2
 
 
+def _dispatch_update(config: Config, args) -> int | None:
+    if args.command != "update":
+        return None
+    return command_update(config, check_only=args.check, assume_yes=args.yes)
+
+
 def _dispatch_actions(config: Config, args) -> int | None:
     if args.command == "set-password":
         return command_set_password(config)
@@ -935,11 +945,7 @@ def _dispatch_actions(config: Config, args) -> int | None:
         return command_self_test(config, notify=args.notify)
     if args.command == "import-signature":
         return command_import_signature(config, args.file)
-    if args.command == "update":
-        return command_update(
-            config, check_only=args.check, assume_yes=args.yes
-        )
-    return None
+    return _dispatch_update(config, args)
 
 
 def _dispatch_inspection(config: Config, args) -> int | None:

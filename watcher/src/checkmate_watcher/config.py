@@ -469,6 +469,12 @@ def _write_config_atomically(target: Path, payload: str) -> Path:
         _discard_temp(temporary)
 
 
+def _prepare_config_target(path: str | Path) -> Path:
+    target = expand_path(str(path))
+    target.parent.mkdir(parents=True, exist_ok=True)
+    return target
+
+
 def save_config(
     path: str | Path,
     config: Config,
@@ -477,8 +483,7 @@ def save_config(
     password_env: str | None = None,
 ) -> Path:
     """Ecrit la configuration de facon atomique, lisible par l'utilisateur seul."""
-    target = expand_path(str(path))
-    target.parent.mkdir(parents=True, exist_ok=True)
+    target = _prepare_config_target(path)
     payload = _config_payload(
         config, password=password, password_env=password_env
     )
@@ -546,19 +551,26 @@ def _load_cesar(data: dict, *, require_password: bool) -> CesarConfig:
     return _build_cesar(table, base_url, username, password, service)
 
 
-def _watcher_timing(table: dict, defaults: WatcherConfig) -> dict:
+def _watcher_auto_config(table: dict, defaults: WatcherConfig) -> dict:
     return {
+        "auto_sign": _bool(table, "auto_sign", defaults.auto_sign),
+        "auto_sign_delay": _int(
+            table, "auto_sign_delay", defaults.auto_sign_delay
+        ),
+    }
+
+
+def _watcher_timing(table: dict, defaults: WatcherConfig) -> dict:
+    data = {
         "poll_interval": _int(table, "poll_interval", defaults.poll_interval),
         "dedupe_ttl": _int(table, "dedupe_ttl", defaults.dedupe_ttl),
         "confirm_timeout": _int(
             table, "confirm_timeout", defaults.confirm_timeout
         ),
         "prompt_retry": _int(table, "prompt_retry", defaults.prompt_retry),
-        "auto_sign": _bool(table, "auto_sign", defaults.auto_sign),
-        "auto_sign_delay": _int(
-            table, "auto_sign_delay", defaults.auto_sign_delay
-        ),
     }
+    data.update(_watcher_auto_config(table, defaults))
+    return data
 
 
 def _watcher_path_config(table: dict, defaults: WatcherConfig) -> dict:
@@ -571,6 +583,11 @@ def _watcher_path_config(table: dict, defaults: WatcherConfig) -> dict:
     }
 
 
+def _watcher_transport(table: dict, defaults: WatcherConfig) -> str:
+    raw = table.get("transport", defaults.transport)
+    return str(raw).strip().lower()
+
+
 def _watcher_flags(table: dict, defaults: WatcherConfig) -> dict:
     data = {
         "headless": _bool(table, "headless", defaults.headless),
@@ -578,9 +595,7 @@ def _watcher_flags(table: dict, defaults: WatcherConfig) -> dict:
             table, "visible_on_sign", defaults.visible_on_sign
         ),
         "executable_path": _opt_str(table, "executable_path"),
-        "transport": str(table.get("transport", defaults.transport))
-        .strip()
-        .lower(),
+        "transport": _watcher_transport(table, defaults),
     }
     data.update(_watcher_path_config(table, defaults))
     return data
@@ -657,9 +672,7 @@ def _validate_padding(signature: SignatureConfig) -> None:
         )
 
 
-def _validate_limits(
-    watcher: WatcherConfig, signature: SignatureConfig
-) -> None:
+def _validate_watcher(watcher: WatcherConfig) -> None:
     if watcher.transport not in {"browser", "http"}:
         raise ConfigError(
             "[watcher] transport doit valoir 'browser' ou 'http'"
@@ -670,6 +683,12 @@ def _validate_limits(
         raise ConfigError("[watcher] confirm_timeout doit etre >= 10 secondes")
     if watcher.prompt_retry < 30:
         raise ConfigError("[watcher] prompt_retry doit etre >= 30 secondes")
+
+
+def _validate_limits(
+    watcher: WatcherConfig, signature: SignatureConfig
+) -> None:
+    _validate_watcher(watcher)
     _validate_padding(signature)
 
 

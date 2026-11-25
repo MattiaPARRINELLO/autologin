@@ -91,7 +91,7 @@ MARKER_PATTERN = re.compile(
 )
 
 
-def _release_markers(body: object) -> tuple[str | None, str | None, bool]:
+def _marker_values(body: object) -> tuple[dict, set[str]]:
     values = {"MIGRATION": None, "REQUIRED": None}
     seen = set()
     for match in MARKER_PATTERN.finditer(str(body or "")):
@@ -99,6 +99,11 @@ def _release_markers(body: object) -> tuple[str | None, str | None, bool]:
         reason = match.group(2).strip()
         seen.add(kind)
         values[kind] = None if reason == "0" else reason
+    return values, seen
+
+
+def _release_markers(body: object) -> tuple[str | None, str | None, bool]:
+    values, seen = _marker_values(body)
     return (
         values["MIGRATION"],
         values["REQUIRED"],

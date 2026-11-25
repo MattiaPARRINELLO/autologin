@@ -137,15 +137,16 @@ class SetupSession:
 
     # --- etat ---
 
+    def _schedule_windows(self) -> list[str]:
+        return [str(window) for window in self.config.schedule.windows]
+
     def state(self) -> dict:
         return {
             "username": self.config.cesar.username,
             "base_url": self.config.cesar.base_url,
             "has_signature": self._has_signature(),
             "days": self._active_days(),
-            "windows": [
-                str(window) for window in self.config.schedule.windows
-            ],
+            "windows": self._schedule_windows(),
             "notifications": self.config.notifications.enabled,
             "keyring": keyring_available(),
         }
@@ -170,13 +171,17 @@ class SetupSession:
     # --- validation ---
 
     @staticmethod
-    def _text(
-        payload: dict, key: str, label: str, *, max_length: int = 300
-    ) -> str:
+    def _text_value(payload: dict, key: str, label: str) -> str:
         value = payload.get(key)
         if not isinstance(value, str) or not value.strip():
             raise SetupError(f"{label} obligatoire")
-        value = value.strip()
+        return value.strip()
+
+    @staticmethod
+    def _text(
+        payload: dict, key: str, label: str, *, max_length: int = 300
+    ) -> str:
+        value = SetupSession._text_value(payload, key, label)
         if "\n" in value or "\r" in value:
             raise SetupError(f"{label} invalide")
         if len(value) > max_length:
@@ -525,6 +530,9 @@ class _Handler(LocalHandler):
         if path == "/api/finish":
             self.session.finished.set()
 
+    def _test_notification(self, payload: dict[str, Any]) -> Any:
+        return self.session.test_notification()
+
     def _routes(self) -> dict[str, Any]:
         return {
             "/api/test-login": self.session.test_login,
@@ -532,9 +540,7 @@ class _Handler(LocalHandler):
             "/api/signature": self.session.save_signature,
             "/api/import-signature": self.session.import_signature,
             "/api/schedule": self.session.save_schedule,
-            "/api/test-notification": lambda _: (
-                self.session.test_notification()
-            ),
+            "/api/test-notification": self._test_notification,
             "/api/finish": self.session.finish,
         }
 

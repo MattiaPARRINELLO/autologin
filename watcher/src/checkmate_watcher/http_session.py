@@ -261,18 +261,21 @@ def _cookie_data(cookie: Cookie) -> dict:
     }
 
 
-def _cookie_values(data: dict) -> tuple:
-    head = (0, data["name"], data["value"], None, False, data["domain"], True)
-    middle = (data["domain"].startswith("."), data["path"], True)
-    middle += (data["secure"], data.get("expires"))
-    tail = (
+def _cookie_tail(data: dict) -> tuple:
+    return (
         data.get("discard", True),
         None,
         None,
         data.get("rest") or {},
         False,
     )
-    return head + middle + tail
+
+
+def _cookie_values(data: dict) -> tuple:
+    head = (0, data["name"], data["value"], None, False, data["domain"], True)
+    middle = (data["domain"].startswith("."), data["path"], True)
+    middle += (data["secure"], data.get("expires"))
+    return head + middle + _cookie_tail(data)
 
 
 def _cookie_from_data(data: dict) -> Cookie:

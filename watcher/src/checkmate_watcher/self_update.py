@@ -60,10 +60,7 @@ exit "$status"
 """
 
 
-def install(archive: Path, *, cleanup: Path | None = None) -> None:
-    """Lance l'installation en arriere-plan puis rend la main."""
-    if not archive.is_file():
-        raise UpdateError("paquet de mise a jour introuvable")
+def _install_for_platform(archive: Path, cleanup: Path | None) -> None:
     if sys.platform.startswith("win"):
         _install_windows(archive)
     elif sys.platform.startswith("linux"):
@@ -74,16 +71,19 @@ def install(archive: Path, *, cleanup: Path | None = None) -> None:
         )
 
 
+def install(archive: Path, *, cleanup: Path | None = None) -> None:
+    """Lance l'installation en arriere-plan puis rend la main."""
+    if not archive.is_file():
+        raise UpdateError("paquet de mise a jour introuvable")
+    _install_for_platform(archive, cleanup)
+
+
 def _install_windows(archive: Path) -> None:
-    flags = (
-        0x00000008 | 0x00000200
-    )  # DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP
+    # DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP.
+    flags = 0x00000008 | 0x00000200
     try:
-        subprocess.Popen(
-            [str(archive), *WINDOWS_FLAGS],
-            close_fds=True,
-            creationflags=flags,
-        )
+        options = {"close_fds": True, "creationflags": flags}
+        subprocess.Popen([str(archive), *WINDOWS_FLAGS], **options)
     except OSError as exc:
         raise UpdateError(
             f"lancement de l'installeur impossible : {exc}"
@@ -149,18 +149,22 @@ def _spawn_systemd_update(runner, script, unit) -> bool:
     return True
 
 
-def _try_systemd_run(script, unit):
-    runner = shutil.which("systemd-run")
-    if runner is None:
-        return False
-    if not _spawn_systemd_update(runner, script, unit):
-        return False
+def _systemd_unit_ready(unit: str) -> bool:
     if _transient_unit_active(unit):
         return True
     logger.warning(
         "unite %s inactive, installation dans le cgroup du service", unit
     )
     return False
+
+
+def _try_systemd_run(script, unit):
+    runner = shutil.which("systemd-run")
+    if runner is None:
+        return False
+    if not _spawn_systemd_update(runner, script, unit):
+        return False
+    return _systemd_unit_ready(unit)
 
 
 def _spawn_detached(argv: list[str]) -> None:
@@ -186,8 +190,8 @@ def _quote(value: str) -> str:
     return "'" + value.replace("'", "'\\''") + "'"
 
 
-def _transient_unit_state(unit: str) -> str | None:
-    command = (
+def _systemctl_state_command(unit: str) -> tuple[str, ...]:
+    return (
         "systemctl",
         "--user",
         "show",
@@ -195,6 +199,10 @@ def _transient_unit_state(unit: str) -> str | None:
         "--value",
         unit,
     )
+
+
+def _transient_unit_state(unit: str) -> str | None:
+    command = _systemctl_state_command(unit)
     try:
         result = subprocess.run(
             command, capture_output=True, text=True, timeout=2, check=False

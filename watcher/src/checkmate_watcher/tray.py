@@ -93,18 +93,22 @@ class TrayController:
         self._stop = threading.Event()
         self._shown: tuple[str, str] | None = None
 
-    def start(self) -> None:
-        if self._start_sni():
-            self._start_watcher()
-            return
+    def _start_xembed(self) -> bool:
         if pystray is None or Image is None:
             logger.info(
                 "icone de notification indisponible sur cette plateforme"
             )
-            return
+            return False
         self._thread = threading.Thread(target=self._run, daemon=True)
         self._thread.start()
-        self._start_watcher()
+        return True
+
+    def start(self) -> None:
+        if self._start_sni():
+            self._start_watcher()
+            return
+        if self._start_xembed():
+            self._start_watcher()
 
     def _start_watcher(self) -> None:
         self._watcher = threading.Thread(target=self._watch, daemon=True)

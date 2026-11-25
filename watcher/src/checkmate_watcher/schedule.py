@@ -143,13 +143,17 @@ def parse_time(value: str) -> time:
         ) from exc
 
 
-def parse_window(value: str) -> Window:
-    text = str(value).strip()
+def _split_window(value: str, text: str) -> tuple[str, str]:
     if "-" not in text:
         raise ScheduleError(
             f"plage invalide : {value!r} (attendu HH:MM-HH:MM)"
         )
-    start_text, end_text = text.split("-", 1)
+    return tuple(text.split("-", 1))
+
+
+def parse_window(value: str) -> Window:
+    text = str(value).strip()
+    start_text, end_text = _split_window(value, text)
     start = parse_time(start_text)
     end = parse_time(end_text)
     if end <= start:

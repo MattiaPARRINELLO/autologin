@@ -414,6 +414,14 @@ class SniTray:
         await watcher.call_register_status_notifier_item(name)
         logger.info("icone StatusNotifierItem enregistree")
 
+    def _update_state(
+        self, title: str, pixmaps: list, status: str, label: str
+    ) -> None:
+        self.state.title = title
+        self.state.label = label
+        self.state.pixmaps = pixmaps
+        self.state.status = status
+
     def update(
         self,
         title: str,
@@ -421,10 +429,10 @@ class SniTray:
         status: str = "Active",
         label: str = "",
     ) -> None:
-        self.state.title = title
-        self.state.label = label
-        self.state.pixmaps = pixmaps
-        self.state.status = status
+        self._update_state(title, pixmaps, status, label)
+        self._schedule_updates()
+
+    def _schedule_updates(self) -> None:
         if self._loop is None or self._item is None:
             return
         self._loop.call_soon_threadsafe(self._emit_updates)

@@ -123,26 +123,32 @@ def _send_notify_send(title, message, *, app_name, icon, urgency):
     return _notify_send_succeeded(_run_notify_send(command))
 
 
+GDBUS_PREFIX = (
+    "call",
+    "--session",
+    "--dest",
+    "org.freedesktop.Notifications",
+    "--object-path",
+    "/org/freedesktop/Notifications",
+    "--method",
+    "org.freedesktop.Notifications.Notify",
+)
+GDBUS_SUFFIX = ("[]", "{}", "5000")
+
+
+def _gdbus_values(app_name, icon, title, message) -> list[str]:
+    return [
+        _gvariant(app_name),
+        "0",
+        _gvariant(icon),
+        _gvariant(title),
+        _gvariant(message),
+    ]
+
+
 def _gdbus_command(binary, app_name, icon, title, message):
-    return (
-        [
-            binary,
-            "call",
-            "--session",
-            "--dest",
-            "org.freedesktop.Notifications",
-        ]
-        + ["--object-path", "/org/freedesktop/Notifications", "--method"]
-        + ["org.freedesktop.Notifications.Notify", _gvariant(app_name), "0"]
-        + [
-            _gvariant(icon),
-            _gvariant(title),
-            _gvariant(message),
-            "[]",
-            "{}",
-            "5000",
-        ]
-    )
+    values = _gdbus_values(app_name, icon, title, message)
+    return [binary, *GDBUS_PREFIX, *values, *GDBUS_SUFFIX]
 
 
 def _run_gdbus(command):
@@ -155,11 +161,7 @@ def _run_gdbus(command):
         return None
 
 
-def _send_gdbus(title, message, *, app_name, icon):
-    binary = shutil.which("gdbus")
-    if not binary:
-        return False
-    result = _run_gdbus(_gdbus_command(binary, app_name, icon, title, message))
+def _gdbus_succeeded(result) -> bool:
     if result is None:
         return False
     if result.returncode != 0:
@@ -168,6 +170,14 @@ def _send_gdbus(title, message, *, app_name, icon):
         )
         return False
     return True
+
+
+def _send_gdbus(title, message, *, app_name, icon):
+    binary = shutil.which("gdbus")
+    if not binary:
+        return False
+    result = _run_gdbus(_gdbus_command(binary, app_name, icon, title, message))
+    return _gdbus_succeeded(result)
 
 
 def _start_menu_shortcut(app_name: str) -> Path | None:
@@ -205,15 +215,15 @@ def _toast_command(powershell: str, encoded: str) -> list[str]:
     ]
 
 
+def _encoded_toast() -> str:
+    return base64.b64encode(TOAST_SCRIPT.encode("utf-16-le")).decode("ascii")
+
+
 def _run_toast(powershell, title, message, app_id):
-    encoded = base64.b64encode(TOAST_SCRIPT.encode("utf-16-le")).decode(
-        "ascii"
-    )
     try:
         options = _subprocess_options(20, _toast_env(title, message, app_id))
-        return subprocess.run(
-            _toast_command(powershell, encoded), check=False, **options
-        )
+        command = _toast_command(powershell, _encoded_toast())
+        return subprocess.run(command, check=False, **options)
     except (OSError, subprocess.SubprocessError) as exc:
         logger.warning("notification Windows echouee : %s", exc)
         return None
@@ -313,6 +323,12 @@ def _run_zenity(command, timeout):
         raise DialogUnavailable(f"zenity a echoue : {exc}") from exc
 
 
+def _raise_zenity_error(stderr: str) -> None:
+    raise DialogUnavailable(
+        f"zenity n'a pas pu afficher la confirmation : {stderr}"
+    )
+
+
 def _zenity_result(result, timeout):
     if result.returncode == 0:
         return True
@@ -322,9 +338,7 @@ def _zenity_result(result, timeout):
     stderr = (result.stderr or "").strip()
     if not stderr:
         return False
-    raise DialogUnavailable(
-        f"zenity n'a pas pu afficher la confirmation : {stderr}"
-    )
+    _raise_zenity_error(stderr)
 
 
 def ask_zenity(text, *, timeout, title, ok_label, cancel_label):
@@ -372,18 +386,22 @@ def _make_close(root, answer):
     return close
 
 
-def _build_tk_dialog(root, text, ok_label, cancel_label, close, tk):
-    tk.Label(
-        root, text=text, wraplength=460, justify="left", padx=20, pady=16
-    ).pack()
-    buttons = tk.Frame(root, padx=16, pady=12)
-    buttons.pack()
+def _build_tk_buttons(buttons, ok_label, cancel_label, close, tk):
     tk.Button(
         buttons, text=ok_label, width=18, command=lambda: close(True)
     ).pack(side="left", padx=6)
     tk.Button(
         buttons, text=cancel_label, width=12, command=lambda: close(False)
     ).pack(side="left", padx=6)
+
+
+def _build_tk_dialog(root, text, ok_label, cancel_label, close, tk):
+    tk.Label(
+        root, text=text, wraplength=460, justify="left", padx=20, pady=16
+    ).pack()
+    buttons = tk.Frame(root, padx=16, pady=12)
+    buttons.pack()
+    _build_tk_buttons(buttons, ok_label, cancel_label, close, tk)
 
 
 def _run_tk_dialog(root, timeout, close):
@@ -452,11 +470,7 @@ class Notifier:
         self.icon = icon
         self.platform = platform or sys.platform
 
-    def send(self, title, message, *, urgency="critical"):
-        if self.platform.startswith("win"):
-            return send_windows(title, message, app_name=self.app_name)
-        if self.platform == "darwin":
-            return send_macos(title, message)
+    def _send_linux(self, title, message, urgency) -> bool:
         return send_linux(
             title,
             message,
@@ -464,6 +478,13 @@ class Notifier:
             icon=self.icon,
             urgency=urgency,
         )
+
+    def send(self, title, message, *, urgency="critical"):
+        if self.platform.startswith("win"):
+            return send_windows(title, message, app_name=self.app_name)
+        if self.platform == "darwin":
+            return send_macos(title, message)
+        return self._send_linux(title, message, urgency)
 
     def ask(
         self,
