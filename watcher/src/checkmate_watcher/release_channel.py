@@ -40,7 +40,9 @@ class ReleaseChannel:
 
 def _version_from_tag(tag: str) -> Version:
     if not TAG_PATTERN.match(tag):
-        raise ValueError(f"tag de release attendu : {TAG_PREFIX}vX.Y.Z[-beta.N]")
+        raise ValueError(
+            f"tag de release attendu : {TAG_PREFIX}vX.Y.Z[-beta.N]"
+        )
     version = parse_version(tag)
     if version is None:
         raise ValueError(f"version illisible dans le tag {tag}")

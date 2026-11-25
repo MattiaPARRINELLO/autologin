@@ -16,7 +16,9 @@ def test_dns_failure_est_expliquee():
 
 def test_connexion_refusee_est_expliquee():
     kind, message = describe_error(
-        Exception("net::ERR_CONNECTION_REFUSED at https://cesar.emineo-education.fr/")
+        Exception(
+            "net::ERR_CONNECTION_REFUSED at https://cesar.emineo-education.fr/"
+        )
     )
     assert kind == "reseau"
     assert "refuse la connexion" in message
@@ -55,13 +57,17 @@ def test_cause_curl_certificat_est_signalee():
 
 
 def test_echec_de_connexion_cesar():
-    kind, message = describe_error(LoginError("champs de connexion introuvables"))
+    kind, message = describe_error(
+        LoginError("champs de connexion introuvables")
+    )
     assert kind == "connexion"
     assert "champs de connexion introuvables" in message
 
 
 def test_echec_de_signature():
-    kind, message = describe_error(SignError("canvas de signature sans dimensions"))
+    kind, message = describe_error(
+        SignError("canvas de signature sans dimensions")
+    )
     assert kind == "signature"
     assert "signature" in message
 

@@ -98,7 +98,9 @@ class TrayController:
             self._start_watcher()
             return
         if pystray is None or Image is None:
-            logger.info("icone de notification indisponible sur cette plateforme")
+            logger.info(
+                "icone de notification indisponible sur cette plateforme"
+            )
             return
         self._thread = threading.Thread(target=self._run, daemon=True)
         self._thread.start()
@@ -171,7 +173,9 @@ class TrayController:
     def _safe(self, action) -> None:
         try:
             result = action()
-            message = result.get("message") if isinstance(result, dict) else None
+            message = (
+                result.get("message") if isinstance(result, dict) else None
+            )
             if message:
                 self._notify(message)
         except Exception as exc:
@@ -212,7 +216,9 @@ class TrayController:
 
     def _refresh_sni(self, title: str, mode: str, label: str) -> bool:
         try:
-            self.sni.update(title, status_pixmaps(mode), status_level(mode), label)
+            self.sni.update(
+                title, status_pixmaps(mode), status_level(mode), label
+            )
             self._shown = (mode, label)
             return True
         except Exception:

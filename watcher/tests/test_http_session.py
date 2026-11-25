@@ -124,7 +124,9 @@ def attendance_line(
         "signingOff": signing_off,
         "signature": {"signed": True} if signed else None,
         "attendanceWithoutSignature": False,
-        "planningGroupSubscription": {"studentRegistration": {"uuid": student_uuid}},
+        "planningGroupSubscription": {
+            "studentRegistration": {"uuid": student_uuid}
+        },
     }
 
 
@@ -167,7 +169,9 @@ def test_detecte_uniquement_l_emargement_ouvert_de_l_etudiant(tmp_path):
             [attendance_line("other-line", student_uuid="student-2")],
             "Autre etudiant",
         ),
-        course("signed", [attendance_line("signed-line", signed=True)], "Signe"),
+        course(
+            "signed", [attendance_line("signed-line", signed=True)], "Signe"
+        ),
         course(
             "expired",
             [
@@ -240,14 +244,21 @@ def test_session_expiree_relance_le_login(tmp_path):
             FakeResponse(dashboard),
         ]
     )
-    fake.cookies.set("PHPSESSID", "expired", domain="cesar.example.fr", secure=True)
+    fake.cookies.set(
+        "PHPSESSID", "expired", domain="cesar.example.fr", secure=True
+    )
     session = HttpCesarSession(config)
     session._session = fake
 
     signal = asyncio.run(session.check())
 
     assert signal is not None
-    assert [method for method, _, _ in fake.calls] == ["GET", "GET", "POST", "GET"]
+    assert [method for method, _, _ in fake.calls] == [
+        "GET",
+        "GET",
+        "POST",
+        "GET",
+    ]
     assert fake.calls[2][2]["data"]["_csrf_token"] == "new-csrf"
     assert config.watcher.http_cookies_file.is_file()
 
@@ -308,7 +319,9 @@ def test_cookies_http_sont_persistes_avec_permissions_restreintes(tmp_path):
 
     session._login()
 
-    saved = json.loads(config.watcher.http_cookies_file.read_text(encoding="utf-8"))
+    saved = json.loads(
+        config.watcher.http_cookies_file.read_text(encoding="utf-8")
+    )
     assert saved[0]["name"] == "PHPSESSID"
     assert saved[0]["value"] == "session-secret"
     assert saved[0]["domain"] == "cesar.example.fr"
@@ -337,7 +350,9 @@ def test_cookies_persistants_evitent_un_nouveau_login(tmp_path, monkeypatch):
         encoding="utf-8",
     )
     fake = FakeSession([])
-    monkeypatch.setattr(http_session.curl_requests, "Session", lambda **kwargs: fake)
+    monkeypatch.setattr(
+        http_session.curl_requests, "Session", lambda **kwargs: fake
+    )
     session = HttpCesarSession(config)
 
     asyncio.run(session.open())
@@ -374,7 +389,9 @@ def test_cookies_d_un_autre_domaine_sont_ignores(tmp_path, monkeypatch):
         encoding="utf-8",
     )
     fake = FakeSession([])
-    monkeypatch.setattr(http_session.curl_requests, "Session", lambda **kwargs: fake)
+    monkeypatch.setattr(
+        http_session.curl_requests, "Session", lambda **kwargs: fake
+    )
     session = HttpCesarSession(config)
 
     asyncio.run(session.open())
@@ -383,7 +400,9 @@ def test_cookies_d_un_autre_domaine_sont_ignores(tmp_path, monkeypatch):
     assert names == {"PHPSESSID"}
 
 
-def test_cookie_http_non_secure_reste_non_secure_dans_chrome(tmp_path, monkeypatch):
+def test_cookie_http_non_secure_reste_non_secure_dans_chrome(
+    tmp_path, monkeypatch
+):
     browsers: list[FakeBrowser] = []
 
     def browser_factory(config):

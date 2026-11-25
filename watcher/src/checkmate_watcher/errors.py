@@ -6,7 +6,9 @@ from .cesar import CesarError, LoginError, SignError
 
 MAX_MESSAGE = 200
 
-TIMEOUT_MESSAGE = "CESAR met trop de temps à répondre. Vérifie la connexion internet."
+TIMEOUT_MESSAGE = (
+    "CESAR met trop de temps à répondre. Vérifie la connexion internet."
+)
 
 DNS_MESSAGE = (
     "CESAR est injoignable : le nom de domaine ne se résout pas. "

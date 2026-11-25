@@ -115,7 +115,9 @@ class SignatureDiagnostics:
         try:
             await canvas.evaluate(INSTALL_RECORDER_JS)
         except Exception:
-            logger.debug("enregistreur d'evenements indisponible", exc_info=True)
+            logger.debug(
+                "enregistreur d'evenements indisponible", exc_info=True
+            )
         await self.add_step("avant le trace", canvas, None)
 
     async def add_step(self, label: str, canvas, ink: dict | None) -> None:
@@ -125,7 +127,12 @@ class SignatureDiagnostics:
         except Exception:
             logger.debug("etape de diagnostic indisponible", exc_info=True)
             return
-        step = {"label": label, "ink": ink, "context": context, "events": events}
+        step = {
+            "label": label,
+            "ink": ink,
+            "context": context,
+            "events": events,
+        }
         self.payload["steps"].append(step)
         logger.info("diagnostic signature (%s) : %s", label, summary(step))
 
@@ -133,16 +140,24 @@ class SignatureDiagnostics:
         try:
             self.attempt_dir.mkdir(parents=True, exist_ok=True)
             data_url = await canvas.evaluate(CANVAS_PNG_JS)
-            (self.attempt_dir / "canvas.png").write_bytes(decode_data_url(data_url))
+            (self.attempt_dir / "canvas.png").write_bytes(
+                decode_data_url(data_url)
+            )
             if self.page is not None:
-                await self.page.screenshot(path=str(self.attempt_dir / "page.png"))
-            self.payload["savedAt"] = datetime.now().isoformat(timespec="seconds")
+                await self.page.screenshot(
+                    path=str(self.attempt_dir / "page.png")
+                )
+            self.payload["savedAt"] = datetime.now().isoformat(
+                timespec="seconds"
+            )
             (self.attempt_dir / "diagnostic.json").write_text(
                 json.dumps(self.payload, ensure_ascii=False, indent=2),
                 encoding="utf-8",
             )
         except Exception:
-            logger.warning("diagnostic de signature non enregistre", exc_info=True)
+            logger.warning(
+                "diagnostic de signature non enregistre", exc_info=True
+            )
             return
         prune(self.directory)
         logger.info("diagnostic signature enregistre : %s", self.attempt_dir)
@@ -172,7 +187,9 @@ def _canvas_text(context: dict, box: dict) -> str:
     )
 
 
-def _details_text(context: dict, events: dict, hit: dict, ink_text: str) -> str:
+def _details_text(
+    context: dict, events: dict, hit: dict, ink_text: str
+) -> str:
     return (
         f" recouvert {context.get('covered')}"
         f" par {hit.get('tag')}.{hit.get('className')},"
@@ -189,7 +206,9 @@ def summary(step: dict) -> str:
     hit = context.get("hit") or {}
     box = context.get("box") or {}
     ink_text = _ink_text(step.get("ink") or {})
-    return _canvas_text(context, box) + _details_text(context, events, hit, ink_text)
+    return _canvas_text(context, box) + _details_text(
+        context, events, hit, ink_text
+    )
 
 
 def prune(directory: Path, keep: int = MAX_ATTEMPTS) -> None:

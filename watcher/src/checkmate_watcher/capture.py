@@ -106,7 +106,9 @@ MASK_JS = """
 SENSITIVE_META = re.compile(
     r'<meta\b[^>]*\bname="(?:app-user|user|csrf[^"]*)"[^>]*>', re.IGNORECASE
 )
-SENSITIVE_INPUT = re.compile(r'<input\b[^>]*\bname="_?csrf[^"]*"[^>]*>', re.IGNORECASE)
+SENSITIVE_INPUT = re.compile(
+    r'<input\b[^>]*\bname="_?csrf[^"]*"[^>]*>', re.IGNORECASE
+)
 
 FORM_ACTION = re.compile(r'(<form\b[^>]*\baction=")([^"]*)(")', re.IGNORECASE)
 CSS_URL = re.compile(r"url\(\s*(['\"]?)([^'\")]+)\1\s*\)")
@@ -140,7 +142,9 @@ class CaptureSession:
         (self.root / PAGES_DIR).mkdir(parents=True, exist_ok=True)
         (self.root / ASSETS_DIR).mkdir(parents=True, exist_ok=True)
         self._playwright = await async_playwright().start()
-        options = resolve_launch_options(self._playwright.chromium, None).as_kwargs()
+        options = resolve_launch_options(
+            self._playwright.chromium, None
+        ).as_kwargs()
         self._browser = await self._playwright.chromium.launch(
             headless=headless,
             args=["--no-first-run", "--no-default-browser-check"],
@@ -159,7 +163,9 @@ class CaptureSession:
             raise RuntimeError("capture non demarree")
         await self.page.goto(self.base_url + path, wait_until="networkidle")
 
-    async def save_step(self, name: str, mask_selectors: Sequence[str] = ()) -> Path:
+    async def save_step(
+        self, name: str, mask_selectors: Sequence[str] = ()
+    ) -> Path:
         if self.page is None:
             raise RuntimeError("capture non demarree")
         body = await self.page.evaluate(MASK_JS, list(mask_selectors))
@@ -190,7 +196,9 @@ class CaptureSession:
             "assets": self.assets,
         }
         path = self.root / METADATA_NAME
-        path.write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
+        path.write_text(
+            json.dumps(metadata, indent=2) + "\n", encoding="utf-8"
+        )
 
     def _on_response(self, response) -> None:
         task = asyncio.create_task(self._store_response(response))
@@ -279,7 +287,9 @@ def rewrite_stylesheets(root: Path, mapping: dict[str, str]) -> None:
         if path.suffix != ".css" or not path.is_file():
             continue
         css = path.read_text(encoding="utf-8")
-        path.write_text(rewrite_css_urls(css, origin, mapping), encoding="utf-8")
+        path.write_text(
+            rewrite_css_urls(css, origin, mapping), encoding="utf-8"
+        )
 
 
 def rewrite_css_urls(css: str, origin: str, mapping: dict[str, str]) -> str:
@@ -300,7 +310,9 @@ def strip_har_secrets(path: Path) -> None:
     for entry in har.get("log", {}).get("entries", []):
         scrub_message(entry.get("request", {}))
         scrub_message(entry.get("response", {}))
-    path.write_text(json.dumps(har, ensure_ascii=False, indent=2), encoding="utf-8")
+    path.write_text(
+        json.dumps(har, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
 
 
 def _visible_headers(message: dict) -> list:
@@ -313,7 +325,11 @@ def _visible_headers(message: dict) -> list:
 
 def _visible_content(message: dict) -> dict:
     content = message.get("content", {})
-    return {key: value for key, value in content.items() if key in SECRET_CONTENT_KEYS}
+    return {
+        key: value
+        for key, value in content.items()
+        if key in SECRET_CONTENT_KEYS
+    }
 
 
 def scrub_message(message: dict) -> None:
@@ -396,7 +412,9 @@ async def run_capture(args: argparse.Namespace) -> None:
     print(f"\nScenario ecrit dans {args.output}")
     references = [step for step in REFERENCE_STEPS if step in session.steps]
     if references:
-        print(f"  captures de reference (non servies) : {', '.join(references)}")
+        print(
+            f"  captures de reference (non servies) : {', '.join(references)}"
+        )
     print(f"  python emulator/server.py --scenario {args.output}")
 
 

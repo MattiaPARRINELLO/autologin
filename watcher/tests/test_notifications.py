@@ -2,7 +2,11 @@ from __future__ import annotations
 
 from checkmate_watcher import notifications
 from checkmate_watcher.config import default_config
-from checkmate_watcher.notifications import Notifier, _applescript_string, _gvariant
+from checkmate_watcher.notifications import (
+    Notifier,
+    _applescript_string,
+    _gvariant,
+)
 
 
 def test_notifier_reprend_la_configuration():
@@ -24,7 +28,9 @@ def _espionne_send(monkeypatch, nom="send_windows"):
     captured = {}
 
     def fake_send(title, message, *, app_name, **reste):
-        captured.update(title=title, message=message, app_name=app_name, **reste)
+        captured.update(
+            title=title, message=message, app_name=app_name, **reste
+        )
         return True
 
     monkeypatch.setattr(notifications, nom, fake_send)
@@ -48,11 +54,17 @@ def test_envoi_windows(monkeypatch):
     captured = _espionne_send(monkeypatch)
     notifier = Notifier(app_name="CheckMate", platform="win32")
     assert notifier.send("titre", "message") is True
-    assert captured == {"title": "titre", "message": "message", "app_name": "CheckMate"}
+    assert captured == {
+        "title": "titre",
+        "message": "message",
+        "app_name": "CheckMate",
+    }
 
 
 def test_envoi_macos(monkeypatch):
-    monkeypatch.setattr(notifications, "send_macos", lambda title, message: True)
+    monkeypatch.setattr(
+        notifications, "send_macos", lambda title, message: True
+    )
     notifier = Notifier(platform="darwin")
     assert notifier.send("titre", "message") is True
 
@@ -81,13 +93,17 @@ def test_confirmation_linux_bascule_sur_tkinter(monkeypatch):
         raise notifications.DialogUnavailable("zenity introuvable")
 
     monkeypatch.setattr(notifications, "ask_zenity", unavailable)
-    monkeypatch.setattr(notifications, "ask_tkinter", lambda *args, **kwargs: False)
+    monkeypatch.setattr(
+        notifications, "ask_tkinter", lambda *args, **kwargs: False
+    )
     notifier = Notifier(platform="linux")
     assert notifier.ask("present ?") is False
 
 
 def test_confirmation_expiree_ne_relance_pas_tkinter(monkeypatch):
-    monkeypatch.setattr(notifications, "ask_zenity", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        notifications, "ask_zenity", lambda *args, **kwargs: None
+    )
     monkeypatch.setattr(
         notifications,
         "ask_tkinter",

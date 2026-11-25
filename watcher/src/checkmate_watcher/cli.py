@@ -38,7 +38,12 @@ from .notifications import Notifier
 from .paths import default_config_path, default_log_file
 from .self_update import update_now
 from .setup_server import run_setup
-from .signature import SignatureError, load_signature, parse_points, save_signature
+from .signature import (
+    SignatureError,
+    load_signature,
+    parse_points,
+    save_signature,
+)
 from .state import StateStore
 from .status_server import read_runtime, status_alive
 from .support import build_support_bundle
@@ -193,11 +198,17 @@ def _add_common_args(parser: argparse.ArgumentParser) -> None:
 
 
 def _add_run_args(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("--once", action="store_true", help="un seul cycle puis sortie")
     parser.add_argument(
-        "--dry-run", action="store_true", help="detecte sans notifier ni signer"
+        "--once", action="store_true", help="un seul cycle puis sortie"
     )
-    parser.add_argument("--auto", action="store_true", help="signe sans confirmation")
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="detecte sans notifier ni signer",
+    )
+    parser.add_argument(
+        "--auto", action="store_true", help="signe sans confirmation"
+    )
 
 
 def _add_update_args(parser: argparse.ArgumentParser) -> None:
@@ -214,9 +225,13 @@ def _add_update_args(parser: argparse.ArgumentParser) -> None:
 
 
 def _add_command_args(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("--output", help="support-bundle : chemin de l'archive")
+    parser.add_argument(
+        "--output", help="support-bundle : chemin de l'archive"
+    )
     parser.add_argument("--file", help="import-signature : fichier JSON")
-    parser.add_argument("--no-browser", action="store_true", help=HELP_NO_BROWSER)
+    parser.add_argument(
+        "--no-browser", action="store_true", help=HELP_NO_BROWSER
+    )
     parser.add_argument("--notify", action="store_true", help=HELP_NOTIFY)
 
 
@@ -313,7 +328,9 @@ def _statut_signature(fichier: Path) -> tuple[str, object]:
 
 def command_check_config(config: Config) -> int:
     statut = _statut_signature(config.signature.file)
-    tools_status = [(tool, shutil.which(tool)) for tool in ("notify-send", "zenity")]
+    tools_status = [
+        (tool, shutil.which(tool)) for tool in ("notify-send", "zenity")
+    ]
     _afficher_check_config(config, statut, tools_status)
     return 0
 
@@ -327,7 +344,9 @@ async def command_capture(config: Config) -> int:
             playwright.chromium, config.watcher.executable_path
         ).as_kwargs()
         try:
-            browser = await playwright.chromium.launch(headless=False, **options)
+            browser = await playwright.chromium.launch(
+                headless=False, **options
+            )
         except Exception as exc:
             if "Executable doesn't exist" in str(exc):
                 print(missing_browser_message())
@@ -354,7 +373,9 @@ async def command_capture(config: Config) -> int:
         return 1
 
     save_signature(config.signature.file, points)
-    print(f"Signature enregistree ({len(points)} points) dans {config.signature.file}")
+    print(
+        f"Signature enregistree ({len(points)} points) dans {config.signature.file}"
+    )
     return 0
 
 
@@ -391,7 +412,9 @@ def _afficher_set_password(etape: str, service: str = "") -> None:
     if etape == "vide":
         print("mot de passe vide, rien n'a ete enregistre")
     elif etape == "pas_trousseau":
-        print("trousseau systeme indisponible : utilise password_env ou password")
+        print(
+            "trousseau systeme indisponible : utilise password_env ou password"
+        )
     elif etape == "echec":
         print("enregistrement dans le trousseau impossible")
     else:
@@ -412,7 +435,9 @@ def _enregistrer_set_password(config: Config, password: str) -> int:
 
 
 def command_set_password(config: Config) -> int:
-    return _enregistrer_set_password(config, getpass.getpass("Mot de passe CESAR : "))
+    return _enregistrer_set_password(
+        config, getpass.getpass("Mot de passe CESAR : ")
+    )
 
 
 def _afficher_self_test(checks: list[tuple[str, bool, str]]) -> None:
@@ -566,7 +591,9 @@ def command_import_signature(config: Config, file_path: str | None) -> int:
         _afficher_import_signature(erreur=erreur)
         return 1
     save_signature(config.signature.file, points)
-    _afficher_import_signature(points=len(points), fichier=config.signature.file)
+    _afficher_import_signature(
+        points=len(points), fichier=config.signature.file
+    )
     return 0
 
 
@@ -619,7 +646,9 @@ def command_status(config: Config, config_path: Path) -> int:
     return 1
 
 
-def _afficher_compteurs(starts: int, detections: int, signed: int, errors: int) -> None:
+def _afficher_compteurs(
+    starts: int, detections: int, signed: int, errors: int
+) -> None:
     print(f"  Demarrages        : {starts}")
     print(f"  Detections        : {detections}")
     print(f"  Signatures        : {signed}")
@@ -659,7 +688,9 @@ def _lire_telechargements() -> tuple[int | None, str | None, object]:
     try:
         releases = fetch_releases()
         downloads = sum(release.downloads for release in releases)
-        latest_tag = max(releases, key=lambda r: r.version).tag if releases else None
+        latest_tag = (
+            max(releases, key=lambda r: r.version).tag if releases else None
+        )
     except Exception as exc:
         return None, None, exc
     return downloads, latest_tag, None
@@ -669,7 +700,9 @@ def command_stats(config: Config) -> int:
     state = StateStore(config.watcher.state_file)
     starts, detections, signed, errors = _lire_compteurs(state)
     downloads, latest_tag, erreur = _lire_telechargements()
-    _afficher_stats(starts, detections, signed, errors, downloads, latest_tag, erreur)
+    _afficher_stats(
+        starts, detections, signed, errors, downloads, latest_tag, erreur
+    )
     return 0
 
 
@@ -687,7 +720,9 @@ def _afficher_check_update(channel, policy, erreur=None) -> None:
 
 
 def _afficher_migration(release) -> None:
-    print(f"Migration a passer d'abord : {release.tag} ({release.migration_reason})")
+    print(
+        f"Migration a passer d'abord : {release.tag} ({release.migration_reason})"
+    )
 
 
 def _release_status(config: Config) -> tuple[object, object]:
@@ -797,7 +832,9 @@ def _installer_si_confirme(config: Config, assume_yes: bool) -> int:
     return _installer_update(config)
 
 
-def command_update(config: Config, *, check_only: bool, assume_yes: bool) -> int:
+def command_update(
+    config: Config, *, check_only: bool, assume_yes: bool
+) -> int:
     release, code = _release_ou_code(config)
     if code is not None:
         return code
@@ -811,8 +848,12 @@ def _afficher_autostart_install_echec() -> None:
     print("installation du demarrage automatique impossible")
 
 
-def _afficher_autostart_installe(executable: object, config_path: Path) -> None:
-    print(f"demarrage automatique installe : {executable} --config {config_path} run")
+def _afficher_autostart_installe(
+    executable: object, config_path: Path
+) -> None:
+    print(
+        f"demarrage automatique installe : {executable} --config {config_path} run"
+    )
 
 
 def _afficher_autostart_uninstall_echec() -> None:
@@ -895,7 +936,9 @@ def _dispatch_actions(config: Config, args) -> int | None:
     if args.command == "import-signature":
         return command_import_signature(config, args.file)
     if args.command == "update":
-        return command_update(config, check_only=args.check, assume_yes=args.yes)
+        return command_update(
+            config, check_only=args.check, assume_yes=args.yes
+        )
     return None
 
 
@@ -920,7 +963,11 @@ def _dispatch_support(config: Config, args) -> int | None:
 
 
 def _dispatch_config(config: Config, args) -> int | None:
-    for dispatch in (_dispatch_inspection, _dispatch_actions, _dispatch_support):
+    for dispatch in (
+        _dispatch_inspection,
+        _dispatch_actions,
+        _dispatch_support,
+    ):
         result = dispatch(config, args)
         if result is not None:
             return result

@@ -43,7 +43,9 @@ def test_cycle_de_vie_du_mot_de_passe(monkeypatch):
 
 
 def test_trousseau_en_erreur_ne_plante_pas(monkeypatch):
-    monkeypatch.setattr(credentials, "_keyring_module", lambda: BrokenKeyring())
+    monkeypatch.setattr(
+        credentials, "_keyring_module", lambda: BrokenKeyring()
+    )
     assert credentials.get_password("checkmate", "eleve") is None
     assert credentials.set_password("checkmate", "eleve", "secret") is False
     assert credentials.delete_password("checkmate", "eleve") is False

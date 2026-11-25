@@ -24,7 +24,9 @@ def _parsed_version(tag: str) -> Version:
     return version
 
 
-def release(tag: str, *, prerelease: bool = False, assets: tuple = ()) -> Release:
+def release(
+    tag: str, *, prerelease: bool = False, assets: tuple = ()
+) -> Release:
     return Release(
         tag=tag,
         version=_parsed_version(tag),
@@ -44,7 +46,9 @@ def _paquet(tmp_path, contenu=b"archive"):
 def _sommes(tmp_path, contenu=b"archive"):
     digest = hashlib.sha256(contenu).hexdigest()
     path = tmp_path / "SHA256SUMS.txt"
-    path.write_text(f"{digest}  CheckMate-linux-0.4.2.tar.gz\n", encoding="utf-8")
+    path.write_text(
+        f"{digest}  CheckMate-linux-0.4.2.tar.gz\n", encoding="utf-8"
+    )
     return path
 
 
@@ -138,7 +142,9 @@ def _payload(tag: str, name: str, *, prerelease: bool = False) -> dict:
     }
 
 
-def _assert_release(tag: str, name: str, version: Version, *, prerelease=False):
+def _assert_release(
+    tag: str, name: str, version: Version, *, prerelease=False
+):
     parsed = parse_release(_payload(tag, name, prerelease=prerelease))
     assert parsed is not None
     assert parsed.version == version
@@ -188,8 +194,13 @@ def test_check_for_update_deja_a_jour():
 
 
 def test_check_for_update_refuse_les_prereleases():
-    releases = [release("watcher-0.1.0"), release("watcher-v0.2.0", prerelease=True)]
-    assert check_for_update("0.1.0", channel="stable", releases=releases) is None
+    releases = [
+        release("watcher-0.1.0"),
+        release("watcher-v0.2.0", prerelease=True),
+    ]
+    assert (
+        check_for_update("0.1.0", channel="stable", releases=releases) is None
+    )
 
 
 def test_check_for_update_accepte_les_prereleases_en_beta():
@@ -206,7 +217,9 @@ def test_une_beta_du_meme_numero_est_proposee_avant_la_stable():
     releases = [release("watcher-v0.6.0-beta.1", prerelease=True)]
     beta = check_for_update("0.5.0", channel="beta", releases=releases)
     assert beta is not None and beta.tag == "watcher-v0.6.0-beta.1"
-    assert check_for_update("0.5.0", channel="stable", releases=releases) is None
+    assert (
+        check_for_update("0.5.0", channel="stable", releases=releases) is None
+    )
     assert check_for_update("0.6.0", channel="beta", releases=releases) is None
 
 
@@ -217,7 +230,9 @@ def _asset(name: str, url: str = "u", **extra: object) -> dict[str, object]:
 def test_parse_release_collecte_les_assets():
     setup = _asset("CheckMate-Setup-0.4.2.exe", size=42)
     sums = _asset("SHA256SUMS.txt")
-    parsed = parse_release({"tag_name": "watcher-v0.4.2", "assets": [setup, sums]})
+    parsed = parse_release(
+        {"tag_name": "watcher-v0.4.2", "assets": [setup, sums]}
+    )
     assert parsed is not None
     assert len(parsed.assets) == 2
     found = parsed.find_asset("CheckMate-Setup-", ".exe")
@@ -227,7 +242,9 @@ def test_parse_release_collecte_les_assets():
 
 
 def test_platform_asset():
-    parsed = release("watcher-v0.4.2", prerelease=True, assets=_platform_assets())
+    parsed = release(
+        "watcher-v0.4.2", prerelease=True, assets=_platform_assets()
+    )
     assert platform_asset(parsed, "win32").name.endswith(".exe")
     assert platform_asset(parsed, "linux").name.endswith(".tar.gz")
     assert platform_asset(parsed, "darwin") is None
@@ -269,7 +286,9 @@ def test_download_update(tmp_path):
     sommes = _sommes(tmp_path)
     assets = tuple(Asset(f.name, f.as_uri()) for f in (paquet, sommes))
     release_obj = release("watcher-v0.4.2", prerelease=True, assets=assets)
-    archive = download_update(release_obj, tmp_path / "download", platform="linux")
+    archive = download_update(
+        release_obj, tmp_path / "download", platform="linux"
+    )
     assert archive.name == "CheckMate-linux-0.4.2.tar.gz"
     assert archive.read_bytes() == b"archive"
 

@@ -26,7 +26,12 @@ from .paths import data_dir, default_log_file
 from .self_update import update_now
 from .status_data import build_snapshot
 from .status_ui import STATUS_HTML
-from .updates import BETA_CHANNEL, STABLE_CHANNEL, UpdateError, check_for_update
+from .updates import (
+    BETA_CHANNEL,
+    STABLE_CHANNEL,
+    UpdateError,
+    check_for_update,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -144,7 +149,9 @@ def _ensure_runtime_dir(path: Path) -> None:
 
 
 def _write_runtime_file(path: Path, payload: dict) -> None:
-    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    path.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
     path.chmod(0o600)
 
 
@@ -316,7 +323,9 @@ class StatusSession:
         try:
             subprocess.Popen(self._build_assistant_command(), close_fds=True)
         except OSError as exc:
-            raise StatusError(f"impossible de lancer l'assistant : {exc}") from exc
+            raise StatusError(
+                f"impossible de lancer l'assistant : {exc}"
+            ) from exc
 
     def _assistant_started_response(self) -> dict:
         return {
@@ -333,7 +342,9 @@ class StatusSession:
         try:
             self._launch_log_folder(folder)
         except OSError as exc:
-            raise StatusError(f"impossible d'ouvrir le dossier : {exc}") from exc
+            raise StatusError(
+                f"impossible d'ouvrir le dossier : {exc}"
+            ) from exc
         return {"ok": True, "message": f"Dossier ouvert : {folder}"}
 
     def _log_folder(self):
@@ -359,7 +370,11 @@ class StatusSession:
         if desired not in {STABLE_CHANNEL, BETA_CHANNEL}:
             raise StatusError("canal inconnu")
         self.config = save_updates_channel(self.config_path, desired)
-        return {"ok": True, "channel": desired, "message": _channel_message(desired)}
+        return {
+            "ok": True,
+            "channel": desired,
+            "message": _channel_message(desired),
+        }
 
     def action(self, name: str, payload: dict | None = None) -> dict:
         action = ACTIONS_BY_NAME.get(name)

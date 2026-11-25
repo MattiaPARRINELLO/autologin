@@ -75,7 +75,9 @@ def _surcharge_watcher_et_signature() -> str:
 
 
 def test_surcharge_les_valeurs(tmp_path):
-    config = load_config(write_config(tmp_path, _surcharge_watcher_et_signature()))
+    config = load_config(
+        write_config(tmp_path, _surcharge_watcher_et_signature())
+    )
     assert config.watcher.poll_interval == 30
     assert config.watcher.auto_sign is True
     assert config.watcher.headless is True
@@ -113,7 +115,9 @@ def test_refuse_un_intervalle_trop_court(tmp_path):
 
 def test_refuse_un_transport_inconnu(tmp_path):
     with pytest.raises(ConfigError, match="transport doit valoir"):
-        load_config(write_config(tmp_path, '[watcher]\ntransport = "websocket"'))
+        load_config(
+            write_config(tmp_path, '[watcher]\ntransport = "websocket"')
+        )
 
 
 def _fail_once(monkeypatch, method: str, error: Exception):
@@ -132,7 +136,9 @@ def _fail_once(monkeypatch, method: str, error: Exception):
 
 def test_save_config_retente_apres_verrou(tmp_path, monkeypatch):
     path = tmp_path / "config.toml"
-    calls = _fail_once(monkeypatch, "replace", PermissionError("fichier verrouille"))
+    calls = _fail_once(
+        monkeypatch, "replace", PermissionError("fichier verrouille")
+    )
     save_config(path, default_config(), password_env="CHECKMATE_PASSWORD")
     assert calls["count"] >= 2
     assert path.is_file()
@@ -178,7 +184,9 @@ def test_lit_le_canal_beta(tmp_path):
 
 
 def test_alias_include_prerelease(tmp_path):
-    config = load_config(write_config(tmp_path, "[updates]\ninclude_prerelease = true"))
+    config = load_config(
+        write_config(tmp_path, "[updates]\ninclude_prerelease = true")
+    )
     assert config.updates.channel == "beta"
     config = load_config(
         write_config(tmp_path, "[updates]\ninclude_prerelease = false")

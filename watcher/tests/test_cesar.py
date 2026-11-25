@@ -241,7 +241,9 @@ def test_check_navigateur_utilise_les_uuuids_du_calendrier():
 
     signal = asyncio.run(session.check())
 
-    assert signal.key == signal_key({"course_uuid": "course-1", "line_uuid": "line-1"})
+    assert signal.key == signal_key(
+        {"course_uuid": "course-1", "line_uuid": "line-1"}
+    )
 
 
 class FakeHitCanvas:
@@ -264,7 +266,10 @@ def test_attend_que_le_canvas_soit_decouvert():
     session = make_session(page)
     canvas = FakeHitCanvas([False, False, True])
 
-    assert asyncio.run(session._wait_until_hittable(canvas, timeout_ms=500)) is True
+    assert (
+        asyncio.run(session._wait_until_hittable(canvas, timeout_ms=500))
+        is True
+    )
     assert len(page.waits) == 2
 
 
@@ -273,5 +278,8 @@ def test_abandonne_si_le_canvas_reste_recouvert():
     session = make_session(page)
     canvas = FakeHitCanvas([False] * 40)
 
-    assert asyncio.run(session._wait_until_hittable(canvas, timeout_ms=150)) is False
+    assert (
+        asyncio.run(session._wait_until_hittable(canvas, timeout_ms=150))
+        is False
+    )
     assert len(page.waits) >= 1

@@ -78,7 +78,9 @@ def _create_window(backend: Any, url: str) -> Any:
     )
 
 
-def _start_close_watcher(window: Any, close_event: threading.Event | None) -> None:
+def _start_close_watcher(
+    window: Any, close_event: threading.Event | None
+) -> None:
     if close_event is None:
         return
     threading.Thread(
@@ -104,7 +106,9 @@ def show(url: str, *, close_event: threading.Event | None = None) -> bool:
     return _run_window(backend, url, close_event)
 
 
-def _run_window(backend: Any, url: str, close_event: threading.Event | None) -> bool:
+def _run_window(
+    backend: Any, url: str, close_event: threading.Event | None
+) -> bool:
     try:
         window = _create_window(backend, url)
         _start_close_watcher(window, close_event)
@@ -128,7 +132,9 @@ def open_url(url: str, *, close_event: threading.Event | None = None) -> bool:
 
     Rend True si une fenetre native a ete utilisee.
     """
-    if os.environ.get(BROWSER_ENV) != "1" and show(url, close_event=close_event):
+    if os.environ.get(BROWSER_ENV) != "1" and show(
+        url, close_event=close_event
+    ):
         return True
     webbrowser.open(url)
     return False

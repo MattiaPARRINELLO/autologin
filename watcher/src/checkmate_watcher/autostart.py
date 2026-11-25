@@ -51,7 +51,12 @@ def _quote(value: str) -> str:
 
 
 def _linux_command(executable: Path, config_path: Path) -> str:
-    parts = [_quote(str(executable)), "--config", _quote(str(config_path)), "run"]
+    parts = [
+        _quote(str(executable)),
+        "--config",
+        _quote(str(config_path)),
+        "run",
+    ]
     return " ".join(parts)
 
 
@@ -67,7 +72,9 @@ def _systemctl() -> str | None:
 def _install_linux_unit(executable: Path, config_path: Path) -> Path:
     unit_path = Path.home() / ".config/systemd/user" / UNIT_NAME
     unit_path.parent.mkdir(parents=True, exist_ok=True)
-    unit_path.write_text(_linux_unit(executable, config_path), encoding="utf-8")
+    unit_path.write_text(
+        _linux_unit(executable, config_path), encoding="utf-8"
+    )
     return unit_path
 
 
@@ -130,7 +137,9 @@ def enable_autostart(executable: Path, config_path: Path) -> bool:
         return _enable_windows(executable, config_path)
     if sys.platform == "linux":
         return _enable_linux(executable, config_path)
-    logger.error("demarrage automatique non pris en charge sur %s", sys.platform)
+    logger.error(
+        "demarrage automatique non pris en charge sur %s", sys.platform
+    )
     return False
 
 
@@ -158,7 +167,9 @@ def _remove_run_entry() -> bool:
     except FileNotFoundError:
         return True
     except OSError as exc:
-        logger.error("suppression du demarrage automatique impossible : %s", exc)
+        logger.error(
+            "suppression du demarrage automatique impossible : %s", exc
+        )
         return False
     return True
 

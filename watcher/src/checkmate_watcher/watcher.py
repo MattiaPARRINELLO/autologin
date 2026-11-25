@@ -23,7 +23,11 @@ from .notifications import Notifier
 from .paths import default_config_path
 from .signature import load_signature
 from .state import StateStore
-from .status_server import StatusSession, start_status_server, stop_status_server
+from .status_server import (
+    StatusSession,
+    start_status_server,
+    stop_status_server,
+)
 from .tray import TrayController
 from .updates import check_for_update, update_policy
 
@@ -76,13 +80,20 @@ def _notifier(config: Config) -> Notifier:
 
 
 async def _send(
-    config: Config, title: str, message: str, *, icon: str, urgency: str = "critical"
+    config: Config,
+    title: str,
+    message: str,
+    *,
+    icon: str,
+    urgency: str = "critical",
 ) -> bool:
     if not config.notifications.enabled:
         logger.debug("notification desactivee : %s", title)
         return False
     notifier = _notifier(config)
-    return await asyncio.to_thread(notifier.send, title, message, urgency=urgency)
+    return await asyncio.to_thread(
+        notifier.send, title, message, urgency=urgency
+    )
 
 
 @dataclass(frozen=True)
@@ -99,7 +110,9 @@ def _pause_reason(schedule, state, now: datetime) -> Pause | None:
     if situation.reason not in {"outside", "signed"}:
         return None
     resume = now + timedelta(seconds=schedule.seconds_until_next(now))
-    label = "hors plage" if situation.reason == "outside" else "creneau deja signe"
+    label = (
+        "hors plage" if situation.reason == "outside" else "creneau deja signe"
+    )
     return Pause(label, resume, situation.key)
 
 
@@ -234,7 +247,9 @@ async def _browser_fallback(
     error: HttpTransportError,
 ) -> CesarSession:
     await session.close()
-    logger.warning("transport HTTP indisponible (%s), bascule navigateur", error)
+    logger.warning(
+        "transport HTTP indisponible (%s), bascule navigateur", error
+    )
     await _send(
         config,
         "Detection CESAR",
@@ -301,7 +316,9 @@ async def handle_signal(
         logger.info("[dry-run] emargement detecte : %s", signal.label)
         return DRY_RUN
 
-    await _send(config, "Emargement ouvert", message, icon=config.notifications.icon)
+    await _send(
+        config, "Emargement ouvert", message, icon=config.notifications.icon
+    )
 
     if auto:
         delay = max(0, config.watcher.auto_sign_delay)
@@ -342,7 +359,9 @@ async def handle_signal(
         )
         return ABSENT
 
-    logger.info("aucune reponse a la confirmation, nouvelle tentative plus tard")
+    logger.info(
+        "aucune reponse a la confirmation, nouvelle tentative plus tard"
+    )
     await _send(
         config,
         "Emargement en attente",
@@ -371,11 +390,15 @@ async def run_loop(
             logger.error("signature indisponible : %s", exc)
             logger.error("lance 'checkmate-watcher capture' pour en creer une")
             return 2
-        logger.warning("signature indisponible (%s), dry-run sans signature", exc)
+        logger.warning(
+            "signature indisponible (%s), dry-run sans signature", exc
+        )
         points = []
 
     started_at = datetime.now()
-    state = StateStore(config.watcher.state_file, ttl=config.watcher.dedupe_ttl)
+    state = StateStore(
+        config.watcher.state_file, ttl=config.watcher.dedupe_ttl
+    )
     state.increment("stats.starts")
     if not dry_run:
         analytics.record_startup(config, state)
@@ -449,7 +472,9 @@ async def run_loop(
                         pause.resume.strftime("%d/%m %H:%M"),
                     )
                     await session.close()
-                    await _wait_for_new_window(schedule, pause.window_key, stop_event)
+                    await _wait_for_new_window(
+                        schedule, pause.window_key, stop_event
+                    )
                     session = await _open_session(config, poll_headless)
                     continue
 
@@ -472,9 +497,12 @@ async def run_loop(
                     if signal is None:
                         logger.debug("rien a signer")
                         if asyncio.get_running_loop().time() >= next_heartbeat:
-                            logger.info("surveillance active, aucun emargement detecte")
+                            logger.info(
+                                "surveillance active, aucun emargement detecte"
+                            )
                             next_heartbeat = (
-                                asyncio.get_running_loop().time() + HEARTBEAT_SECONDS
+                                asyncio.get_running_loop().time()
+                                + HEARTBEAT_SECONDS
                             )
                     elif state.seen(signal.key):
                         logger.debug("emargement deja traite : %s", signal.key)
@@ -482,7 +510,9 @@ async def run_loop(
                         prompt_cooldowns.get(signal.key, 0)
                         > asyncio.get_running_loop().time()
                     ):
-                        logger.debug("nouvelle demande en attente pour %s", signal.key)
+                        logger.debug(
+                            "nouvelle demande en attente pour %s", signal.key
+                        )
                     else:
                         state.increment("stats.detections")
                         state.set_meta("last_detection_at", _now_iso())
@@ -528,7 +558,9 @@ async def run_loop(
                                 if window_key:
                                     state.mark_window(window_key)
                                 if is_success_confirmation(confirmation):
-                                    logger.info("presence signee : %s", confirmation)
+                                    logger.info(
+                                        "presence signee : %s", confirmation
+                                    )
                                     await _send(
                                         config,
                                         "Presence pointee",
@@ -537,7 +569,8 @@ async def run_loop(
                                     )
                                 else:
                                     logger.warning(
-                                        "confirmation inattendue : %s", confirmation
+                                        "confirmation inattendue : %s",
+                                        confirmation,
                                     )
                                     await _send(
                                         config,
@@ -570,7 +603,9 @@ async def run_loop(
                             await session.restart()
                             consecutive_errors = 0
                         except Exception as restart_exc:
-                            logger.error("redemarrage impossible : %s", restart_exc)
+                            logger.error(
+                                "redemarrage impossible : %s", restart_exc
+                            )
                             return 1
 
                 if once:

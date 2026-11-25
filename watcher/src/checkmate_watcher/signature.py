@@ -75,8 +75,13 @@ def load_signature(path: Path) -> list[Point]:
 
 def save_signature(path: Path, points: list[Point]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    payload = [{"x": round(p.x, 2), "y": round(p.y, 2), "type": p.kind} for p in points]
-    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    payload = [
+        {"x": round(p.x, 2), "y": round(p.y, 2), "type": p.kind}
+        for p in points
+    ]
+    path.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
     path.chmod(0o600)
 
 
@@ -102,7 +107,9 @@ def _coerce_point(raw: object) -> Point:
     return Point(x=x, y=y, kind=_point_kind(raw))
 
 
-def _require_fit_inputs(points, width: float, height: float, padding: float) -> None:
+def _require_fit_inputs(
+    points, width: float, height: float, padding: float
+) -> None:
     if not points:
         raise SignatureError("aucun point a mettre a l'echelle")
     if width <= 0 or height <= 0:

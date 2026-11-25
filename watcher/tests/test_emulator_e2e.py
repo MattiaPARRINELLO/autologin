@@ -40,7 +40,9 @@ E2E_ENABLED = os.environ.get("CHECKMATE_E2E") == "1"
 # Fixture autouse : isole les diagnostics de chaque test sans appel explicite.
 @pytest.fixture(autouse=True)
 def diagnostics_isolees(tmp_path, monkeypatch):
-    monkeypatch.setenv("CHECKMATE_DIAGNOSTICS_DIR", str(tmp_path / "diagnostics"))
+    monkeypatch.setenv(
+        "CHECKMATE_DIAGNOSTICS_DIR", str(tmp_path / "diagnostics")
+    )
 
 
 pytestmark = pytest.mark.skipif(
@@ -59,7 +61,12 @@ def free_port() -> int:
 
 
 def chromium_path() -> str | None:
-    for name in ("chromium", "chromium-browser", "google-chrome", "brave-browser"):
+    for name in (
+        "chromium",
+        "chromium-browser",
+        "google-chrome",
+        "brave-browser",
+    ):
         path = shutil.which(name)
         if path:
             return path
@@ -69,7 +76,9 @@ def chromium_path() -> str | None:
 def wait_for_state(base_url: str, attempts: int = 60) -> dict:
     for _ in range(attempts):
         try:
-            with urllib.request.urlopen(f"{base_url}/api/state", timeout=1) as response:
+            with urllib.request.urlopen(
+                f"{base_url}/api/state", timeout=1
+            ) as response:
                 return json.loads(response.read())
         except Exception:
             time.sleep(0.2)
@@ -167,7 +176,9 @@ def _signature_config(tmp_path, points=None) -> SignatureConfig:
     return SignatureConfig(file=signature_file, padding_ratio=0.9)
 
 
-def make_config(tmp_path, executable: str, base_url: str, points=None) -> Config:
+def make_config(
+    tmp_path, executable: str, base_url: str, points=None
+) -> Config:
     return Config(
         cesar=_cesar(base_url),
         watcher=_watcher(tmp_path, executable),
@@ -184,7 +195,9 @@ def run_once(config: Config, timeout: float) -> int:
     return asyncio.run(asyncio.wait_for(coroutine, timeout=timeout))
 
 
-def run_watcher(tmp_path, base_url, executable, points=None, timeout=120) -> int:
+def run_watcher(
+    tmp_path, base_url, executable, points=None, timeout=120
+) -> int:
     config = make_config(tmp_path, executable, base_url, points=points)
     return run_once(config, timeout)
 
@@ -254,14 +267,22 @@ def test_overlay_signature_apparait_puis_est_retire(tmp_path):
                 pointer_events = await overlay.evaluate(
                     "element => getComputedStyle(element).pointerEvents"
                 )
-                clip_path = await overlay.evaluate("element => element.style.clipPath")
+                clip_path = await overlay.evaluate(
+                    "element => element.style.clipPath"
+                )
                 confirmation = await task
                 remaining = await overlay.count()
                 state = wait_for_state(base_url)
-                return confirmation, pointer_events, clip_path, remaining, state
+                return (
+                    confirmation,
+                    pointer_events,
+                    clip_path,
+                    remaining,
+                    state,
+                )
 
-        confirmation, pointer_events, clip_path, remaining, state = asyncio.run(
-            asyncio.wait_for(scenario(), timeout=120)
+        confirmation, pointer_events, clip_path, remaining, state = (
+            asyncio.run(asyncio.wait_for(scenario(), timeout=120))
         )
 
     assert "prise en compte" in confirmation.lower()
@@ -274,7 +295,9 @@ def test_overlay_signature_apparait_puis_est_retire(tmp_path):
 def test_une_signature_reduite_a_un_point_ne_signe_pas(tmp_path):
     with emulator() as (executable, base_url):
         points = [Point(20, 20, "start"), Point(20, 20, "end")]
-        code = run_watcher(tmp_path, base_url, executable, points=points, timeout=60)
+        code = run_watcher(
+            tmp_path, base_url, executable, points=points, timeout=60
+        )
         assert code == 2
         assert wait_for_state(base_url)["signed"] is False
 
@@ -312,11 +335,18 @@ def test_le_watcher_detecte_et_signe_sur_un_scenario_capture(tmp_path):
 
 
 def test_le_scenario_respecte_le_delai_de_fermeture(tmp_path):
-    arguments = ("--scenario", str(SCENARIO), "--attendance-close-delay-ms", "1500")
+    arguments = (
+        "--scenario",
+        str(SCENARIO),
+        "--attendance-close-delay-ms",
+        "1500",
+    )
     with emulator(*arguments) as (executable, base_url):
         config = make_config(tmp_path, executable, base_url)
         scenario = _sign_et_mesurer(config)
-        confirmation, elapsed = asyncio.run(asyncio.wait_for(scenario, timeout=120))
+        confirmation, elapsed = asyncio.run(
+            asyncio.wait_for(scenario, timeout=120)
+        )
         assert "prise en compte" in confirmation.lower()
         assert elapsed >= 1.5
         assert wait_for_state(base_url)["signed"] is True
@@ -326,17 +356,23 @@ def test_le_watcher_signe_avec_une_animation_lente(tmp_path):
     with emulator("--variant", "slow-animation") as (executable, base_url):
         config = make_config(tmp_path, executable, base_url)
         scenario = _signer_avec_html(config)
-        html, confirmation = asyncio.run(asyncio.wait_for(scenario, timeout=120))
+        html, confirmation = asyncio.run(
+            asyncio.wait_for(scenario, timeout=120)
+        )
         assert "modal-in" in html
         assert "prise en compte" in confirmation.lower()
         assert wait_for_state(base_url)["signed"] is True
 
 
-def test_le_watcher_signe_quand_le_canvas_ignore_les_evenements_pointer(tmp_path):
+def test_le_watcher_signe_quand_le_canvas_ignore_les_evenements_pointer(
+    tmp_path,
+):
     with emulator("--variant", "mouse-events-only") as (executable, base_url):
         config = make_config(tmp_path, executable, base_url)
         scenario = _signer_avec_html(config)
-        html, confirmation = asyncio.run(asyncio.wait_for(scenario, timeout=120))
+        html, confirmation = asyncio.run(
+            asyncio.wait_for(scenario, timeout=120)
+        )
         assert "mousemove" in html
         assert "pointerdown" not in html
         assert "prise en compte" in confirmation.lower()
@@ -387,7 +423,13 @@ async def capture_scenario_pages(base_url: str, output: Path) -> None:
         await session.close()
 
 
-EXPECTED_PAGES = ["accueil", "accueil-signe", "confirmation", "connexion", "signature"]
+EXPECTED_PAGES = [
+    "accueil",
+    "accueil-signe",
+    "confirmation",
+    "connexion",
+    "signature",
+]
 
 
 def _capturer(source_url: str, output: Path) -> None:

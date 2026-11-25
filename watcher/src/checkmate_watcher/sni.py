@@ -19,7 +19,12 @@ logger = logging.getLogger(__name__)
 
 try:
     from dbus_next.constants import PropertyAccess
-    from dbus_next.service import ServiceInterface, dbus_property, method, signal
+    from dbus_next.service import (
+        ServiceInterface,
+        dbus_property,
+        method,
+        signal,
+    )
 
     HAS_DBUS = True
 except Exception:  # dependance optionnelle hors Linux
@@ -402,13 +407,19 @@ class SniTray:
         await self._bus.request_name(name)
 
         introspection = await self._bus.introspect(WATCHER_NAME, WATCHER_PATH)
-        proxy = self._bus.get_proxy_object(WATCHER_NAME, WATCHER_PATH, introspection)
+        proxy = self._bus.get_proxy_object(
+            WATCHER_NAME, WATCHER_PATH, introspection
+        )
         watcher = proxy.get_interface(WATCHER_NAME)
         await watcher.call_register_status_notifier_item(name)
         logger.info("icone StatusNotifierItem enregistree")
 
     def update(
-        self, title: str, pixmaps: list, status: str = "Active", label: str = ""
+        self,
+        title: str,
+        pixmaps: list,
+        status: str = "Active",
+        label: str = "",
     ) -> None:
         self.state.title = title
         self.state.label = label

@@ -23,9 +23,7 @@ class DialogUnavailable(Exception):
 
 CHECKMATE_APP_ID = "CheckMate.Watcher"
 
-POWERSHELL_APP_ID = (
-    "{1AC14E77-02E7-4E5D-B744-2EB1AE5198B7}\\WindowsPowerShell\\v1.0\\powershell.exe"
-)
+POWERSHELL_APP_ID = "{1AC14E77-02E7-4E5D-B744-2EB1AE5198B7}\\WindowsPowerShell\\v1.0\\powershell.exe"
 
 TOAST_SCRIPT = """
 $ErrorActionPreference = 'Stop'
@@ -62,7 +60,9 @@ def _gvariant(value: str) -> str:
 def send_linux(
     title: str, message: str, *, app_name: str, icon: str, urgency: str
 ) -> bool:
-    if _send_notify_send(title, message, app_name=app_name, icon=icon, urgency=urgency):
+    if _send_notify_send(
+        title, message, app_name=app_name, icon=icon, urgency=urgency
+    ):
         return True
     logger.info("notify-send indisponible, tentative via D-Bus")
     return _send_gdbus(title, message, app_name=app_name, icon=icon)
@@ -125,10 +125,23 @@ def _send_notify_send(title, message, *, app_name, icon, urgency):
 
 def _gdbus_command(binary, app_name, icon, title, message):
     return (
-        [binary, "call", "--session", "--dest", "org.freedesktop.Notifications"]
+        [
+            binary,
+            "call",
+            "--session",
+            "--dest",
+            "org.freedesktop.Notifications",
+        ]
         + ["--object-path", "/org/freedesktop/Notifications", "--method"]
         + ["org.freedesktop.Notifications.Notify", _gvariant(app_name), "0"]
-        + [_gvariant(icon), _gvariant(title), _gvariant(message), "[]", "{}", "5000"]
+        + [
+            _gvariant(icon),
+            _gvariant(title),
+            _gvariant(message),
+            "[]",
+            "{}",
+            "5000",
+        ]
     )
 
 
@@ -150,7 +163,9 @@ def _send_gdbus(title, message, *, app_name, icon):
     if result is None:
         return False
     if result.returncode != 0:
-        logger.warning("gdbus code %s : %s", result.returncode, result.stderr.strip())
+        logger.warning(
+            "gdbus code %s : %s", result.returncode, result.stderr.strip()
+        )
         return False
     return True
 
@@ -181,11 +196,19 @@ def _toast_env(title: str, message: str, app_id: str) -> dict:
 
 
 def _toast_command(powershell: str, encoded: str) -> list[str]:
-    return [powershell, "-NoProfile", "-NonInteractive", "-EncodedCommand", encoded]
+    return [
+        powershell,
+        "-NoProfile",
+        "-NonInteractive",
+        "-EncodedCommand",
+        encoded,
+    ]
 
 
 def _run_toast(powershell, title, message, app_id):
-    encoded = base64.b64encode(TOAST_SCRIPT.encode("utf-16-le")).decode("ascii")
+    encoded = base64.b64encode(TOAST_SCRIPT.encode("utf-16-le")).decode(
+        "ascii"
+    )
     try:
         options = _subprocess_options(20, _toast_env(title, message, app_id))
         return subprocess.run(
@@ -205,7 +228,9 @@ def _log_toast_failure(result, app_id: str) -> None:
     )
 
 
-def _show_toast(powershell: str, title: str, message: str, app_id: str) -> bool:
+def _show_toast(
+    powershell: str, title: str, message: str, app_id: str
+) -> bool:
     result = _run_toast(powershell, title, message, app_id)
     if result is None:
         return False
@@ -297,7 +322,9 @@ def _zenity_result(result, timeout):
     stderr = (result.stderr or "").strip()
     if not stderr:
         return False
-    raise DialogUnavailable(f"zenity n'a pas pu afficher la confirmation : {stderr}")
+    raise DialogUnavailable(
+        f"zenity n'a pas pu afficher la confirmation : {stderr}"
+    )
 
 
 def ask_zenity(text, *, timeout, title, ok_label, cancel_label):
@@ -305,7 +332,8 @@ def ask_zenity(text, *, timeout, title, ok_label, cancel_label):
     if not binary:
         raise DialogUnavailable("zenity introuvable")
     result = _run_zenity(
-        _zenity_command(binary, title, text, timeout, ok_label, cancel_label), timeout
+        _zenity_command(binary, title, text, timeout, ok_label, cancel_label),
+        timeout,
     )
     return _zenity_result(result, timeout)
 
@@ -345,15 +373,17 @@ def _make_close(root, answer):
 
 
 def _build_tk_dialog(root, text, ok_label, cancel_label, close, tk):
-    tk.Label(root, text=text, wraplength=460, justify="left", padx=20, pady=16).pack()
+    tk.Label(
+        root, text=text, wraplength=460, justify="left", padx=20, pady=16
+    ).pack()
     buttons = tk.Frame(root, padx=16, pady=12)
     buttons.pack()
-    tk.Button(buttons, text=ok_label, width=18, command=lambda: close(True)).pack(
-        side="left", padx=6
-    )
-    tk.Button(buttons, text=cancel_label, width=12, command=lambda: close(False)).pack(
-        side="left", padx=6
-    )
+    tk.Button(
+        buttons, text=ok_label, width=18, command=lambda: close(True)
+    ).pack(side="left", padx=6)
+    tk.Button(
+        buttons, text=cancel_label, width=12, command=lambda: close(False)
+    ).pack(side="left", padx=6)
 
 
 def _run_tk_dialog(root, timeout, close):
@@ -362,7 +392,9 @@ def _run_tk_dialog(root, timeout, close):
     root.mainloop()
 
 
-def _run_tk_confirmation(root, text, timeout, title, ok_label, cancel_label, tk):
+def _run_tk_confirmation(
+    root, text, timeout, title, ok_label, cancel_label, tk
+):
     _configure_tk_root(root, title, tk)
     answer = {"value": None}
     close = _make_close(root, answer)
@@ -378,7 +410,9 @@ def ask_tkinter(text, *, timeout, title, ok_label, cancel_label):
     root = _open_tk_root(tk)
     if root is None:
         return None
-    return _run_tk_confirmation(root, text, timeout, title, ok_label, cancel_label, tk)
+    return _run_tk_confirmation(
+        root, text, timeout, title, ok_label, cancel_label, tk
+    )
 
 
 def _ask_linux(text, kwargs):
@@ -424,7 +458,11 @@ class Notifier:
         if self.platform == "darwin":
             return send_macos(title, message)
         return send_linux(
-            title, message, app_name=self.app_name, icon=self.icon, urgency=urgency
+            title,
+            message,
+            app_name=self.app_name,
+            icon=self.icon,
+            urgency=urgency,
         )
 
     def ask(
@@ -436,7 +474,9 @@ class Notifier:
         ok_label="Je suis present",
         cancel_label="Absent",
     ):
-        kwargs = _dialog_kwargs(timeout, title or self.app_name, ok_label, cancel_label)
+        kwargs = _dialog_kwargs(
+            timeout, title or self.app_name, ok_label, cancel_label
+        )
         if self.platform.startswith("linux"):
             return _ask_linux(text, kwargs)
         return ask_tkinter(text, **kwargs)

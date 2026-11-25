@@ -105,7 +105,10 @@ def test_pause_sur_creneau_deja_signe(tmp_path):
 
 
 def test_surveillance_active_sur_creneau_libre(tmp_path):
-    assert _pause_reason(SCHEDULE, StateStore(tmp_path / "s.json"), LUNDI_10H) is None
+    assert (
+        _pause_reason(SCHEDULE, StateStore(tmp_path / "s.json"), LUNDI_10H)
+        is None
+    )
 
 
 def test_succes_note_le_retour_a_la_normale(tmp_path):

@@ -13,7 +13,9 @@ from pathlib import Path
 from . import __version__
 
 GITHUB_REPO = "MattiaPARRINELLO/autologin"
-RELEASES_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases?per_page=30"
+RELEASES_URL = (
+    f"https://api.github.com/repos/{GITHUB_REPO}/releases?per_page=30"
+)
 TAG_PREFIX = "watcher-"
 STABLE_CHANNEL = "stable"
 BETA_CHANNEL = "beta"
@@ -97,7 +99,11 @@ def _release_markers(body: object) -> tuple[str | None, str | None, bool]:
         reason = match.group(2).strip()
         seen.add(kind)
         values[kind] = None if reason == "0" else reason
-    return values["MIGRATION"], values["REQUIRED"], seen == {"MIGRATION", "REQUIRED"}
+    return (
+        values["MIGRATION"],
+        values["REQUIRED"],
+        seen == {"MIGRATION", "REQUIRED"},
+    )
 
 
 def parse_version(text: str) -> Version | None:
@@ -125,7 +131,11 @@ def _release_assets(assets):
 
 
 def _release_downloads(assets):
-    return sum(int(a.get("download_count") or 0) for a in assets if isinstance(a, dict))
+    return sum(
+        int(a.get("download_count") or 0)
+        for a in assets
+        if isinstance(a, dict)
+    )
 
 
 def _marker_fields(body) -> dict:
@@ -160,10 +170,14 @@ def parse_release(data: dict) -> Release | None:
     return _build_release(tag, version, data, data.get("assets") or [])
 
 
-def _channel_candidates(releases: list[Release], channel: str) -> list[Release]:
+def _channel_candidates(
+    releases: list[Release], channel: str
+) -> list[Release]:
     accept_prerelease = str(channel).strip().lower() == BETA_CHANNEL
     return [
-        release for release in releases if accept_prerelease or not release.prerelease
+        release
+        for release in releases
+        if accept_prerelease or not release.prerelease
     ]
 
 
@@ -237,7 +251,10 @@ def update_policy(current, *, channel=STABLE_CHANNEL, releases=None):
 def _releases_request(timeout: int):
     return urllib.request.Request(
         RELEASES_URL,
-        headers={"Accept": "application/vnd.github+json", "User-Agent": USER_AGENT},
+        headers={
+            "Accept": "application/vnd.github+json",
+            "User-Agent": USER_AGENT,
+        },
     )
 
 

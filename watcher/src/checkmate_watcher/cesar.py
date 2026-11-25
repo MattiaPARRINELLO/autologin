@@ -18,7 +18,13 @@ from .signature_diagnostics import SignatureDiagnostics, diagnostics_directory
 
 logger = logging.getLogger(__name__)
 
-SUCCESS_KEYWORDS = ("presence", "prise en compte", "present", "signe", "enregistr")
+SUCCESS_KEYWORDS = (
+    "presence",
+    "prise en compte",
+    "present",
+    "signe",
+    "enregistr",
+)
 
 READY_SELECTORS = (
     ".toastui-calendar-day-view",
@@ -565,19 +571,23 @@ class CesarSession:
     async def open(self, headless: bool | None = None) -> None:
         from playwright.async_api import async_playwright
 
-        self.headless = self.config.watcher.headless if headless is None else headless
+        self.headless = (
+            self.config.watcher.headless if headless is None else headless
+        )
         self.config.watcher.profile_dir.mkdir(parents=True, exist_ok=True)
         self._playwright = await async_playwright().start()
         options = resolve_launch_options(
             self._playwright.chromium,
             self.config.watcher.executable_path,
         ).as_kwargs()
-        self._context = await self._playwright.chromium.launch_persistent_context(
-            user_data_dir=str(self.config.watcher.profile_dir),
-            headless=self.headless,
-            viewport={"width": 1366, "height": 900},
-            args=["--no-first-run", "--no-default-browser-check"],
-            **options,
+        self._context = (
+            await self._playwright.chromium.launch_persistent_context(
+                user_data_dir=str(self.config.watcher.profile_dir),
+                headless=self.headless,
+                viewport={"width": 1366, "height": 900},
+                args=["--no-first-run", "--no-default-browser-check"],
+                **options,
+            )
         )
         self._context.set_default_timeout(20000)
         pages = self._context.pages
@@ -630,7 +640,9 @@ class CesarSession:
         )
         await self._find_with_wait(selectors, timeout_ms)
 
-    async def _find_with_wait(self, selectors: tuple[str, ...], timeout_ms: int):
+    async def _find_with_wait(
+        self, selectors: tuple[str, ...], timeout_ms: int
+    ):
         if self.page is None:
             return None
         deadline = asyncio.get_running_loop().time() + timeout_ms / 1000
@@ -650,7 +662,9 @@ class CesarSession:
                 if await locator.count() and await locator.is_visible():
                     return locator
             except Exception:
-                logger.debug("selecteur %s non exploitable", selector, exc_info=True)
+                logger.debug(
+                    "selecteur %s non exploitable", selector, exc_info=True
+                )
                 continue
         return None
 
@@ -719,9 +733,13 @@ class CesarSession:
         await self._goto_dashboard()
         await self._ensure_logged_in()
 
-        button = await self._find_with_wait(self.selectors.attendance_button, 1500)
+        button = await self._find_with_wait(
+            self.selectors.attendance_button, 1500
+        )
         if button is None:
-            logger.debug("aucun bouton d'emargement visible apres rafraichissement")
+            logger.debug(
+                "aucun bouton d'emargement visible apres rafraichissement"
+            )
             return None
 
         try:
@@ -744,7 +762,9 @@ class CesarSession:
             identity = await self.page.evaluate(CALENDAR_IDENTITY_JS)
             payload.update(identity)
         except Exception:
-            logger.debug("identifiants calendrier indisponibles", exc_info=True)
+            logger.debug(
+                "identifiants calendrier indisponibles", exc_info=True
+            )
 
         label = (payload.get("label") or "").strip() or "Emargement ouvert"
         key = signal_key(payload)
@@ -764,7 +784,9 @@ class CesarSession:
             raise SignError("bouton d'emargement introuvable")
 
         await button.click()
-        canvas = await self._wait_for_selector(self.selectors.signature_canvas, 20000)
+        canvas = await self._wait_for_selector(
+            self.selectors.signature_canvas, 20000
+        )
         try:
             await canvas.scroll_into_view_if_needed(timeout=2000)
         except Exception:
@@ -798,7 +820,9 @@ class CesarSession:
             raise SignError("aucune confirmation affichee apres la signature")
         logger.info("confirmation du site : %s", confirmation)
 
-        hidden = await self._wait_for_hidden(self.selectors.attendance_button, 15000)
+        hidden = await self._wait_for_hidden(
+            self.selectors.attendance_button, 15000
+        )
         elapsed = time.monotonic() - started
         if not hidden:
             # Sur le vrai CESAR, apres l'enregistrement un nouveau popup s'ouvre
@@ -818,7 +842,9 @@ class CesarSession:
                     logger.debug("rafraichissement impossible", exc_info=True)
             if self.page is not None:
                 await self.page.wait_for_timeout(500)
-            still_visible = await self._first_visible(self.selectors.attendance_button)
+            still_visible = await self._first_visible(
+                self.selectors.attendance_button
+            )
             if still_visible is not None:
                 raise SignError(
                     "bouton d'emargement toujours visible 15 s apres la signature"
@@ -906,10 +932,15 @@ class CesarSession:
             "trace incomplet sur le canvas CESAR (%s), nouvelle tentative", ink
         )
         retry_box = await self._stable_box(canvas)
-        if retry_box is None or retry_box["width"] <= 0 or retry_box["height"] <= 0:
+        if (
+            retry_box is None
+            or retry_box["width"] <= 0
+            or retry_box["height"] <= 0
+        ):
             raise SignError("canvas de signature sans dimensions")
         await canvas.evaluate(
-            EVENT_DRAW_JS, draw_coordinates(self._fit_points(points, retry_box))
+            EVENT_DRAW_JS,
+            draw_coordinates(self._fit_points(points, retry_box)),
         )
         await self.page.wait_for_timeout(200)
         ink = await canvas.evaluate(INK_DIFF_JS)
@@ -922,7 +953,9 @@ class CesarSession:
                 "(trace reduit a un point ou a une ligne)"
             )
 
-    async def _wait_until_hittable(self, canvas, timeout_ms: int = 3000) -> bool:
+    async def _wait_until_hittable(
+        self, canvas, timeout_ms: int = 3000
+    ) -> bool:
         """Attend que l'animation de la popup decouvre le canvas.
 
         Pendant l'animation, une couche du site peut recouvrir le canvas : les
@@ -939,7 +972,9 @@ class CesarSession:
                 return True
             waited = True
             await self.page.wait_for_timeout(100)
-        logger.warning("canvas de signature encore recouvert apres %sms", timeout_ms)
+        logger.warning(
+            "canvas de signature encore recouvert apres %sms", timeout_ms
+        )
         return False
 
     async def _canvas_is_hittable(self, canvas) -> bool:
@@ -973,7 +1008,11 @@ class CesarSession:
         return min(extent_x, extent_y) < MIN_INK_RATIO
 
     async def _signature_overlay(self, canvas, active: bool) -> None:
-        script = SIGNATURE_OVERLAY_SHOW_JS if active else SIGNATURE_OVERLAY_REMOVE_JS
+        script = (
+            SIGNATURE_OVERLAY_SHOW_JS
+            if active
+            else SIGNATURE_OVERLAY_REMOVE_JS
+        )
         try:
             await canvas.evaluate(script)
         except Exception:
@@ -985,7 +1024,9 @@ class CesarSession:
         try:
             await self.page.evaluate(SIGNATURE_OVERLAY_PROGRESS_JS, progress)
         except Exception:
-            logger.debug("progression de l'overlay indisponible", exc_info=True)
+            logger.debug(
+                "progression de l'overlay indisponible", exc_info=True
+            )
 
     async def _draw(self, box: dict, points: list[FittedPoint]) -> None:
         if self.page is None:
@@ -996,7 +1037,9 @@ class CesarSession:
         total = max(1, len(points) - 1)
         last_percent = -1
         for index, point in enumerate(points[1:], start=1):
-            await self.page.mouse.move(box["x"] + point.x, box["y"] + point.y, steps=2)
+            await self.page.mouse.move(
+                box["x"] + point.x, box["y"] + point.y, steps=2
+            )
             await asyncio.sleep(0.008)
             percent = index * 100 // total
             if percent != last_percent:
@@ -1007,7 +1050,9 @@ class CesarSession:
         await self.page.mouse.up()
         await self._signature_overlay_progress(1.0)
 
-    async def _wait_for_selector(self, selectors: tuple[str, ...], timeout_ms: int):
+    async def _wait_for_selector(
+        self, selectors: tuple[str, ...], timeout_ms: int
+    ):
         if self.page is None:
             raise SignError("navigateur non demarre")
         deadline = asyncio.get_running_loop().time() + timeout_ms / 1000

@@ -48,7 +48,9 @@ class _InputParser(HTMLParser):
         super().__init__(convert_charrefs=True)
         self.inputs: dict[str, list[str]] = {}
 
-    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+    def handle_starttag(
+        self, tag: str, attrs: list[tuple[str, str | None]]
+    ) -> None:
         if tag.lower() != "input":
             return
         values = dict(attrs)
@@ -62,7 +64,9 @@ class _CalendarParser(HTMLParser):
         super().__init__(convert_charrefs=True)
         self.elements: list[dict[str, str]] = []
 
-    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+    def handle_starttag(
+        self, tag: str, attrs: list[tuple[str, str | None]]
+    ) -> None:
         values = {key: value or "" for key, value in attrs}
         if CALENDAR_ATTRIBUTES[0] in values:
             self.elements.append(values)
@@ -166,7 +170,9 @@ def _calendar_clock(attrs: dict[str, str]) -> tuple[int, int]:
         max_minutes = int(attrs[CALENDAR_ATTRIBUTES[2]])
         server_now = int(attrs[CALENDAR_ATTRIBUTES[3]])
     except ValueError as exc:
-        raise HttpTransportError("horloge du calendrier CESAR invalide") from exc
+        raise HttpTransportError(
+            "horloge du calendrier CESAR invalide"
+        ) from exc
     return max_minutes, server_now
 
 
@@ -207,10 +213,14 @@ def _line_seconds_left(line: dict, max_minutes: int, server_now: int) -> int:
     created_at = line.get("createdAt")
     if not isinstance(created_at, int):
         raise HttpTransportError("date d'emargement CESAR invalide")
-    return round((created_at + max_minutes * 60_000 - server_now * 1000) / 1000)
+    return round(
+        (created_at + max_minutes * 60_000 - server_now * 1000) / 1000
+    )
 
 
-def _open_line(course: dict, student_uuid: str, max_minutes: int, server_now: int):
+def _open_line(
+    course: dict, student_uuid: str, max_minutes: int, server_now: int
+):
     for line in _matching_lines(course, student_uuid):
         if _line_signed(line) or line.get("signingOff") is not True:
             continue
@@ -226,7 +236,9 @@ def _attendance_signal(course: dict, line: dict) -> AttendanceSignal:
 
 
 def _calendar_signal(attrs: dict[str, str]) -> AttendanceSignal | None:
-    schedules, student_uuid, max_minutes, server_now = _calendar_settings(attrs)
+    schedules, student_uuid, max_minutes, server_now = _calendar_settings(
+        attrs
+    )
     for course in schedules:
         if not isinstance(course, dict):
             continue
@@ -253,7 +265,13 @@ def _cookie_values(data: dict) -> tuple:
     head = (0, data["name"], data["value"], None, False, data["domain"], True)
     middle = (data["domain"].startswith("."), data["path"], True)
     middle += (data["secure"], data.get("expires"))
-    tail = (data.get("discard", True), None, None, data.get("rest") or {}, False)
+    tail = (
+        data.get("discard", True),
+        None,
+        None,
+        data.get("rest") or {},
+        False,
+    )
     return head + middle + tail
 
 
@@ -283,7 +301,8 @@ def _cookie_data_expired(item: dict) -> bool:
 
 def _cookie_strings_valid(item: dict) -> bool:
     return all(
-        isinstance(item.get(key), str) for key in ("name", "value", "domain", "path")
+        isinstance(item.get(key), str)
+        for key in ("name", "value", "domain", "path")
     )
 
 
@@ -307,7 +326,9 @@ def _cookie_data_valid(item: dict, host: str) -> bool:
 
 def _replace_private_json(temporary, path, data) -> None:
     temporary.unlink(missing_ok=True)
-    descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    descriptor = os.open(
+        temporary, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600
+    )
     with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
         json.dump(data, handle)
     temporary.replace(path)
@@ -349,7 +370,9 @@ class HttpCesarSession:
             self._workers.discard(worker)
 
     async def open(self, headless: bool | None = None) -> None:
-        self.headless = self.config.watcher.headless if headless is None else headless
+        self.headless = (
+            self.config.watcher.headless if headless is None else headless
+        )
         try:
             await self._run_worker(self._open_http)
         except asyncio.CancelledError:
@@ -359,7 +382,9 @@ class HttpCesarSession:
             raise
         except Exception as exc:
             logger.debug("echec de l'ouverture HTTP", exc_info=True)
-            raise HttpTransportError("ouverture de la session HTTP impossible") from exc
+            raise HttpTransportError(
+                "ouverture de la session HTTP impossible"
+            ) from exc
 
     def _open_http(self) -> None:
         self._session = curl_requests.Session(impersonate="chrome")
@@ -372,13 +397,17 @@ class HttpCesarSession:
         data = _read_cookie_data(self.config.watcher.http_cookies_file)
         host = urlsplit(self.config.cesar.base_url).hostname or ""
         return [
-            _cookie_from_data(item) for item in data if _cookie_data_valid(item, host)
+            _cookie_from_data(item)
+            for item in data
+            if _cookie_data_valid(item, host)
         ]
 
     def _save_cookies(self) -> None:
         if self._session is None:
             return
-        cookies = [_cookie_data(cookie) for cookie in self._session.cookies.jar]
+        cookies = [
+            _cookie_data(cookie) for cookie in self._session.cookies.jar
+        ]
         _write_private_json(self.config.watcher.http_cookies_file, cookies)
 
     def _require_http_session(self):
@@ -446,7 +475,9 @@ class HttpCesarSession:
         self._raise_for_status(response)
         path = urlsplit(str(response.url)).path
         if self._is_login_path(path):
-            raise HttpTransportError("identifiants CESAR refuses par le transport HTTP")
+            raise HttpTransportError(
+                "identifiants CESAR refuses par le transport HTTP"
+            )
         if "/upload/cvec" in path:
             self._skip_cvec(response)
         self._save_cookies()
@@ -503,7 +534,9 @@ class HttpCesarSession:
             raise
         except Exception as exc:
             logger.debug("echec de la detection HTTP", exc_info=True)
-            raise HttpTransportError("detection HTTP CESAR impossible") from exc
+            raise HttpTransportError(
+                "detection HTTP CESAR impossible"
+            ) from exc
 
     async def _open_browser(self, headless: bool) -> None:
         browser = CesarSession(self.config)
@@ -525,7 +558,8 @@ class HttpCesarSession:
             (
                 item
                 for item in self._session.cookies.jar
-                if item.name == "PHPSESSID" and _domain_allowed(host, item.domain)
+                if item.name == "PHPSESSID"
+                and _domain_allowed(host, item.domain)
             ),
             None,
         )
@@ -580,7 +614,9 @@ class HttpCesarSession:
     async def close(self) -> None:
         await self._close_browser()
         workers = [
-            worker for worker in self._workers if worker is not asyncio.current_task()
+            worker
+            for worker in self._workers
+            if worker is not asyncio.current_task()
         ]
         if workers:
             await asyncio.gather(*workers, return_exceptions=True)

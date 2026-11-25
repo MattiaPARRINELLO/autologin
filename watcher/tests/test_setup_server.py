@@ -89,7 +89,9 @@ def _prepare_setup(tmp_path, monkeypatch):
     config = local_config(tmp_path)
     path = tmp_path / "config.toml"
     save_config(path, config, password_env="CHECKMATE_PASSWORD")
-    monkeypatch.setattr(setup_server, "default_env_path", lambda: tmp_path / "env")
+    monkeypatch.setattr(
+        setup_server, "default_env_path", lambda: tmp_path / "env"
+    )
     monkeypatch.setattr(setup_server, "set_password", lambda *args: True)
     monkeypatch.setattr(setup_server, "enable_autostart", lambda *args: True)
     monkeypatch.setattr(setup_server, "restart_autostart", lambda: True)
@@ -117,7 +119,9 @@ def serveur(tmp_path, monkeypatch):
 
 
 def page(base):
-    with urllib.request.urlopen(f"{base}/?token={TOKEN}", timeout=5) as response:
+    with urllib.request.urlopen(
+        f"{base}/?token={TOKEN}", timeout=5
+    ) as response:
         return response.read().decode()
 
 
@@ -127,7 +131,10 @@ def etat(base):
 
 def planning(base, days, windows):
     return call(
-        base, "/api/schedule", token=TOKEN, payload={"days": days, "windows": windows}
+        base,
+        "/api/schedule",
+        token=TOKEN,
+        payload={"days": days, "windows": windows},
     )
 
 
@@ -137,11 +144,15 @@ def credentials(base, url, user, password):
 
 
 def signature(base, points):
-    return call(base, "/api/signature", token=TOKEN, payload={"points": points})
+    return call(
+        base, "/api/signature", token=TOKEN, payload={"points": points}
+    )
 
 
 def import_signature(base, raw):
-    return call(base, "/api/import-signature", token=TOKEN, payload={"raw": raw})
+    return call(
+        base, "/api/import-signature", token=TOKEN, payload={"raw": raw}
+    )
 
 
 def finish(base):
@@ -176,11 +187,15 @@ def _verifier_planning_refuse(base):
 
 
 def _verifier_credentials(base, config_path, tmp_path):
-    status, _ = credentials(base, "https://cesar.example.fr", "eleve", "secret")
+    status, _ = credentials(
+        base, "https://cesar.example.fr", "eleve", "secret"
+    )
     assert status == 200
     assert config_path.is_file()
     if sys.platform.startswith("linux"):
-        assert (tmp_path / "env").read_text().strip() == 'CHECKMATE_PASSWORD="secret"'
+        assert (
+            tmp_path / "env"
+        ).read_text().strip() == 'CHECKMATE_PASSWORD="secret"'
 
 
 def _verifier_signatures(base, tmp_path):
@@ -244,7 +259,9 @@ def test_le_test_de_connexion_reutilise_la_session(tmp_path, monkeypatch):
 
 
 def test_signature_invalide_refusee(tmp_path):
-    session = SetupSession(tmp_path / "config.toml", local_config(tmp_path), "jeton")
+    session = SetupSession(
+        tmp_path / "config.toml", local_config(tmp_path), "jeton"
+    )
     try:
         session.save_signature({"points": []})
     except setup_server.SetupError as exc:
@@ -254,9 +271,13 @@ def test_signature_invalide_refusee(tmp_path):
 
 
 def test_identifiants_invalides_refuses(tmp_path):
-    session = SetupSession(tmp_path / "config.toml", local_config(tmp_path), "jeton")
+    session = SetupSession(
+        tmp_path / "config.toml", local_config(tmp_path), "jeton"
+    )
     try:
-        session.save_credentials({"base_url": "", "username": "x", "password": "y"})
+        session.save_credentials(
+            {"base_url": "", "username": "x", "password": "y"}
+        )
     except setup_server.SetupError as exc:
         assert "adresse" in str(exc)
     else:

@@ -18,7 +18,9 @@ def prefer_keyring() -> bool:
 def _keyring_module():
     try:
         import keyring
-    except ImportError as exc:  # pragma: no cover - dependance toujours installee
+    except (
+        ImportError
+    ) as exc:  # pragma: no cover - dependance toujours installee
         logger.warning("keyring indisponible : %s", exc)
         return None
     return keyring

@@ -69,11 +69,15 @@ def install(archive: Path, *, cleanup: Path | None = None) -> None:
     elif sys.platform.startswith("linux"):
         _install_linux(archive, cleanup or archive.parent)
     else:
-        raise UpdateError("mise a jour automatique indisponible sur ce systeme")
+        raise UpdateError(
+            "mise a jour automatique indisponible sur ce systeme"
+        )
 
 
 def _install_windows(archive: Path) -> None:
-    flags = 0x00000008 | 0x00000200  # DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP
+    flags = (
+        0x00000008 | 0x00000200
+    )  # DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP
     try:
         subprocess.Popen(
             [str(archive), *WINDOWS_FLAGS],
@@ -81,7 +85,9 @@ def _install_windows(archive: Path) -> None:
             creationflags=flags,
         )
     except OSError as exc:
-        raise UpdateError(f"lancement de l'installeur impossible : {exc}") from exc
+        raise UpdateError(
+            f"lancement de l'installeur impossible : {exc}"
+        ) from exc
 
 
 def _fill_update_script(handle, archive, cleanup):
@@ -151,7 +157,9 @@ def _try_systemd_run(script, unit):
         return False
     if _transient_unit_active(unit):
         return True
-    logger.warning("unite %s inactive, installation dans le cgroup du service", unit)
+    logger.warning(
+        "unite %s inactive, installation dans le cgroup du service", unit
+    )
     return False
 
 
@@ -179,7 +187,14 @@ def _quote(value: str) -> str:
 
 
 def _transient_unit_state(unit: str) -> str | None:
-    command = ("systemctl", "--user", "show", "--property=ActiveState", "--value", unit)
+    command = (
+        "systemctl",
+        "--user",
+        "show",
+        "--property=ActiveState",
+        "--value",
+        unit,
+    )
     try:
         result = subprocess.run(
             command, capture_output=True, text=True, timeout=2, check=False

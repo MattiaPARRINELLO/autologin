@@ -34,7 +34,10 @@ MAC_CANDIDATES = (
         "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
         "chrome",
     ),
-    ("/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge", "msedge"),
+    (
+        "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+        "msedge",
+    ),
 )
 
 
@@ -62,7 +65,9 @@ def playwright_cache_dir(platform: str | None = None) -> Path:
         return Path(override)
     current = platform or sys.platform
     if current.startswith("win"):
-        base = os.environ.get("LOCALAPPDATA") or str(Path.home() / "AppData/Local")
+        base = os.environ.get("LOCALAPPDATA") or str(
+            Path.home() / "AppData/Local"
+        )
         return Path(base) / "ms-playwright"
     if current == "darwin":
         return Path.home() / "Library/Caches/ms-playwright"

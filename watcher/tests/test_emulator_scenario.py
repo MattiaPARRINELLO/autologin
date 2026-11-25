@@ -13,7 +13,9 @@ REFERENCE_SCENARIO = REPO_ROOT / "emulator" / "scenarios" / "cesar-simplifie"
 
 
 def load_module():
-    spec = importlib.util.spec_from_file_location("emulator_scenario", MODULE_PATH)
+    spec = importlib.util.spec_from_file_location(
+        "emulator_scenario", MODULE_PATH
+    )
     module = importlib.util.module_from_spec(spec)
     # dataclasses resout les annotations via sys.modules pendant l'execution.
     sys.modules[spec.name] = module
@@ -25,7 +27,9 @@ scenario_module = load_module()
 
 
 def write_scenario(tmp_path: Path, manifest: dict, **files: str) -> Path:
-    (tmp_path / "scenario.json").write_text(json.dumps(manifest), encoding="utf-8")
+    (tmp_path / "scenario.json").write_text(
+        json.dumps(manifest), encoding="utf-8"
+    )
     for name, content in files.items():
         (tmp_path / name).write_text(content, encoding="utf-8")
     return tmp_path
@@ -46,7 +50,9 @@ def test_la_page_suit_letat_demargement():
     assert b"Aucun emargement en cours" in scenario.page_html("/", "default")
     assert b'class="buttonPresent' in scenario.page_html("/", "open")
     assert b"Presence signee" in scenario.page_html("/", "signed")
-    assert scenario.page_html("/", "etat-inconnu") == scenario.page_html("/", "default")
+    assert scenario.page_html("/", "etat-inconnu") == scenario.page_html(
+        "/", "default"
+    )
 
 
 def test_le_script_de_liaison_est_injecte_avant_la_fin_du_body():
@@ -98,7 +104,9 @@ def test_un_chemin_hors_du_scenario_est_refuse(tmp_path):
         **{"page.html": "<html></html>"},
     )
 
-    with pytest.raises(scenario_module.ScenarioError, match="hors du scenario"):
+    with pytest.raises(
+        scenario_module.ScenarioError, match="hors du scenario"
+    ):
         scenario_module.load_scenario(directory)
 
 
