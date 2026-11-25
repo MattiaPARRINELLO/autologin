@@ -144,6 +144,107 @@ STATUS_HTML = """<!doctype html>
   max-width: 62ch; }
   footer { display: flex; justify-content: space-between; gap: 16px;
   margin-top: 16px; font-size: 12px; color: var(--muted); }
+  .release-layer {
+    position: fixed; inset: 0; z-index: 50; display: grid; place-items: center;
+    padding: 24px; overflow: auto; background:
+    radial-gradient(circle at 18% 12%, rgba(111, 61, 103, 0.78), transparent 38%),
+    radial-gradient(circle at 88% 88%, rgba(150, 96, 40, 0.58), transparent 34%),
+    rgba(20, 14, 19, 0.88); backdrop-filter: blur(14px);
+    animation: release-layer-in 420ms var(--ease) both;
+  }
+  .release-layer[hidden] { display: none; }
+  .release-atmosphere { position: fixed; inset: 0; overflow: hidden;
+  pointer-events: none; }
+  .release-orb { position: absolute; border-radius: 50%; filter: blur(70px);
+  opacity: 0.5; animation: release-drift 12s ease-in-out infinite alternate; }
+  .release-orb.one { width: 360px; height: 360px; left: 8%; top: 4%;
+  background: #b87932; }
+  .release-orb.two { width: 420px; height: 420px; right: 4%; bottom: -8%;
+  background: #71466c; animation-delay: -4s; }
+  .release-dialog {
+    position: relative; width: min(900px, 100%); max-height: calc(100vh - 48px);
+    overflow: auto; padding: 42px 46px 34px; border-radius: 32px;
+    color: #241c19; background: linear-gradient(145deg, #fffaf2, #f3e9dc);
+    box-shadow: 0 40px 120px rgba(0, 0, 0, 0.38), inset 0 1px #fff;
+    animation: release-dialog-in 720ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+  .release-close { position: absolute; right: 18px; top: 18px; width: 38px;
+  height: 38px; padding: 0; border-radius: 50%; color: #6f6157;
+  background: rgba(255, 255, 255, 0.55); border-color: rgba(31, 27, 22, 0.1); }
+  .release-close:hover { background: #fff; color: #241c19; }
+  .release-check { width: 66px; height: 66px; margin: 0 0 24px; display: grid;
+  place-items: center; border-radius: 50%; color: #fffaf2; background: #2f6f4f;
+  box-shadow: 0 16px 36px rgba(47, 111, 79, 0.28);
+  animation: release-check-in 620ms 120ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+  .release-check svg { width: 34px; height: 34px; }
+  .release-check path { stroke-dasharray: 30; stroke-dashoffset: 30;
+  animation: release-check-draw 480ms 380ms var(--ease) forwards; }
+  .release-kicker { display: flex; align-items: center; gap: 10px; margin: 0 0 12px;
+  color: #8a6236; font-size: 11px; font-weight: 800; letter-spacing: 0.15em;
+  text-transform: uppercase; }
+  .release-kicker::before { content: ""; width: 26px; height: 2px;
+  background: #b67a32; }
+  .release-dialog h2 { max-width: 690px; margin: 0; color: #241c19;
+  font-size: clamp(40px, 6vw, 62px); line-height: 0.98; letter-spacing: -0.055em;
+  font-weight: 650; }
+  .release-summary { max-width: 670px; margin: 18px 0 28px; color: #6f6157;
+  font-size: 17px; line-height: 1.55; }
+  .release-metrics { display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: 12px; }
+  .release-metric { padding: 18px 18px 16px; border: 1px solid #dac9b5;
+  border-radius: 18px; background: rgba(255, 255, 255, 0.56);
+  animation: release-item-in 560ms var(--ease) both;
+  animation-delay: var(--delay, 0ms); }
+  .release-metric strong { display: block; color: #2f6f4f; font-size: 32px;
+  line-height: 1; letter-spacing: -0.045em; font-variant-numeric: tabular-nums; }
+  .release-metric span { display: block; margin-top: 7px; color: #4e443c;
+  font-size: 13px; font-weight: 700; }
+  .release-metric small { display: block; margin-top: 5px; color: #7b6e63;
+  font-size: 11px; line-height: 1.4; }
+  .release-features { display: grid; grid-template-columns: 1fr 1fr;
+  gap: 16px 26px; margin: 26px 0 22px; }
+  .release-feature { position: relative; padding-left: 24px;
+  animation: release-item-in 560ms var(--ease) both;
+  animation-delay: var(--delay, 0ms); }
+  .release-feature::before { content: ""; position: absolute; left: 0; top: 5px;
+  width: 9px; height: 9px; border-radius: 50%; background: #2f6f4f;
+  box-shadow: 0 0 0 4px rgba(47, 111, 79, 0.1); }
+  .release-feature:last-child { grid-column: 1 / -1; }
+  .release-feature strong { display: block; color: #332a24; font-size: 14px; }
+  .release-feature p { margin: 4px 0 0; color: #74675c; font-size: 12px;
+  line-height: 1.5; }
+  .release-measurement { margin: 0; padding-top: 16px; border-top: 1px solid
+  rgba(31, 27, 22, 0.12); color: #817367; font-size: 11px; line-height: 1.5; }
+  .release-actions { display: flex; align-items: center; gap: 14px;
+  margin-top: 24px; }
+  .release-actions .primary { height: 46px; padding: 0 22px;
+  background: #241c19; color: #fff8ef; }
+  .release-actions .primary:hover { background: #3a2e27; }
+  .release-link { color: #6f6157; font-size: 13px; font-weight: 650;
+  text-decoration-color: rgba(47, 111, 79, 0.45); text-underline-offset: 4px; }
+  .release-link:hover { color: #2f6f4f; }
+  .release-spark { position: absolute; width: 7px; height: 14px; border-radius: 2px;
+  opacity: 0; background: #d7a14e; animation: release-spark 1500ms var(--ease)
+  both; animation-delay: var(--delay, 0ms); }
+  .release-spark.s1 { left: 12%; top: 16%; --rotate: 24deg; }
+  .release-spark.s2 { right: 13%; top: 12%; --rotate: -32deg;
+  background: #6fa586; }
+  .release-spark.s3 { left: 17%; bottom: 14%; --rotate: 48deg;
+  background: #6fa586; }
+  .release-spark.s4 { right: 16%; bottom: 16%; --rotate: -18deg; }
+  body.release-open { overflow: hidden; }
+  @keyframes release-layer-in { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes release-dialog-in { from { opacity: 0; transform: translateY(26px)
+  scale(0.97); } to { opacity: 1; transform: none; } }
+  @keyframes release-check-in { from { opacity: 0; transform: scale(0.6); }
+  to { opacity: 1; transform: none; } }
+  @keyframes release-check-draw { to { stroke-dashoffset: 0; } }
+  @keyframes release-item-in { from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: none; } }
+  @keyframes release-drift { to { transform: translate(24px, -18px) scale(1.08); } }
+  @keyframes release-spark { 0% { opacity: 0; transform: translateY(16px)
+  rotate(var(--rotate)) scale(0.6); } 35% { opacity: 0.85; } 100% { opacity: 0;
+  transform: translateY(-70px) rotate(var(--rotate)) scale(1); } }
   @media (max-width: 720px) {
     .shell { padding: 20px 14px 32px; }
     .panel { padding: 22px; }
@@ -151,6 +252,25 @@ STATUS_HTML = """<!doctype html>
     .grid { grid-template-columns: repeat(2, 1fr); }
     .actions button { flex: 1 1 100%; }
     footer { flex-direction: column; }
+    .release-layer { padding: 12px; }
+    .release-dialog { max-height: calc(100vh - 24px); padding: 34px 24px 26px;
+    border-radius: 24px; }
+    .release-dialog h2 { font-size: 42px; }
+    .release-summary { font-size: 15px; }
+    .release-metrics { grid-template-columns: 1fr; }
+    .release-metric { display: grid; grid-template-columns: 90px 1fr; align-items: center;
+    column-gap: 12px; }
+    .release-metric strong { grid-row: 1 / 3; }
+    .release-metric span, .release-metric small { margin-top: 0; }
+    .release-features { grid-template-columns: 1fr; }
+    .release-feature:last-child { grid-column: auto; }
+    .release-actions { align-items: stretch; flex-direction: column; }
+    .release-link { text-align: center; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+    .release-atmosphere { display: none; }
   }
 </style>
 </head>
@@ -262,6 +382,46 @@ STATUS_HTML = """<!doctype html>
   </footer>
 </div>
 
+<div class="release-layer" id="releaseLayer" hidden>
+  <div class="release-atmosphere" aria-hidden="true">
+    <span class="release-orb one"></span>
+    <span class="release-orb two"></span>
+    <i class="release-spark s1" style="--delay: 420ms"></i>
+    <i class="release-spark s2" style="--delay: 560ms"></i>
+    <i class="release-spark s3" style="--delay: 700ms"></i>
+    <i class="release-spark s4" style="--delay: 840ms"></i>
+  </div>
+  <section class="release-dialog" id="releaseDialog" role="dialog"
+  aria-modal="true" aria-labelledby="releaseTitle" aria-describedby="releaseSummary"
+  tabindex="-1">
+    <button type="button" class="release-close" id="releaseClose"
+    aria-label="Fermer les nouveautés">
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none"
+      aria-hidden="true">
+        <path d="M4 4l10 10M14 4L4 14" stroke="currentColor" stroke-width="1.8"
+        stroke-linecap="round"/>
+      </svg>
+    </button>
+    <div class="release-check" aria-hidden="true">
+      <svg viewBox="0 0 34 34" fill="none">
+        <path d="M8 17.5l6 6L26 11" stroke="currentColor" stroke-width="3"
+        stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+    <p class="release-kicker" id="releaseKicker"></p>
+    <h2 id="releaseTitle"></h2>
+    <p class="release-summary" id="releaseSummary"></p>
+    <div class="release-metrics" id="releaseMetrics"></div>
+    <div class="release-features" id="releaseFeatures"></div>
+    <p class="release-measurement" id="releaseMeasurement"></p>
+    <div class="release-actions">
+      <button type="button" class="primary" id="releaseDone">C'est parti</button>
+      <a class="release-link" id="releaseLink" target="_blank"
+      rel="noopener noreferrer" hidden>Voir les notes complètes</a>
+    </div>
+  </section>
+</div>
+
 <script>
 const TOKEN = "__TOKEN__";
 let timer = null;
@@ -284,6 +444,111 @@ function setMessage(text, kind) {
   element.textContent = text || "";
   element.className = "message" + (kind ? " " + kind : "");
 }
+
+let currentRelease = null;
+let releaseHandledVersion = null;
+let releaseReturnFocus = null;
+
+function appendText(parent, tag, className, text) {
+  const element = document.createElement(tag);
+  element.className = className;
+  element.textContent = text || "";
+  parent.appendChild(element);
+  return element;
+}
+
+function renderRelease(note) {
+  if (!note || !note.version || note.version === releaseHandledVersion) return;
+  releaseHandledVersion = note.version;
+  currentRelease = note;
+  document.getElementById("releaseKicker").textContent =
+    "CheckMate " + note.version + " - mise à jour importante";
+  document.getElementById("releaseTitle").textContent =
+    note.title || "Mise à jour terminée.";
+  document.getElementById("releaseSummary").textContent =
+    note.summary || "Découvre ce qui change.";
+  document.getElementById("releaseMeasurement").textContent =
+    note.measurement || "";
+
+  const metrics = document.getElementById("releaseMetrics");
+  metrics.replaceChildren();
+  (Array.isArray(note.metrics) ? note.metrics : []).forEach((metric, index) => {
+    const item = document.createElement("div");
+    item.className = "release-metric";
+    item.style.setProperty("--delay", (160 + index * 90) + "ms");
+    appendText(item, "strong", "", metric.value);
+    appendText(item, "span", "", metric.label);
+    appendText(item, "small", "", metric.detail);
+    metrics.appendChild(item);
+  });
+
+  const features = document.getElementById("releaseFeatures");
+  features.replaceChildren();
+  (Array.isArray(note.features) ? note.features : []).forEach((feature, index) => {
+    const item = document.createElement("article");
+    item.className = "release-feature";
+    item.style.setProperty("--delay", (260 + index * 70) + "ms");
+    appendText(item, "strong", "", feature.title);
+    appendText(item, "p", "", feature.description);
+    features.appendChild(item);
+  });
+
+  const link = document.getElementById("releaseLink");
+  link.hidden = typeof note.url !== "string" || !note.url;
+  if (!link.hidden) link.href = note.url;
+  releaseReturnFocus = document.activeElement;
+  document.getElementById("releaseLayer").hidden = false;
+  document.body.classList.add("release-open");
+  document.getElementById("releaseDone").focus();
+}
+
+function closeRelease() {
+  document.getElementById("releaseLayer").hidden = true;
+  document.body.classList.remove("release-open");
+  currentRelease = null;
+  if (releaseReturnFocus && typeof releaseReturnFocus.focus === "function") {
+    releaseReturnFocus.focus();
+  }
+  releaseReturnFocus = null;
+}
+
+async function dismissRelease() {
+  const version = currentRelease ? currentRelease.version : null;
+  if (version) releaseHandledVersion = version;
+  closeRelease();
+  if (!version) return;
+  try {
+    await api("/api/action", { action: "dismiss-release" });
+  } catch (error) {
+    console.debug("Fermeture des nouveautés non synchronisée", error);
+  }
+}
+
+document.getElementById("releaseClose")
+  .addEventListener("click", dismissRelease);
+document.getElementById("releaseDone")
+  .addEventListener("click", dismissRelease);
+document.getElementById("releaseLayer")
+  .addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      dismissRelease();
+      return;
+    }
+    if (event.key !== "Tab") return;
+    const focusable = Array.from(document.querySelectorAll(
+      "#releaseDialog button, #releaseDialog a[href]"
+    )).filter((element) => !element.hidden);
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  });
 
 function renderBlocked(blocked, migration) {
   document.getElementById("blockedBanner").hidden = !blocked;
@@ -377,6 +642,7 @@ function render(snapshot) {
     formatDate(snapshot.last_signed_at);
   document.getElementById("lastError").textContent =
     formatDate(snapshot.last_error_at);
+  renderRelease(snapshot.release_note);
 }
 
 async function refresh() {
