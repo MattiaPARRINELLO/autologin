@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import html
 import json
+import os
 import stat
 import threading
 from dataclasses import replace
@@ -328,7 +329,9 @@ def test_cookies_http_sont_persistes_avec_permissions_restreintes(tmp_path):
     assert saved[0]["path"] == "/"
     assert saved[0]["secure"] is True
     mode = stat.S_IMODE(config.watcher.http_cookies_file.stat().st_mode)
-    assert mode == 0o600
+    # Windows ne traduit pas chmod(600) en bits POSIX.
+    if os.name != "nt":
+        assert mode == 0o600
 
 
 def test_cookies_persistants_evitent_un_nouveau_login(tmp_path, monkeypatch):
