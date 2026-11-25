@@ -251,17 +251,16 @@ def _cookie_data(cookie: Cookie) -> dict:
 
 def _cookie_values(data: dict) -> tuple:
     domain = data["domain"]
-    return (
-        (0, data["name"], data["value"], None, False, domain, True)
-        + (
-            domain.startswith("."),
-            data["path"],
-            True,
-            data["secure"],
-            data.get("expires"),
-        )
-        + (data.get("discard", True), None, None, data.get("rest") or {}, False)
+    head = (0, data["name"], data["value"], None, False, domain, True)
+    middle = (
+        domain.startswith("."),
+        data["path"],
+        True,
+        data["secure"],
+        data.get("expires"),
     )
+    tail = (data.get("discard", True), None, None, data.get("rest") or {}, False)
+    return head + middle + tail
 
 
 def _cookie_from_data(data: dict) -> Cookie:
