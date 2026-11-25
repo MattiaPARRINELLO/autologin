@@ -19,6 +19,7 @@ from urllib.parse import urlparse
 from . import __version__
 from .autostart import current_executable
 from .config import Config, save_updates_channel
+from .file_io import write_private_json
 from .local_http import LocalError, LocalHandler
 from .local_http import create_server as _create_server
 from .notifications import Notifier
@@ -149,10 +150,7 @@ def _ensure_runtime_dir(path: Path) -> None:
 
 
 def _write_runtime_file(path: Path, payload: dict) -> None:
-    path.write_text(
-        json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8"
-    )
-    path.chmod(0o600)
+    write_private_json(path, payload)
 
 
 def write_runtime(session: StatusSession) -> None:

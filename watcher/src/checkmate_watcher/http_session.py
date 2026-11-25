@@ -5,7 +5,6 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import os
 import time
 from html.parser import HTMLParser
 from http.cookiejar import Cookie
@@ -21,6 +20,7 @@ from .cesar import (
     signal_key,
 )
 from .config import Config
+from .file_io import write_private_json
 
 logger = logging.getLogger(__name__)
 
@@ -327,27 +327,6 @@ def _cookie_data_valid(item: dict, host: str) -> bool:
     return isinstance(item.get("rest", {}), dict)
 
 
-def _replace_private_json(temporary, path, data) -> None:
-    temporary.unlink(missing_ok=True)
-    descriptor = os.open(
-        temporary, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600
-    )
-    with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
-        json.dump(data, handle)
-    temporary.replace(path)
-    path.chmod(0o600)
-
-
-def _write_private_json(path, data) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_name(path.name + ".tmp")
-    try:
-        _replace_private_json(temporary, path, data)
-    except OSError:
-        temporary.unlink(missing_ok=True)
-        raise
-
-
 class HttpCesarSession:
     """Session HTTP pour detecter, session Chrome pour signer."""
 
@@ -411,7 +390,7 @@ class HttpCesarSession:
         cookies = [
             _cookie_data(cookie) for cookie in self._session.cookies.jar
         ]
-        _write_private_json(self.config.watcher.http_cookies_file, cookies)
+        write_private_json(self.config.watcher.http_cookies_file, cookies)
 
     def _require_http_session(self):
         if self._session is None:

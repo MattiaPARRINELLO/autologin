@@ -7,6 +7,8 @@ import math
 from dataclasses import dataclass
 from pathlib import Path
 
+from .file_io import write_private_json
+
 VALID_KINDS = ("start", "move", "end")
 MIN_PADDING_RATIO = 0.1
 MAX_PADDING_RATIO = 1.0
@@ -79,10 +81,7 @@ def save_signature(path: Path, points: list[Point]) -> None:
         {"x": round(p.x, 2), "y": round(p.y, 2), "type": p.kind}
         for p in points
     ]
-    path.write_text(
-        json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8"
-    )
-    path.chmod(0o600)
+    write_private_json(path, payload)
 
 
 def _point_coords(raw: object) -> tuple[float, float]:
