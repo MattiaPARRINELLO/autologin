@@ -482,7 +482,6 @@ def save_config(
     password: str | None = None,
     password_env: str | None = None,
 ) -> Path:
-    """Ecrit la configuration de facon atomique, lisible par l'utilisateur seul."""
     target = _prepare_config_target(path)
     payload = _config_payload(
         config, password=password, password_env=password_env

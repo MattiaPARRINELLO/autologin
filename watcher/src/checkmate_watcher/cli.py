@@ -168,6 +168,7 @@ CAPTURE_HTML = """
 
 
 HELP_NO_BROWSER = "setup : ne pas ouvrir le navigateur automatiquement"
+DRY_RUN_HELP = "detecte sans notifier ni signer"
 HELP_NOTIFY = "self-test : envoie aussi une notification reelle"
 
 COMMANDS = (
@@ -201,11 +202,7 @@ def _add_run_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--once", action="store_true", help="un seul cycle puis sortie"
     )
-    parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="detecte sans notifier ni signer",
-    )
+    parser.add_argument("--dry-run", action="store_true", help=DRY_RUN_HELP)
     parser.add_argument(
         "--auto", action="store_true", help="signe sans confirmation"
     )
