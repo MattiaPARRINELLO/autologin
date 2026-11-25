@@ -261,6 +261,7 @@ def _afficher_watcher(config: Config) -> None:
     print(f"  Deduplication  : {config.watcher.dedupe_ttl}s")
     print(f"  Confirmation   : {config.watcher.confirm_timeout}s")
     print(f"  Nouvelle demande : {config.watcher.prompt_retry}s")
+    print(f"  Transport      : {config.watcher.transport}")
     print(f"  Auto-signature : {config.watcher.auto_sign}")
     print(f"  Visible a la signature : {config.watcher.visible_on_sign}")
     print(f"  Plages         : {config.schedule.describe()}")
