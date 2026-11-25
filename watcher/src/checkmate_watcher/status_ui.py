@@ -201,6 +201,43 @@ STATUS_HTML = """<!doctype html>
   font-size: 13px; font-weight: 700; }
   .release-metric small { display: block; margin-top: 5px; color: #7b6e63;
   font-size: 11px; line-height: 1.4; }
+  .release-performance { margin: 18px 0 24px; padding: 18px 20px;
+  border: 1px solid #dac9b5; border-radius: 18px;
+  background: rgba(255, 255, 255, 0.4);
+  animation: release-item-in 560ms 220ms var(--ease) both; }
+  .release-performance[hidden] { display: none; }
+  .release-performance-head { display: flex; align-items: flex-start;
+  justify-content: space-between; gap: 18px; margin-bottom: 16px; }
+  .release-performance h3 { margin: 0; color: #332a24; font-size: 15px; }
+  .release-performance-description { margin: 4px 0 0; color: #7b6e63;
+  font-size: 11px; line-height: 1.45; }
+  .release-performance-legend { display: flex; flex: none; gap: 12px;
+  color: #7b6e63; font-size: 10px; }
+  .release-performance-legend span { display: flex; align-items: center; gap: 5px; }
+  .release-performance-legend i { width: 8px; height: 8px; border-radius: 50%;
+  background: #cdbba5; }
+  .release-performance-legend span:last-child i { background: #2f6f4f; }
+  .release-performance-item + .release-performance-item { margin-top: 14px; }
+  .release-performance-row { display: flex; align-items: baseline;
+  justify-content: space-between; gap: 12px; margin-bottom: 7px; }
+  .release-performance-label { color: #4e443c; font-size: 12px; font-weight: 700; }
+  .release-performance-values { display: flex; align-items: baseline; gap: 7px;
+  font-variant-numeric: tabular-nums; }
+  .release-performance-values span { color: #8b7d70; font-size: 11px;
+  text-decoration: line-through; }
+  .release-performance-values strong { min-width: 72px; color: #2f6f4f;
+  font-size: 14px; text-align: right; }
+  .release-performance-track { position: relative; height: 12px; overflow: hidden;
+  border-radius: 999px; background: #e7dccd; }
+  .release-performance-before { position: absolute; inset: 0 auto 0 0;
+  width: 100%; background: #cdbba5; }
+  .release-performance-after { position: absolute; inset: 0 auto 0 0;
+  width: var(--after); border-radius: inherit; background: linear-gradient(90deg,
+  #2f6f4f, #4f9a70); box-shadow: 0 0 18px rgba(47, 111, 79, 0.3);
+  animation: release-performance-drop 1100ms var(--ease) both;
+  animation-delay: var(--delay, 0ms); }
+  .release-performance-gain { display: block; margin-top: 5px; color: #2f6f4f;
+  font-size: 10px; font-weight: 700; text-align: right; }
   .release-features { display: grid; grid-template-columns: 1fr 1fr;
   gap: 16px 26px; margin: 26px 0 22px; }
   .release-feature { position: relative; padding-left: 24px;
@@ -241,6 +278,8 @@ STATUS_HTML = """<!doctype html>
   @keyframes release-check-draw { to { stroke-dashoffset: 0; } }
   @keyframes release-item-in { from { opacity: 0; transform: translateY(12px); }
   to { opacity: 1; transform: none; } }
+  @keyframes release-performance-drop { from { width: 100%; }
+  to { width: var(--after); } }
   @keyframes release-drift { to { transform: translate(24px, -18px) scale(1.08); } }
   @keyframes release-spark { 0% { opacity: 0; transform: translateY(16px)
   rotate(var(--rotate)) scale(0.6); } 35% { opacity: 0.85; } 100% { opacity: 0;
@@ -262,6 +301,8 @@ STATUS_HTML = """<!doctype html>
     column-gap: 12px; }
     .release-metric strong { grid-row: 1 / 3; }
     .release-metric span, .release-metric small { margin-top: 0; }
+    .release-performance { padding: 16px; }
+    .release-performance-head { flex-direction: column; gap: 8px; }
     .release-features { grid-template-columns: 1fr; }
     .release-feature:last-child { grid-column: auto; }
     .release-actions { align-items: stretch; flex-direction: column; }
@@ -412,6 +453,20 @@ STATUS_HTML = """<!doctype html>
     <h2 id="releaseTitle"></h2>
     <p class="release-summary" id="releaseSummary"></p>
     <div class="release-metrics" id="releaseMetrics"></div>
+    <section class="release-performance" id="releasePerformance"
+    aria-label="Comparatif des performances" hidden>
+      <div class="release-performance-head">
+        <div>
+          <h3 id="releasePerformanceTitle"></h3>
+          <p class="release-performance-description"
+          id="releasePerformanceDescription"></p>
+        </div>
+        <div class="release-performance-legend" aria-hidden="true">
+          <span><i></i>Avant</span><span><i></i>Maintenant</span>
+        </div>
+      </div>
+      <div id="releasePerformanceItems"></div>
+    </section>
     <div class="release-features" id="releaseFeatures"></div>
     <p class="release-measurement" id="releaseMeasurement"></p>
     <div class="release-actions">
@@ -448,6 +503,7 @@ function setMessage(text, kind) {
 let currentRelease = null;
 let releaseHandledVersion = null;
 let releaseReturnFocus = null;
+let releasePerformanceFrame = null;
 
 function appendText(parent, tag, className, text) {
   const element = document.createElement(tag);
@@ -455,6 +511,99 @@ function appendText(parent, tag, className, text) {
   element.textContent = text || "";
   parent.appendChild(element);
   return element;
+}
+
+function formatPerformance(value, unit) {
+  const number = new Intl.NumberFormat("fr-FR", {
+    maximumFractionDigits: 0
+  }).format(value);
+  return number + (unit ? " " + unit : "");
+}
+
+function animatePerformance(rows, reduced) {
+  if (releasePerformanceFrame !== null) {
+    cancelAnimationFrame(releasePerformanceFrame);
+    releasePerformanceFrame = null;
+  }
+  if (reduced) {
+    rows.forEach((row) => {
+      row.value.textContent = formatPerformance(row.after, row.unit);
+    });
+    return;
+  }
+  const started = performance.now() + 320;
+  const duration = 1000;
+  const stagger = 140;
+  function frame(now) {
+    rows.forEach((row, index) => {
+      const progress = Math.min(1, Math.max(
+        0, (now - started - index * stagger) / duration
+      ));
+      const eased = 1 - Math.pow(1 - progress, 3);
+      const value = row.before + (row.after - row.before) * eased;
+      row.value.textContent = formatPerformance(value, row.unit);
+    });
+    const total = duration + Math.max(0, rows.length - 1) * stagger;
+    if (now - started < total) {
+      releasePerformanceFrame = requestAnimationFrame(frame);
+    } else {
+      releasePerformanceFrame = null;
+    }
+  }
+  releasePerformanceFrame = requestAnimationFrame(frame);
+}
+
+function renderPerformance(note) {
+  const panel = document.getElementById("releasePerformance");
+  const data = note.performance;
+  const items = data && Array.isArray(data.items) ? data.items.filter((item) =>
+    item && Number.isFinite(item.before) && Number.isFinite(item.after) &&
+    item.before > 0 && item.after >= 0
+  ) : [];
+  panel.hidden = items.length === 0;
+  const container = document.getElementById("releasePerformanceItems");
+  container.replaceChildren();
+  if (panel.hidden) return;
+  document.getElementById("releasePerformanceTitle").textContent =
+    data.title || "Gains de performance";
+  document.getElementById("releasePerformanceDescription").textContent =
+    data.description || "";
+  const rows = items.map((item, index) => {
+    const article = document.createElement("article");
+    article.className = "release-performance-item";
+    const labels = document.createElement("div");
+    labels.className = "release-performance-row";
+    appendText(labels, "span", "release-performance-label", item.label);
+    const values = document.createElement("div");
+    values.className = "release-performance-values";
+    appendText(values, "span", "", formatPerformance(item.before, item.unit));
+    const value = appendText(
+      values, "strong", "", formatPerformance(item.before, item.unit)
+    );
+    labels.appendChild(values);
+    article.appendChild(labels);
+    const track = document.createElement("div");
+    track.className = "release-performance-track";
+    appendText(track, "span", "release-performance-before", "");
+    const after = appendText(track, "span", "release-performance-after", "");
+    after.style.setProperty(
+      "--after", Math.min(100, item.after / item.before * 100) + "%"
+    );
+    after.style.setProperty("--delay", (320 + index * 140) + "ms");
+    article.appendChild(track);
+    const gain = Math.round((1 - item.after / item.before) * 100);
+    if (gain > 0) {
+      appendText(
+        article, "small", "release-performance-gain", gain + " % en moins"
+      );
+    }
+    container.appendChild(article);
+    return {value, before: item.before, after: item.after, unit: item.unit || ""};
+  });
+  const reduced = window.matchMedia(
+    "(prefers-reduced-motion: reduce)"
+  ).matches;
+  animatePerformance(rows, reduced);
 }
 
 function renderRelease(note) {
@@ -482,6 +631,8 @@ function renderRelease(note) {
     metrics.appendChild(item);
   });
 
+  renderPerformance(note);
+
   const features = document.getElementById("releaseFeatures");
   features.replaceChildren();
   (Array.isArray(note.features) ? note.features : []).forEach((feature, index) => {
@@ -503,6 +654,10 @@ function renderRelease(note) {
 }
 
 function closeRelease() {
+  if (releasePerformanceFrame !== null) {
+    cancelAnimationFrame(releasePerformanceFrame);
+    releasePerformanceFrame = null;
+  }
   document.getElementById("releaseLayer").hidden = true;
   document.body.classList.remove("release-open");
   currentRelease = null;

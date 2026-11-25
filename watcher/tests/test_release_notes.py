@@ -38,6 +38,8 @@ def test_le_resume_0_7_0_contient_les_gains_mesures():
     assert note["version"] == "0.7.0"
     assert [item["value"] for item in note["metrics"]] == ["2,3×", "15×", "0"]
     assert len(note["features"]) == 5
+    assert note["performance"]["items"][0]["before"] == 657
+    assert note["performance"]["items"][0]["after"] == 284
 
 
 def test_premiere_execution_sans_popup(tmp_path):

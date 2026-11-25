@@ -21,6 +21,24 @@
         "detail": "Il s'ouvre seulement pour signer"
       }
     ],
+    "performance": {
+      "title": "La différence se voit tout de suite",
+      "description": "Les barres partent de l'ancienne consommation et descendent jusqu'au nouveau niveau.",
+      "items": [
+        {
+          "label": "Temps de détection",
+          "before": 657,
+          "after": 284,
+          "unit": "ms"
+        },
+        {
+          "label": "Mémoire utilisée",
+          "before": 634,
+          "after": 43,
+          "unit": "Mo"
+        }
+      ]
+    },
     "features": [
       {
         "title": "Moins de travail en arrière-plan",
