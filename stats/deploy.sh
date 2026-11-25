@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Deploie le collecteur de statistiques sur le VPS qui heberge deja Caddy.
 #
-#   Exemple d'utilisation : CHECKMATE_STATS_KEY=~/.ssh/id_ed25519 ./stats/deploy.sh
+#   Exemple : CHECKMATE_STATS_KEY=~/.ssh/id_ed25519
+#   ./stats/deploy.sh
 #
 # Variables d'environnement acceptees :
 #   CHECKMATE_STATS_HOST  cible SSH (defaut ubuntu@main.mprnl.fr)
@@ -38,10 +39,13 @@ EOF
   chmod 600 dashboard-password.txt
   echo 'mot de passe du tableau de bord : $DIR/dashboard-password.txt'
 fi"
-run "cd '$DIR' && sed -i 's/^CHECKMATE_INGEST_KEY=.*/CHECKMATE_INGEST_KEY=$COLLECTOR_TAG/' .env"
+run "cd '$DIR' && " \
+    "sed -i " \
+    "'s/^CHECKMATE_INGEST_KEY=.*/CHECKMATE_INGEST_KEY=$COLLECTOR_TAG/' .env"
 
 echo "==> Demarrage du conteneur"
-run "cd '$DIR' && sudo -n chown -R 10001:10001 '$DIR/data' && sudo -n docker compose up -d --build --force-recreate"
+run "cd '$DIR' && sudo -n chown -R 10001:10001 '$DIR/data' " \
+    "&& sudo -n docker compose up -d --build --force-recreate"
 
 echo "==> Route Caddy"
 if ! run "sudo -n grep -q 'cm-stats' /opt/homarr/Caddyfile"; then
@@ -51,7 +55,8 @@ path = Path("/opt/homarr/Caddyfile")
 text = path.read_text()
 old = "main.mprnl.fr {\n    reverse_proxy homarr:7575\n}"
 new = ("main.mprnl.fr {\n"
-       "    # Statistiques CheckMate, servies sous le meme certificat que Homarr.\n"
+       "    # Statistiques CheckMate, servies sous le meme certificat "
+       "que Homarr.\n"
        "    handle_path /cm-stats/* {\n"
        "        reverse_proxy checkmate-stats:8099\n"
        "    }\n"

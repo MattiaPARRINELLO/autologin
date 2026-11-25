@@ -3,7 +3,8 @@
 # s'arrete, et renvoie le code de sortie du watcher.
 #
 #   ./scripts/dev-scenario.sh chemins/vers/capture [port]
-#   ./scripts/dev-scenario.sh capture --visible  affiche le navigateur du watcher
+#   ./scripts/dev-scenario.sh capture --visible
+#   affiche le navigateur du watcher
 #   ./scripts/dev-scenario.sh capture --keep     laisse l'emulateur tourner
 #
 # Sans capture, l'emulateur genere ses pages :
@@ -31,7 +32,8 @@ for arg in "$@"; do
 done
 
 if ! command -v uv >/dev/null 2>&1; then
-    echo "uv est requis : https://docs.astral.sh/uv/getting-started/installation/" >&2
+    echo "uv est requis :" \
+        "https://docs.astral.sh/uv/getting-started/installation/" >&2
     exit 1
 fi
 
@@ -58,7 +60,8 @@ else
     echo "scenario  : pages generees par l'emulateur"
 fi
 
-python3 "$ROOT/emulator/server.py" "${EMULATOR_ARGS[@]}" >"$TMP/emulator.log" 2>&1 &
+python3 "$ROOT/emulator/server.py" "${EMULATOR_ARGS[@]}" \
+    >"$TMP/emulator.log" 2>&1 &
 EMULATOR_PID=$!
 
 BASE="http://127.0.0.1:$PORT"
@@ -129,14 +132,16 @@ if [ "$HEADLESS" = "false" ]; then
 fi
 echo
 set +e
-(cd "$ROOT/watcher" && uv run checkmate-watcher --config "$TMP/config.toml" run --once -v)
+(cd "$ROOT/watcher" && \
+    uv run checkmate-watcher --config "$TMP/config.toml" run --once -v)
 CODE=$?
 set -e
 
 echo
 echo "etat      : $(curl -sf "$BASE/api/state" || echo 'indisponible')"
 if [ "$KEEP" = "1" ]; then
-    echo "emulateur laisse sur $BASE, connexion demo / demo, Ctrl-C pour l'arreter"
+    echo "emulateur laisse sur $BASE, connexion demo / demo," \
+        "Ctrl-C pour l'arreter"
     wait "$EMULATOR_PID"
 fi
 exit "$CODE"

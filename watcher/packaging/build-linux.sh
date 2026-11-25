@@ -9,8 +9,10 @@ STAGE="$ROOT/dist/CheckMate-linux-$VERSION"
 rm -rf "$STAGE"
 mkdir -p "$STAGE"
 
-cp "$ROOT/pyproject.toml" "$ROOT/uv.lock" "$ROOT/README.md" "$ROOT/config.example.toml" "$STAGE/"
-cp -a "$ROOT/src" "$ROOT/systemd" "$ROOT/scripts" "$ROOT/docs" "$ROOT/assets" "$STAGE/"
+cp "$ROOT/pyproject.toml" "$ROOT/uv.lock" "$ROOT/README.md" \
+    "$ROOT/config.example.toml" "$STAGE/"
+cp -a "$ROOT/src" "$ROOT/systemd" "$ROOT/scripts" \
+    "$ROOT/docs" "$ROOT/assets" "$STAGE/"
 
 cat > "$STAGE/install.sh" <<'EOF'
 #!/usr/bin/env bash
@@ -19,7 +21,8 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 if ! command -v uv >/dev/null 2>&1; then
-    echo "uv est requis : https://docs.astral.sh/uv/getting-started/installation/"
+    echo "uv est requis :" \
+        "https://docs.astral.sh/uv/getting-started/installation/"
     exit 1
 fi
 
@@ -34,5 +37,7 @@ fi
 EOF
 chmod +x "$STAGE/install.sh"
 
-tar -C "$ROOT/dist" -czf "$ROOT/dist/CheckMate-linux-$VERSION.tar.gz" "CheckMate-linux-$VERSION"
+tar -C "$ROOT/dist" -czf \
+    "$ROOT/dist/CheckMate-linux-$VERSION.tar.gz" \
+    "CheckMate-linux-$VERSION"
 echo "Archive creee : $ROOT/dist/CheckMate-linux-$VERSION.tar.gz"

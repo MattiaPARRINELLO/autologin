@@ -20,7 +20,8 @@ fi
 
 if [ ! -f "$CONFIG" ]; then
     echo "Configuration reelle absente : $CONFIG"
-    echo "Copie config.example.toml, renseigne tes identifiants, puis relance :"
+    echo "Copie config.example.toml, renseigne tes identifiants," \
+        "puis relance :"
     echo "  mkdir -p $CONFIG_DIR"
     echo "  cp $ROOT/config.example.toml $CONFIG"
     echo "  chmod 600 $CONFIG"
@@ -79,11 +80,15 @@ chmod 644 "$DESKTOP_DIR/checkmate.desktop"
 command -v update-desktop-database >/dev/null 2>&1 &&
     update-desktop-database "$DESKTOP_DIR" >/dev/null 2>&1 || true
 command -v gtk-update-icon-cache >/dev/null 2>&1 &&
-    gtk-update-icon-cache -f -t "$HOME/.local/share/icons/hicolor" >/dev/null 2>&1 || true
+    gtk-update-icon-cache -f -t "$HOME/.local/share/icons/hicolor" \
+        >/dev/null 2>&1 || true
 
-install -m 644 "$ROOT/systemd/checkmate-watcher.service" "$UNIT_DIR/checkmate-watcher.service"
-install -m 644 "$ROOT/systemd/checkmate-watchdog.service" "$UNIT_DIR/checkmate-watchdog.service"
-install -m 644 "$ROOT/systemd/checkmate-watchdog.timer" "$UNIT_DIR/checkmate-watchdog.timer"
+install -m 644 "$ROOT/systemd/checkmate-watcher.service" \
+    "$UNIT_DIR/checkmate-watcher.service"
+install -m 644 "$ROOT/systemd/checkmate-watchdog.service" \
+    "$UNIT_DIR/checkmate-watchdog.service"
+install -m 644 "$ROOT/systemd/checkmate-watchdog.timer" \
+    "$UNIT_DIR/checkmate-watchdog.timer"
 
 if [ ! -f "$CONFIG_DIR/env" ]; then
     cat > "$CONFIG_DIR/env" <<'EOF'
@@ -95,7 +100,8 @@ EOF
     echo "Fichier cree : $CONFIG_DIR/env (renseigne CHECKMATE_PASSWORD)"
 fi
 
-systemctl --user import-environment DISPLAY WAYLAND_DISPLAY XDG_RUNTIME_DIR 2>/dev/null || true
+systemctl --user import-environment \
+    DISPLAY WAYLAND_DISPLAY XDG_RUNTIME_DIR 2>/dev/null || true
 systemctl --user daemon-reload
 systemctl --user enable checkmate-watcher.service
 systemctl --user enable --now checkmate-watchdog.timer

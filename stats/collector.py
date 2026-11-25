@@ -16,8 +16,10 @@ Variables d'environnement :
 
 - ``CHECKMATE_INGEST_KEY`` : cle attendue dans l'en-tete ``X-CheckMate-Key``.
 - ``CHECKMATE_STATS_DB`` : chemin du fichier SQLite (defaut ``stats.sqlite3``).
-- ``CHECKMATE_DASHBOARD_PASSWORD`` : mot de passe du tableau de bord (optionnel).
-- ``CHECKMATE_DASHBOARD_USER`` : utilisateur du tableau de bord (defaut ``checkmate``).
+- ``CHECKMATE_DASHBOARD_PASSWORD`` : mot de passe du tableau
+  de bord (optionnel).
+- ``CHECKMATE_DASHBOARD_USER`` : utilisateur du tableau de bord
+  (defaut ``checkmate``).
 - ``PORT`` : port d'ecoute (defaut ``8099``).
 """
 
@@ -67,9 +69,15 @@ INSERT_EVENT = (
     "(install_id, name, version, os, day, created_at) "
     "VALUES (?, ?, ?, ?, ?, ?)"
 )
-SQL_INSTALLS = "SELECT COUNT(DISTINCT install_id) FROM events WHERE name = 'install'"
+SQL_INSTALLS = (
+    "SELECT COUNT(DISTINCT install_id) FROM events "
+    "WHERE name = 'install'"
+)
 SQL_SIGNATURES = "SELECT COUNT(*) FROM events WHERE name = 'signature'"
-SQL_SIGNERS = "SELECT COUNT(DISTINCT install_id) FROM events WHERE name = 'signature'"
+SQL_SIGNERS = (
+    "SELECT COUNT(DISTINCT install_id) FROM events "
+    "WHERE name = 'signature'"
+)
 SQL_SERIES = (
     "SELECT day, COALESCE(SUM(name = 'signature'), 0) AS signatures "
     "FROM events WHERE day >= ? GROUP BY day"
@@ -128,7 +136,10 @@ class Store:
         start_day = datetime.now(UTC).date() - timedelta(days=days - 1)
         rows = self._rows(SQL_SERIES, start_day.isoformat())
         found = {row["day"]: row for row in rows}
-        return [self._series_point(start_day, found, offset) for offset in range(days)]
+        return [
+            self._series_point(start_day, found, offset)
+            for offset in range(days)
+        ]
 
     @staticmethod
     def _series_point(start_day, found: dict, offset: int) -> dict:
@@ -146,7 +157,10 @@ class Store:
 
     def _platforms(self) -> list[dict]:
         rows = self._rows(SQL_PLATFORMS)
-        return [{"os": row["os"], "installs": int(row["installs"])} for row in rows]
+        return [
+            {"os": row["os"], "installs": int(row["installs"])}
+            for row in rows
+        ]
 
     def summary(self, days: int = 30) -> dict:
         return {
@@ -159,7 +173,9 @@ class Store:
 
 
 class RateLimiter:
-    def __init__(self, limit: int = RATE_LIMIT, window: int = RATE_WINDOW) -> None:
+    def __init__(
+        self, limit: int = RATE_LIMIT, window: int = RATE_WINDOW
+    ) -> None:
         self.limit = limit
         self.window = window
         self._hits: dict[str, deque[float]] = defaultdict(deque)
@@ -290,7 +306,9 @@ class Handler(BaseHTTPRequestHandler):
         self._json(404, {"error": "not_found"})
 
     def _serve_dashboard(self) -> None:
-        self._send(200, DASHBOARD_HTML.encode("utf-8"), "text/html; charset=utf-8")
+        self._send(
+            200, DASHBOARD_HTML.encode("utf-8"), "text/html; charset=utf-8"
+        )
 
     def do_POST(self) -> None:
         if not self._post_allowed():
@@ -372,24 +390,35 @@ DASHBOARD_HTML = """<!doctype html>
   body {
     margin: 0; padding: 40px 24px 72px;
     background: var(--bg); color: var(--ink);
-    font: 15px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    font: 15px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+    sans-serif;
   }
   main { max-width: 980px; margin: 0 auto; }
   h1 { font-size: 26px; margin: 0 0 4px; letter-spacing: -0.02em; }
   .sub { color: var(--muted); margin-bottom: 32px; }
-  .grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
-  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 18px 20px; }
-  .label { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
-  .value { font-size: 32px; font-weight: 650; margin-top: 6px; font-variant-numeric: tabular-nums; }
+  .grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit,
+  minmax(160px, 1fr)); }
+  .card { background: var(--card); border: 1px solid var(--line);
+  border-radius: 14px; padding: 18px 20px; }
+  .label { font-size: 12px; text-transform: uppercase; letter-spacing: .08em;
+  color: var(--muted); }
+  .value { font-size: 32px; font-weight: 650; margin-top: 6px;
+  font-variant-numeric: tabular-nums; }
   section { margin-top: 32px; }
   h2 { font-size: 15px; font-weight: 600; margin: 0 0 12px; }
-  .chart { display: flex; align-items: flex-end; gap: 4px; height: 160px; padding: 16px; background: var(--card); border: 1px solid var(--line); border-radius: 14px; }
-  .bar { flex: 1; background: var(--accent); border-radius: 3px 3px 0 0; min-height: 2px; opacity: .85; }
+  .chart { display: flex; align-items: flex-end; gap: 4px; height: 160px;
+  padding: 16px; background: var(--card); border: 1px solid var(--line);
+  border-radius: 14px; }
+  .bar { flex: 1; background: var(--accent); border-radius: 3px 3px 0 0;
+  min-height: 2px; opacity: .85; }
   .bar:hover { opacity: 1; }
-  table { width: 100%; border-collapse: collapse; background: var(--card); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
-  th, td { text-align: left; padding: 10px 16px; border-bottom: 1px solid var(--line); }
+  table { width: 100%; border-collapse: collapse; background: var(--card);
+  border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+  th, td { text-align: left; padding: 10px 16px; border-bottom: 1px solid
+  var(--line); }
   tr:last-child td { border-bottom: 0; }
-  th { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 500; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: .08em;
+  color: var(--muted); font-weight: 500; }
   .empty { color: var(--muted); }
 </style>
 <main>
@@ -397,9 +426,12 @@ DASHBOARD_HTML = """<!doctype html>
   <div class="sub" id="updated">Statistiques d'usage anonymes</div>
 
   <div class="grid">
-    <div class="card"><div class="label">Utilisateurs</div><div class="value" id="installs">-</div></div>
-    <div class="card"><div class="label">Signatures</div><div class="value" id="signatures">-</div></div>
-    <div class="card"><div class="label">Signataires uniques</div><div class="value" id="signers">-</div></div>
+    <div class="card"><div class="label">Utilisateurs</div><div class="value"
+    id="installs">-</div></div>
+    <div class="card"><div class="label">Signatures</div><div class="value"
+    id="signatures">-</div></div>
+    <div class="card"><div class="label">Signataires uniques</div><div
+    class="value" id="signers">-</div></div>
   </div>
 
   <section>
@@ -409,12 +441,14 @@ DASHBOARD_HTML = """<!doctype html>
 
   <section>
     <h2>Versions installees</h2>
-    <table><thead><tr><th>Version</th><th>Installations</th></tr></thead><tbody id="versions"></tbody></table>
+    <table><thead><tr><th>Version</th><th>Installations</th></tr></thead><tbody
+    id="versions"></tbody></table>
   </section>
 
   <section>
     <h2>Systemes</h2>
-    <table><thead><tr><th>Systeme</th><th>Installations</th></tr></thead><tbody id="platforms"></tbody></table>
+    <table><thead><tr><th>Systeme</th><th>Installations</th></tr></thead><tbody
+    id="platforms"></tbody></table>
   </section>
 </main>
 <script>
@@ -457,7 +491,8 @@ fetch("/api/stats", {headers: {"Accept": "application/json"}})
       "Mis a jour le " + new Date(data.updated_at).toLocaleString("fr-FR");
   })
   .catch(() => {
-    document.getElementById("updated").textContent = "Impossible de charger les statistiques.";
+    document.getElementById("updated").textContent =
+      "Impossible de charger les statistiques.";
   });
 </script>
 </html>
@@ -483,7 +518,9 @@ def make_server(
     dashboard_user: str = "checkmate",
     dashboard_password: str | None = None,
 ) -> ThreadingHTTPServer:
-    handler = _handler_class(store, ingest_key, dashboard_user, dashboard_password)
+    handler = _handler_class(
+        store, ingest_key, dashboard_user, dashboard_password
+    )
     return ThreadingHTTPServer(("0.0.0.0", port), handler)
 
 
@@ -502,7 +539,9 @@ def _server_from_env() -> tuple[ThreadingHTTPServer, int]:
         store,
         ingest_key=os.environ.get("CHECKMATE_INGEST_KEY", ""),
         dashboard_user=os.environ.get("CHECKMATE_DASHBOARD_USER", "checkmate"),
-        dashboard_password=os.environ.get("CHECKMATE_DASHBOARD_PASSWORD") or None,
+        dashboard_password=(
+            os.environ.get("CHECKMATE_DASHBOARD_PASSWORD") or None
+        ),
     )
     return server, port
 

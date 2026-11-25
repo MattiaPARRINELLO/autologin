@@ -2,7 +2,8 @@
 # Cree le venv de l'application.
 #
 # Quand PyGObject est installe pour le Python du systeme, le venv herite de ses
-# paquets systeme, pywebview peut alors ouvrir une vraie fenetre GTK/WebKit. Sinon on
+# paquets systeme, pywebview peut ouvrir une fenetre GTK/WebKit.
+# Sinon on
 # retombe sur le Python gere par uv, et le tableau de bord s'ouvre dans le
 # navigateur.
 set -euo pipefail
@@ -16,7 +17,8 @@ if [ -z "$UV_BIN" ]; then
 fi
 
 SYSTEM_PYTHON=""
-if [ -x /usr/bin/python3 ] && /usr/bin/python3 -c 'import gi' >/dev/null 2>&1; then
+if [ -x /usr/bin/python3 ] && \
+    /usr/bin/python3 -c 'import gi' >/dev/null 2>&1; then
     SYSTEM_PYTHON="/usr/bin/python3"
 fi
 
