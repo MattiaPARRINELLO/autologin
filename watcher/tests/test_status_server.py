@@ -189,6 +189,49 @@ def test_le_message_stable_sur_beta_explique_le_maintien(monkeypatch):
     assert "restes" in status_server._channel_message("stable")
 
 
+def _required_release() -> Release:
+    return Release(
+        tag="watcher-v0.8.0",
+        version=parse_version("0.8.0"),
+        url="https://example.com",
+        name="obligatoire",
+        prerelease=False,
+        required_reason="faille de signature",
+        markers_declared=True,
+    )
+
+
+def test_le_statut_signale_une_version_obligatoire(tmp_path):
+    session = _session(tmp_path)
+    session.set_blocked(_required_release())
+    snapshot = session.snapshot()
+    assert snapshot["mode"] == "blocked"
+    assert snapshot["label"] == "Mise a jour obligatoire"
+    assert snapshot["blocked"]["version"] == "0.8.0"
+    assert snapshot["blocked"]["reason"] == "faille de signature"
+
+
+def _migration_release() -> Release:
+    return Release(
+        tag="watcher-v0.7.5",
+        version=parse_version("0.7.5"),
+        url="https://example.com",
+        name="migration",
+        prerelease=False,
+        migration_reason="format v2",
+        markers_declared=True,
+    )
+
+
+def test_le_statut_signale_une_migration(tmp_path):
+    session = _session(tmp_path)
+    session.set_migration(_migration_release())
+    snapshot = session.snapshot()
+    assert snapshot["migration"]["version"] == "0.7.5"
+    assert snapshot["migration"]["reason"] == "format v2"
+    assert snapshot["blocked"] is None
+
+
 def _channel_config():
     base = default_config()
     cesar = replace(base.cesar, username="eleve", password="secret")

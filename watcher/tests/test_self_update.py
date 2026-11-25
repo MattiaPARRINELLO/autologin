@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from checkmate_watcher import self_update
-from checkmate_watcher.updates import UpdateError
+from checkmate_watcher.updates import Release, UpdateError, UpdatePolicy, Version
 
 
 def test_install_refuse_une_archive_absente(tmp_path):
@@ -82,11 +82,50 @@ def test_install_windows_utilise_les_options_silencieuses(tmp_path, monkeypatch)
     assert "/NORESTART" in argv
 
 
-def test_prepare_signale_deja_a_jour(monkeypatch):
-    class Config:
-        class updates:
-            channel = "beta"
+class _Config:
+    class updates:
+        channel = "beta"
 
-    monkeypatch.setattr(self_update, "check_for_update", lambda *a, **k: None)
+
+def _policy(latest=None, migration=None) -> UpdatePolicy:
+    return UpdatePolicy(Version(0, 6, 6), latest, None, migration, "beta")
+
+
+def test_prepare_signale_deja_a_jour(monkeypatch):
+    monkeypatch.setattr(self_update, "update_policy", lambda *a, **k: _policy())
     with pytest.raises(UpdateError, match="deja a jour"):
-        self_update.prepare(Config())
+        self_update.prepare(_Config())
+
+
+def _capture_download(monkeypatch, tmp_path) -> list:
+    seen = []
+    monkeypatch.setattr(self_update, "default_update_dir", lambda: tmp_path)
+    monkeypatch.setattr(
+        self_update,
+        "download_update",
+        lambda release, directory: seen.append(release) or tmp_path / "a.tgz",
+    )
+    return seen
+
+
+def _release(tag, version, *, migration=None) -> Release:
+    return Release(
+        tag,
+        version,
+        "",
+        "",
+        False,
+        migration_reason=migration,
+        markers_declared=True,
+    )
+
+
+def test_prepare_installe_d_abord_la_migration(monkeypatch, tmp_path):
+    migration = _release("watcher-v0.7.0", Version(0, 7, 0), migration="format v2")
+    latest = _release("watcher-v0.8.0", Version(0, 8, 0))
+    policy = _policy(latest=latest, migration=migration)
+    monkeypatch.setattr(self_update, "update_policy", lambda *a, **k: policy)
+    seen = _capture_download(monkeypatch, tmp_path)
+    release, _archive = self_update.prepare(_Config())
+    assert release is migration
+    assert seen == [migration]

@@ -483,7 +483,8 @@ décrite dans [watcher/docs/architecture.md](watcher/docs/architecture.md) : car
 des modules, déroulé d'un cycle de surveillance, état persistant, tableau de
 bord, onboarding et mises à jour.
 
-En résumé, `watcher.py` porte la boucle, `cesar.py` pilote CESAR avec Playwright,
+En résumé, `watcher.py` porte la boucle, `http_session.py` détecte les
+émargements en HTTP léger, `cesar.py` pilote la signature dans Chrome,
 `browser.py` choisit le navigateur, `schedule.py` décide des créneaux,
 `status_server.py` et `setup_server.py` servent les interfaces locales, et
 `self_update.py` installe les mises à jour vérifiées.

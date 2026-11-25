@@ -305,17 +305,127 @@ une release deja publiee. Les releases historiques 0.1.x a 0.6.0 sont marquees
 prerelease cote GitHub sans suffixe de tag, et elles restent filtrees par ce
 booleen cote watcher.
 
+## Marqueurs obligatoires de release
+
+Chaque release doit declarer exactement une ligne par marqueur dans
+`.github/release-markers.txt`, mis a jour avec le commit de version :
+
+```
+CHECKMATE-MIGRATION: 0
+CHECKMATE-REQUIRED: 0
+```
+
+Les noms sont insensibles a la casse cote lecteur. Chaque ligne commence par
+`CHECKMATE-`, suivi du nom, de `:` et d'une valeur. Un marqueur absent ou vide
+fait echouer le workflow. `0` signifie « non applicable » et ne doit pas etre
+remplace par du texte.
+
+Exemples pour une release qui change un format et corrige une faille :
+
+```
+CHECKMATE-MIGRATION: migration du format de signature vers v2
+CHECKMATE-REQUIRED: correction d'une faille de signature
+```
+
+- `CHECKMATE-MIGRATION` : la release migre des donnees ou un format de facon
+  irreversible. Mettre `0` si aucune migration. Sinon, une raison courte.
+  La mise a jour installe d'abord la plus ancienne migration non faite, puis
+  reprend normalement apres redemarrage ; sauter cette version reste non
+  supporte. Plusieurs migrations s'enchainent donc une par une.
+- `CHECKMATE-REQUIRED` : version minimale obligatoire. Mettre `0` si aucune
+  contrainte. Sinon, une raison courte qui sera affichee a l'utilisateur.
+  Une version locale inferieure a la derniere release `REQUIRED` est bloquee
+  au demarrage : le tableau de bord passe en mode bloque avec le bouton
+  d'installation, l'icone signale une attention requise, et la CLI `run --once`
+  sort avec le code 3. Le controle echoue ouvert si GitHub est injoignable.
+
+Les deux marqueurs sont ajoutes en tete des notes de release par le workflow.
+Si l'un des deux n'est pas `0`, la publication passe par l'environnement GitHub
+`release-manual` et attend une approbation humaine. Apres une telle release,
+remettre les deux valeurs a `0` dans le commit de version suivant.
+
+### Environnements GitHub de publication
+
+Le workflow utilise deux environnements :
+
+- `release-auto` : aucun relecteur, pour les releases dont les deux marqueurs
+  sont `0` ;
+- `release-manual` : au moins un relecteur obligatoire, pour toute release avec
+  un marqueur non nul.
+
+Les deux doivent limiter le deploiement au tag `watcher-v*`. Sans cette
+configuration, GitHub cree automatiquement un environnement vide au premier
+passage : une release manuelle peut alors partir sans validation, ce qui rend
+le garde-fou inopérant.
+
+Configuration minimale pour un depot ou le mainteneur est seul relecteur :
+desactiver « Prevent self-review », sinon il ne peut pas approuver son propre
+deploiement. Avec plusieurs mainteneurs, activer cette option est preferable.
+
+Commandes `gh api` pour creer les environnements et leur politique de tag :
+
+```bash
+UID=$(gh api user --jq .id)
+REPO=MattiaPARRINELLO/autologin
+
+gh api -X PUT "repos/$REPO/environments/release-manual" --input - <<JSON
+{
+  "reviewers": [{"type": "User", "id": $UID}],
+  "prevent_self_review": false,
+  "deployment_branch_policy": {
+    "protected_branches": false,
+    "custom_branch_policies": true
+  }
+}
+JSON
+
+gh api -X POST "repos/$REPO/environments/release-manual/deployment-branch-policies" \
+  -f name='watcher-v*' -f type=tag
+
+gh api -X PUT "repos/$REPO/environments/release-auto" --input - <<'JSON'
+{
+  "deployment_branch_policy": {
+    "protected_branches": false,
+    "custom_branch_policies": true
+  }
+}
+JSON
+
+gh api -X POST "repos/$REPO/environments/release-auto/deployment-branch-policies" \
+  -f name='watcher-v*' -f type=tag
+```
+
+Aucun secret ni variable d'environnement n'est necessaire pour ces jobs. SignPath
+reste optionnel et utilise ses propres variables et secrets documentes dans
+[`watcher/docs/signpath-setup.md`](watcher/docs/signpath-setup.md).
+
+## Procedure de release
+
+1. Mettre a jour la version dans `watcher/src/checkmate_watcher/__init__.py`,
+   `watcher/pyproject.toml` et `watcher/uv.lock` dans un commit dedie
+   `chore: passe la version a X.Y.Z`.
+2. Mettre a jour `.github/release-markers.txt` dans ce meme commit. Les valeurs
+   sont `0` si la release n'impose ni migration ni version minimale.
+3. Verifier localement avec les commandes de la section « Verification locale ».
+4. Pour une beta, pousser `beta`, puis creer et pousser le tag
+   `watcher-vX.Y.Z-beta.N` depuis `beta`.
+5. Pour une stable, passer par la procedure de stabilisation ci-dessous, puis
+   creer et pousser le tag `watcher-vX.Y.Z` depuis `main`.
+6. Suivre le workflow `Release`. Si un marqueur est non nul, approuver le
+   deploiement dans l'environnement `release-manual`.
+7. Verifier la prerelease, les artefacts Windows et Linux, `SHA256SUMS.txt`, et
+   tester l'installation de la version publiée.
+8. Pour la release suivante, remettre les marqueurs a `0` s'ils etaient non nuls.
+
+Aucun tag ni aucune release ne doit etre cree sans validation humaine.
+
 ## Procedure de stabilisation beta vers main
 
 1. Verifier la CI et la validation Windows sur `beta`.
 2. Ouvrir une pull request `beta` vers `main`.
 3. Relire le diff, puis fusionner la pull request.
-4. Depuis `main`, creer le tag stable `watcher-vX.Y.Z` et le pousser :
-   `git tag watcher-vX.Y.Z && git push origin watcher-vX.Y.Z`.
-5. Le workflow publie l'installeur Windows, l'archive Linux et
-   `SHA256SUMS.txt` en release stable.
-
-Aucun tag ni aucune release ne doit etre cree sans validation humaine.
+4. Depuis `main`, appliquer la procedure de release pour le tag stable
+   `watcher-vX.Y.Z`.
 
 ## Protection de `main`
 

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from checkmate_watcher.cesar import LoginError, SignError
+from checkmate_watcher.cesar import CesarError, LoginError, SignError
 from checkmate_watcher.errors import MAX_MESSAGE, describe_error
 
 
@@ -32,6 +32,26 @@ def test_timeout_asyncio():
     kind, message = describe_error(TimeoutError())
     assert kind == "reseau"
     assert "trop de temps" in message
+
+
+def test_cause_curl_timeout_est_expliquee():
+    error = CesarError("transport HTTP impossible")
+    error.__cause__ = TimeoutError("curl timed out")
+
+    kind, message = describe_error(error)
+
+    assert kind == "reseau"
+    assert "trop de temps" in message
+
+
+def test_cause_curl_certificat_est_signalee():
+    error = CesarError("transport HTTP impossible")
+    error.__cause__ = ValueError("SSL certificate problem")
+
+    kind, message = describe_error(error)
+
+    assert kind == "securite"
+    assert "certificat" in message
 
 
 def test_echec_de_connexion_cesar():

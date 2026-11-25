@@ -10,9 +10,11 @@ Le watcher est un processus unique qui :
 
 1. charge la configuration TOML et la signature ;
 2. decide si la surveillance est autorisee par le planning ;
-3. pilote un Chromium headless avec Playwright pour interroger CESAR ;
+3. detecte les emargements en HTTP leger avec `curl_cffi`, ou dans Chromium en
+   repli ;
 4. demande confirmation a l'utilisateur quand un emargement apparait ;
-5. signe, memorise l'emargement traite et attend le cycle suivant ;
+5. ouvre Chrome uniquement pour signer, memorise l'emargement traite et attend
+   le cycle suivant ;
 6. expose un tableau de bord local (HTTP sur `127.0.0.1`) et une icone de
    notification tant qu'il tourne.
 
@@ -28,6 +30,7 @@ active.
 | `cli.py` | point d'entree `checkmate-watcher` : commandes `run`, `setup`, `status`, `capture`, `self-test`, `update`, `support-bundle`, etc. |
 | `watcher.py` | boucle de surveillance `run_loop`, orchestration des decisions et des signatures |
 | `cesar.py` | `CesarSession` : navigation Playwright, connexion, detection de l'emargement, trace de la signature |
+| `http_session.py` | `HttpCesarSession` : login CSRF/CVEC, detection HTTP, cookie partage et signature a la demande |
 | `browser.py` | choix du navigateur : config, Chromium de Playwright, navigateur systeme |
 | `config.py` | chargement et validation du TOML (`[cesar]`, `[watcher]`, `[schedule]`, `[notifications]`, `[updates]`, `[selectors]`) |
 | `schedule.py` | plages horaires, creneau courant, prochaine ouverture |
@@ -44,9 +47,9 @@ active.
 | `window.py` | fenetre native pywebview, avec repli navigateur |
 | `tray.py`, `sni.py` | icone de notification : `pystray` et StatusNotifierItem Linux |
 | `autostart.py` | service systemd utilisateur ou tache planifiee Windows |
-| `updates.py` | lecture des releases GitHub, choix du canal et verification du SHA256 |
+| `updates.py` | lecture des releases GitHub, marqueurs de release, canal, version minimale et migration |
 | `analytics.py` | compteurs d'usage anonymes : installation et signature |
-| `self_update.py` | installation d'une mise a jour par un processus detache |
+| `self_update.py` | installation de la cible de mise a jour par un processus detache |
 | `support.py` | archive de diagnostic sans mot de passe ni signature |
 | `paths.py`, `logging_setup.py` | emplacements portables et journalisation avec rotation |
 | `release_channel.py` | classification d'un tag (`stable` ou `beta`) utilisee par la release |
@@ -58,23 +61,28 @@ run_loop() [watcher.py]
   |
   |-- chargement config + signature
   |-- demarrage tableau de bord + icone (sauf --once)
-  |-- verification de mise a jour (si activee)
+  |-- verification de la politique de mise a jour (si activee)
+  |     REQUIRED au-dessus de la version locale -> mode bloque, run --once code 3
+  |     sinon -> annoncer la migration eventuelle et poursuivre
   |
   |-- planning : hors plage ou creneau deja signe ?
   |     oui -> attendre la prochaine ouverture (tranches de 5 s)
   |
-  |-- CesarSession.open(headless=...) [cesar.py + browser.py]
+  |-- session = HttpCesarSession ou CesarSession [transport]
+  |     HTTP -> login curl_cffi, cookie persistant, aucun Chromium
+  |     navigateur -> CesarSession.open(headless=...)
   |
   v
 boucle toutes les poll_interval secondes
   |
   |-- planning : fin de plage ou creneau deja signe ?
-  |     oui -> fermer le navigateur, attendre, rouvrir
+  |     oui -> fermer la session, attendre, rouvrir
   |
   |-- session.check()  -> AttendanceSignal | None
-  |     - rechargement du tableau de bord
-  |     - recherche du bouton d'emargement
-  |     - identifiant stable de l'emargement
+  |     HTTP -> GET du tableau de bord, parsing des attributs calendrier
+  |     navigateur -> rechargement et recherche du bouton
+  |     erreur HTTP -> notification et repli navigateur
+  |     identifiant stable de l'emargement
   |
   |-- aucun signal -> attendre le cycle suivant
   |
@@ -86,8 +94,10 @@ boucle toutes les poll_interval secondes
   |     SANS REPONSE -> reessayer apres prompt_retry
   |
   |-- sign_with_visibility() : session.sign(points)
+  |     - HTTP -> ouvrir Chrome et injecter PHPSESSID
   |     - eventuellement bascule en navigateur visible
   |     - trace, validation, lecture de la confirmation
+  |     - HTTP -> refermer Chrome apres la signature
   |
   |-- succes -> state.mark(), compteurs, notification
   |-- erreur Cesar -> compteur d'erreurs, nouvelle tentative plus tard
@@ -96,9 +106,11 @@ boucle toutes les poll_interval secondes
 attendre poll_interval puis recommencer
 ```
 
-Chaque cycle repart d'une page rechargee : c'est ce rafraichissement qui fait
-apparaitre le bouton d'emargement. La detection arrive donc au pire un
-`poll_interval` apres l'ouverture par le formateur.
+En mode HTTP, la detection lit les attributs JSON du calendrier dans la reponse
+CESAR. La signature reste toujours rejouee dans Chrome avec la meme session :
+le cookie `PHPSESSID` est injecte dans le contexte Playwright juste avant la
+signature. Le transport `browser` reste disponible et sert de repli automatique
+si le HTTP echoue, est bloque ou renvoie une page inattendue.
 
 ## Etat et deduplication
 
@@ -128,15 +140,57 @@ navigateur si le moteur natif manque.
 
 ## Mises a jour
 
-`updates.py` interroge les releases GitHub, filtre selon `updates.channel`
-(`stable` ou `beta`) et verifie le SHA256 de l'archive. `self_update.py` delegue
-l'installation a un processus detache, car le binaire ne peut pas se remplacer
-pendant qu'il tourne : installeur Inno sous Windows, script shell sous Linux.
+`updates.py` interroge les releases GitHub et filtre les candidates selon
+`updates.channel` (`stable` ou `beta`). Le canal explicite de la configuration
+reste prioritaire ; sans valeur explicite, il suit la version installee.
+
+Chaque release peut porter deux marqueurs dans son corps, ajoutes en tete par le
+workflow de release :
+
+```
+CHECKMATE-MIGRATION: 0
+CHECKMATE-REQUIRED: 0
+```
+
+`0` signifie non applicable. Sinon, la valeur est une raison courte conservee
+dans `Release.migration_reason` ou `Release.required_reason`.
+
+`update_policy()` produit un `UpdatePolicy` qui contient :
+
+- `latest` : la version la plus recente du canal courant ;
+- `required` : la release `REQUIRED` la plus recente au-dessus de la version
+  locale ;
+- `migration` : la premiere release `MIGRATION` au-dessus de la version locale ;
+- `available` : vrai si `latest` est plus recente que la version locale ;
+- `install_target` : `migration` si une etape intermediaire existe, sinon
+  `latest` si une mise a jour est disponible.
+
+Au demarrage, `watcher.py` evalue cette politique avant d'ouvrir CESAR. Si
+`required` existe, la surveillance ne demarre pas : notification, icone en
+attention requise, tableau de bord en mode bloque et code de sortie 3 pour
+`run --once`. L'installation et l'arret restent accessibles depuis le tableau de
+bord. Une erreur reseau ou une verification desactivee laisse l'application
+fonctionner.
+
+`self_update.prepare()` telecharge `install_target`, verifie le SHA256, puis
+`self_update.py` delegue l'installation a un processus detache : installeur Inno
+sous Windows, script shell sous Linux. Une migration est donc installee avant la
+cible finale. Apres redemarrage, elle sort de la fenetre de mise a jour et
+l'etape suivante peut etre proposee.
+
+Cote publication, `.github/release-markers.txt` porte les deux valeurs de la
+prochaine release. Le workflow refuse un marqueur absent ou vide. Un marqueur
+non nul passe par l'environnement GitHub `release-manual`, qui exige une
+approbation humaine. Les valeurs `0`/`0` passent par `release-auto`. La
+configuration exacte des environnements est documentee dans
+[`CONTRIBUTING.md`](../../CONTRIBUTING.md#environnements-github-de-publication).
 
 ## Frontiere de securite
 
 - Le mot de passe ne passe jamais dans les logs ; il vient du trousseau ou de
   `CHECKMATE_PASSWORD`.
+- Le fichier `http-cookies.json` contient la session CESAR, est limite aux
+  permissions `600` et n'est jamais affiche dans les logs ou les notifications.
 - Les serveurs locaux n'ecoutent que sur `127.0.0.1` et exigent un jeton.
 - La signature est stockee en points, pas en image.
 - Aucun secret n'est ecrit dans la configuration par defaut.

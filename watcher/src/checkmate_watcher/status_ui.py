@@ -62,6 +62,21 @@ STATUS_HTML = """<!doctype html>
     border-left: 3px solid var(--warn); background: #f3ead9; color: var(--ink-2);
     font-size: 13px;
   }
+  .state-dot.blocked { background: var(--err); }
+  .blocked {
+    margin-top: 20px; padding: 14px 16px; border-radius: 12px;
+    border: 1px solid rgba(179, 38, 30, 0.35); background: #f8e7e5;
+    color: var(--ink);
+  }
+  .blocked strong { display: block; margin-bottom: 4px; color: var(--err); }
+  .blocked span { font-size: 13px; color: var(--ink-2); }
+  .migration {
+    margin-top: 20px; padding: 14px 16px; border-radius: 12px;
+    border: 1px solid rgba(154, 107, 47, 0.35); background: #f3ead9;
+    color: var(--ink);
+  }
+  .migration strong { display: block; margin-bottom: 4px; color: var(--warn); }
+  .migration span { font-size: 13px; color: var(--ink-2); }
   .schedule { margin-top: 28px; padding-top: 20px; border-top: 1px solid var(--line); }
   .schedule-label { margin: 0 0 8px; font-size: 12px; color: var(--muted); }
   .slots { display: flex; gap: 10px; flex-wrap: wrap; }
@@ -143,6 +158,16 @@ STATUS_HTML = """<!doctype html>
       depuis le menu Démarrer pour appliquer les nouveaux réglages.
     </div>
 
+    <div class="blocked" id="blockedBanner" hidden>
+      <strong>Mise à jour obligatoire</strong>
+      <span id="blockedDetail"></span>
+    </div>
+
+    <div class="migration" id="migrationBanner" hidden>
+      <strong>Migration intermédiaire requise</strong>
+      <span id="migrationDetail"></span>
+    </div>
+
     <section class="schedule">
       <p class="schedule-label">Créneaux surveillés</p>
       <div class="slots" id="slots"></div>
@@ -222,6 +247,31 @@ function setMessage(text, kind) {
   element.className = "message" + (kind ? " " + kind : "");
 }
 
+function renderBlocked(blocked, migration) {
+  document.getElementById("blockedBanner").hidden = !blocked;
+  if (!blocked) return;
+  const first = migration ? migration.version : blocked.version;
+  const reason = migration ? migration.reason : blocked.reason;
+  let text = "Installe " + first + " pour continuer. Raison : " + reason + ".";
+  if (migration) text += " Ensuite, " + blocked.version + " sera proposée.";
+  document.getElementById("blockedDetail").textContent = text;
+  const button = document.getElementById("updateButton");
+  button.textContent = "Installer " + first;
+  button.hidden = false;
+}
+
+function renderMigration(migration, blocked) {
+  document.getElementById("migrationBanner").hidden = !migration;
+  if (!migration) return;
+  document.getElementById("migrationDetail").textContent =
+    "Installe " + migration.version + " avant les versions suivantes. Raison : " +
+    migration.reason + ".";
+  if (blocked) return;
+  const button = document.getElementById("updateButton");
+  button.textContent = "Installer " + migration.version;
+  button.hidden = false;
+}
+
 function render(snapshot) {
   const dot = document.getElementById("stateDot");
   dot.className = "state-dot " + snapshot.mode;
@@ -244,6 +294,8 @@ function render(snapshot) {
   document.getElementById("stateDetail").textContent = detail;
 
   document.getElementById("restartBanner").hidden = !snapshot.restart_required;
+  renderBlocked(snapshot.blocked, snapshot.migration);
+  renderMigration(snapshot.migration, snapshot.blocked);
   document.getElementById("version").textContent =
     "Version " + snapshot.version + " - canal " + snapshot.channel +
     " - build " + snapshot.build;

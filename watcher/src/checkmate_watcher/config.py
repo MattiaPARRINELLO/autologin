@@ -18,6 +18,7 @@ from .analytics import DEFAULT_ENDPOINT as DEFAULT_ANALYTICS_ENDPOINT
 from .credentials import DEFAULT_SERVICE
 from .credentials import get_password as get_keyring_password
 from .paths import (
+    default_http_cookies_file,
     default_profile_dir,
     default_signature_path,
     default_state_file,
@@ -122,6 +123,7 @@ class WatcherConfig:
     dedupe_ttl: int = 3600
     confirm_timeout: int = 180
     prompt_retry: int = 300
+    transport: str = "http"
     auto_sign: bool = False
     auto_sign_delay: int = 20
     headless: bool = False
@@ -129,6 +131,7 @@ class WatcherConfig:
     executable_path: str | None = None
     profile_dir: Path = field(default_factory=default_profile_dir)
     state_file: Path = field(default_factory=default_state_file)
+    http_cookies_file: Path = field(default_factory=default_http_cookies_file)
 
 
 @dataclass(frozen=True)
@@ -311,11 +314,18 @@ def _cesar_to_dict(cesar: CesarConfig, password=None, password_env=None) -> dict
 
 
 def _watcher_to_dict(watcher: WatcherConfig) -> dict:
-    scalars = ("poll_interval", "dedupe_ttl", "confirm_timeout", "prompt_retry")
+    scalars = (
+        "poll_interval",
+        "dedupe_ttl",
+        "confirm_timeout",
+        "prompt_retry",
+        "transport",
+    )
     flags = ("auto_sign", "auto_sign_delay", "headless", "visible_on_sign")
     data = {name: getattr(watcher, name) for name in scalars + flags}
     data["profile_dir"] = str(watcher.profile_dir)
     data["state_file"] = str(watcher.state_file)
+    data["http_cookies_file"] = str(watcher.http_cookies_file)
     if watcher.executable_path:
         data["executable_path"] = watcher.executable_path
     return data
@@ -528,6 +538,10 @@ def _watcher_flags(table: dict, defaults: WatcherConfig) -> dict:
         "executable_path": _opt_str(table, "executable_path"),
         "profile_dir": _path(table, "profile_dir", defaults.profile_dir),
         "state_file": _path(table, "state_file", defaults.state_file),
+        "http_cookies_file": _path(
+            table, "http_cookies_file", defaults.http_cookies_file
+        ),
+        "transport": str(table.get("transport", defaults.transport)).strip().lower(),
     }
 
 
@@ -601,6 +615,8 @@ def _validate_padding(signature: SignatureConfig) -> None:
 
 
 def _validate_limits(watcher: WatcherConfig, signature: SignatureConfig) -> None:
+    if watcher.transport not in {"browser", "http"}:
+        raise ConfigError("[watcher] transport doit valoir 'browser' ou 'http'")
     if watcher.poll_interval < 10:
         raise ConfigError("[watcher] poll_interval doit etre >= 10 secondes")
     if watcher.confirm_timeout < 10:

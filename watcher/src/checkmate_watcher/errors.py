@@ -22,6 +22,8 @@ UNREACHABLE_MESSAGE = "CESAR est injoignable pour le moment."
 HINTS = (
     ("ERR_NAME_NOT_RESOLVED", "reseau", DNS_MESSAGE),
     ("ERR_NAME_RESOLUTION_FAILED", "reseau", DNS_MESSAGE),
+    ("could not resolve host", "reseau", DNS_MESSAGE),
+    ("couldn't resolve host", "reseau", DNS_MESSAGE),
     (
         "ERR_INTERNET_DISCONNECTED",
         "reseau",
@@ -35,6 +37,8 @@ HINTS = (
     ("ERR_CONNECTION_RESET", "reseau", INTERRUPTED_MESSAGE),
     ("ERR_CONNECTION_CLOSED", "reseau", INTERRUPTED_MESSAGE),
     ("ERR_CONNECTION_TIMED_OUT", "reseau", TIMEOUT_MESSAGE),
+    ("timed out", "reseau", TIMEOUT_MESSAGE),
+    ("timeout", "reseau", TIMEOUT_MESSAGE),
     ("ERR_TIMED_OUT", "reseau", TIMEOUT_MESSAGE),
     (
         "ERR_PROXY_CONNECTION_FAILED",
@@ -43,6 +47,14 @@ HINTS = (
     ),
     (
         "ERR_CERT_",
+        "securite",
+        (
+            "Le certificat de CESAR n'est pas valide. "
+            "Ne saisis pas tes identifiants tant que le problème persiste."
+        ),
+    ),
+    (
+        "certificate",
         "securite",
         (
             "Le certificat de CESAR n'est pas valide. "
@@ -89,10 +101,27 @@ def _describe_known_error(exc: BaseException, text: str) -> tuple[str, str]:
     return "inconnue", f"Erreur inattendue : {text}"
 
 
+def _error_chain(exc: BaseException) -> list[BaseException]:
+    chain = []
+    current: BaseException | None = exc
+    seen = set()
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        chain.append(current)
+        current = current.__cause__ or current.__context__
+    return chain
+
+
 def describe_error(exc: BaseException) -> tuple[str, str]:
     """Retourne la catégorie et le message lisible d'une exception."""
     text = _first_line(exc)
-    hint = _match(text)
-    if hint is not None:
-        return hint
-    return _describe_known_error(exc, text)
+    chain = _error_chain(exc)
+    for item in chain:
+        hint = _match(_first_line(item))
+        if hint is not None:
+            return hint
+    for item in chain:
+        kind, message = _describe_known_error(item, _first_line(item))
+        if kind != "inconnue":
+            return kind, message
+    return "inconnue", f"Erreur inattendue : {text}"

@@ -42,7 +42,7 @@ from .signature import SignatureError, load_signature, parse_points, save_signat
 from .state import StateStore
 from .status_server import read_runtime, status_alive
 from .support import build_support_bundle
-from .updates import UpdateError, check_for_update, fetch_releases
+from .updates import UpdateError, fetch_releases, update_policy
 from .watcher import run_loop
 from .window import open_url
 
@@ -261,6 +261,7 @@ def _afficher_watcher(config: Config) -> None:
     print(f"  Deduplication  : {config.watcher.dedupe_ttl}s")
     print(f"  Confirmation   : {config.watcher.confirm_timeout}s")
     print(f"  Nouvelle demande : {config.watcher.prompt_retry}s")
+    print(f"  Transport      : {config.watcher.transport}")
     print(f"  Auto-signature : {config.watcher.auto_sign}")
     print(f"  Visible a la signature : {config.watcher.visible_on_sign}")
     print(f"  Plages         : {config.schedule.describe()}")
@@ -672,31 +673,34 @@ def command_stats(config: Config) -> int:
     return 0
 
 
-def _afficher_check_update(channel, release_tag, release_url, erreur=None) -> None:
+def _afficher_check_update(channel, policy, erreur=None) -> None:
     if erreur is not None:
         _afficher_update_verification_impossible(erreur)
         return
-    if release_tag is None:
+    if policy is None or not policy.available:
         _afficher_update_a_jour(channel)
         return
-    _afficher_update_disponible(release_tag, channel)
-    if release_url is not None:
-        _afficher_update_url(release_url)
+    if policy.migration is not None:
+        _afficher_migration(policy.migration)
+    _afficher_update_disponible(policy.latest.tag, channel)
+    _afficher_update_url(policy.latest.url)
 
 
-def _release_status(config: Config) -> tuple[str | None, str | None, object]:
+def _afficher_migration(release) -> None:
+    print(f"Migration a passer d'abord : {release.tag} ({release.migration_reason})")
+
+
+def _release_status(config: Config) -> tuple[object, object]:
     try:
-        release = check_for_update(__version__, channel=config.updates.channel)
+        policy = update_policy(__version__, channel=config.updates.channel)
     except Exception as exc:
-        return None, None, exc
-    if release is None:
-        return None, None, None
-    return release.tag, release.url, None
+        return None, exc
+    return policy, None
 
 
 def command_check_update(config: Config) -> int:
-    tag, url, erreur = _release_status(config)
-    _afficher_check_update(config.updates.channel, tag, url, erreur)
+    policy, erreur = _release_status(config)
+    _afficher_check_update(config.updates.channel, policy, erreur)
     return 1 if erreur is not None else 0
 
 
@@ -741,10 +745,10 @@ def _afficher_demander_confirmation(reponse: list[str]) -> None:
 
 def _release_pour_update(config: Config):
     try:
-        release = check_for_update(__version__, channel=config.updates.channel)
+        policy = update_policy(__version__, channel=config.updates.channel)
     except Exception as exc:
         return None, exc
-    return release, None
+    return policy.install_target, None
 
 
 def _release_ou_code(config: Config):

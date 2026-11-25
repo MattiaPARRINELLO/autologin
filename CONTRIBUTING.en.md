@@ -59,7 +59,7 @@ uv run playwright install chromium   # or install a system Chromium/Chrome/Edge
 CHECKMATE_E2E=1 uv run pytest -q tests/test_emulator_e2e.py
 ```
 
-CI does not run the e2e tests.
+CI runs these tests with `CHECKMATE_E2E=1`; without it, pytest skips them.
 
 ## Capturing a real CESAR session
 
@@ -142,7 +142,7 @@ If an issue, pull request or comment is written by an AI assistant, say so
 explicitly. State what a human actually ran, tested or verified. Never imply
 human validation that did not happen.
 
-## Release channels and tags
+## Release channels, tags and mandatory markers
 
 - `main`: stable releases, used by the `stable` channel.
 - `beta`: upcoming releases, published as prereleases, used by the `beta`
@@ -152,5 +152,42 @@ Release tags use the `watcher-v` prefix:
 
 - beta: `watcher-v0.6.0-beta.1`, then `watcher-v0.6.0-beta.2`
 - stable: `watcher-v0.6.0`
+
+Every version bump must update `.github/release-markers.txt` in the same commit:
+
+```
+CHECKMATE-MIGRATION: 0
+CHECKMATE-REQUIRED: 0
+```
+
+- `CHECKMATE-MIGRATION`: the release migrates data or a format irreversibly.
+  Use `0` when no migration applies, otherwise a short reason. The updater
+  installs the oldest unapplied migration first, restarts, then continues.
+- `CHECKMATE-REQUIRED`: a mandatory minimum version. Use `0` when no constraint
+  applies, otherwise a short reason shown to the user. An older installation is
+  blocked at startup, the dashboard offers installation, and `run --once` exits
+  with code 3. A network failure leaves the application usable.
+
+Missing or empty markers fail the release workflow. A non-zero marker routes
+publication through the `release-manual` GitHub environment and waits for human
+approval. After that release, reset both values to `0` in the next version bump.
+
+The workflow also uses `release-auto` for releases whose markers are both `0`.
+Both environments must restrict deployments to the `watcher-v*` tag. A missing
+`release-manual` environment is dangerous: GitHub creates it without protection
+rules, which disables the manual approval gate. The full setup commands are in
+[the French contribution guide](CONTRIBUTING.md#environnements-github-de-publication).
+
+Release checklist:
+
+1. Bump `watcher/src/checkmate_watcher/__init__.py`, `watcher/pyproject.toml`
+   and `watcher/uv.lock` together.
+2. Set the two markers for this release.
+3. Run the local checks.
+4. Tag `beta` for a beta, or `main` for a stable after beta stabilisation.
+5. Follow the `Release` workflow and approve `release-manual` when requested.
+6. Verify the prerelease flag, Windows and Linux assets, and `SHA256SUMS.txt`.
+7. Test the published installation, then reset non-zero markers for the next
+   release.
 
 Never create a tag or release without human validation.
