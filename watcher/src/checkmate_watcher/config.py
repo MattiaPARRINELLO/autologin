@@ -313,19 +313,27 @@ def _cesar_to_dict(cesar: CesarConfig, password=None, password_env=None) -> dict
     return _with_secret(data, password, password_env)
 
 
+WATCHER_SCALARS = (
+    "poll_interval",
+    "dedupe_ttl",
+    "confirm_timeout",
+    "prompt_retry",
+    "transport",
+)
+WATCHER_FLAGS = ("auto_sign", "auto_sign_delay", "headless", "visible_on_sign")
+
+
+def _watcher_paths(watcher: WatcherConfig) -> dict:
+    return {
+        "profile_dir": str(watcher.profile_dir),
+        "state_file": str(watcher.state_file),
+        "http_cookies_file": str(watcher.http_cookies_file),
+    }
+
+
 def _watcher_to_dict(watcher: WatcherConfig) -> dict:
-    scalars = (
-        "poll_interval",
-        "dedupe_ttl",
-        "confirm_timeout",
-        "prompt_retry",
-        "transport",
-    )
-    flags = ("auto_sign", "auto_sign_delay", "headless", "visible_on_sign")
-    data = {name: getattr(watcher, name) for name in scalars + flags}
-    data["profile_dir"] = str(watcher.profile_dir)
-    data["state_file"] = str(watcher.state_file)
-    data["http_cookies_file"] = str(watcher.http_cookies_file)
+    data = {name: getattr(watcher, name) for name in WATCHER_SCALARS + WATCHER_FLAGS}
+    data.update(_watcher_paths(watcher))
     if watcher.executable_path:
         data["executable_path"] = watcher.executable_path
     return data
@@ -531,18 +539,25 @@ def _watcher_timing(table: dict, defaults: WatcherConfig) -> dict:
     }
 
 
-def _watcher_flags(table: dict, defaults: WatcherConfig) -> dict:
+def _watcher_path_config(table: dict, defaults: WatcherConfig) -> dict:
     return {
-        "headless": _bool(table, "headless", defaults.headless),
-        "visible_on_sign": _bool(table, "visible_on_sign", defaults.visible_on_sign),
-        "executable_path": _opt_str(table, "executable_path"),
         "profile_dir": _path(table, "profile_dir", defaults.profile_dir),
         "state_file": _path(table, "state_file", defaults.state_file),
         "http_cookies_file": _path(
             table, "http_cookies_file", defaults.http_cookies_file
         ),
+    }
+
+
+def _watcher_flags(table: dict, defaults: WatcherConfig) -> dict:
+    data = {
+        "headless": _bool(table, "headless", defaults.headless),
+        "visible_on_sign": _bool(table, "visible_on_sign", defaults.visible_on_sign),
+        "executable_path": _opt_str(table, "executable_path"),
         "transport": str(table.get("transport", defaults.transport)).strip().lower(),
     }
+    data.update(_watcher_path_config(table, defaults))
+    return data
 
 
 def _load_watcher(data: dict) -> WatcherConfig:
