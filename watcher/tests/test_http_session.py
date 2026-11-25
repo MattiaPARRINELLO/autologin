@@ -4,6 +4,7 @@ import asyncio
 import html
 import json
 import stat
+import threading
 from dataclasses import replace
 
 import pytest
@@ -446,3 +447,65 @@ def test_signature_invisible_ouvvre_et_ferme_chrome(tmp_path, monkeypatch):
     assert result == "signature confirmee"
     assert browsers[0].opened_with is True
     assert browsers[0].closed is True
+
+
+async def _wait_started(event: threading.Event) -> None:
+    while not event.is_set():
+        await asyncio.sleep(0)
+
+
+def test_annulation_open_attend_la_fin_du_worker(tmp_path):
+    session = HttpCesarSession(make_config(tmp_path))
+    started = threading.Event()
+    release = threading.Event()
+
+    def blocking_open():
+        started.set()
+        release.wait(5)
+
+    session._open_http = blocking_open
+
+    async def scenario():
+        task = asyncio.create_task(session.open())
+        await _wait_started(started)
+        task.cancel()
+        await asyncio.sleep(0)
+        assert not task.done()
+        release.set()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+
+    try:
+        asyncio.run(scenario())
+    finally:
+        release.set()
+
+
+def test_close_attend_les_workers_avant_de_fermer_la_session(tmp_path):
+    session = HttpCesarSession(make_config(tmp_path))
+    fake = FakeSession([])
+    session._session = fake
+    started = threading.Event()
+    release = threading.Event()
+
+    def blocking_check():
+        started.set()
+        release.wait(5)
+
+    session._check_http = blocking_check
+
+    async def scenario():
+        check_task = asyncio.create_task(session.check())
+        await _wait_started(started)
+        close_task = asyncio.create_task(session.close())
+        await asyncio.sleep(0)
+        assert fake.closed is False
+        release.set()
+        await check_task
+        await close_task
+        assert fake.closed is True
+
+    try:
+        asyncio.run(scenario())
+    finally:
+        release.set()

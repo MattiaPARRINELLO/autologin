@@ -229,11 +229,29 @@ class HttpCesarSession:
         self.headless = config.watcher.headless
         self._session = None
         self._browser: CesarSession | None = None
+        self._workers: set[asyncio.Task] = set()
+
+    async def _run_worker(self, function):
+        worker = asyncio.create_task(asyncio.to_thread(function))
+        self._workers.add(worker)
+        try:
+            return await asyncio.shield(worker)
+        except asyncio.CancelledError:
+            try:
+                await worker
+            except Exception:
+                logger.debug("worker HTTP interrompu", exc_info=True)
+            raise
+        finally:
+            self._workers.discard(worker)
 
     async def open(self, headless: bool | None = None) -> None:
         self.headless = self.config.watcher.headless if headless is None else headless
         try:
-            await asyncio.to_thread(self._open_http)
+            await self._run_worker(self._open_http)
+        except asyncio.CancelledError:
+            await self.close()
+            raise
         except HttpTransportError:
             raise
         except Exception as exc:
@@ -400,7 +418,7 @@ class HttpCesarSession:
         if self._browser is not None:
             return await self._browser.check()
         try:
-            return await asyncio.to_thread(self._check_http)
+            return await self._run_worker(self._check_http)
         except HttpTransportError:
             raise
         except Exception as exc:
@@ -480,6 +498,11 @@ class HttpCesarSession:
 
     async def close(self) -> None:
         await self._close_browser()
+        workers = [
+            worker for worker in self._workers if worker is not asyncio.current_task()
+        ]
+        if workers:
+            await asyncio.gather(*workers, return_exceptions=True)
         if self._session is not None:
-            await asyncio.to_thread(self._session.close)
+            await self._run_worker(self._session.close)
             self._session = None
