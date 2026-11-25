@@ -35,6 +35,7 @@ from .local_http import LocalError, LocalHandler
 from .local_http import create_server as _create_server
 from .notifications import Notifier
 from .paths import default_env_path
+from .remote_selectors import with_remote_selectors
 from .schedule import (
     DAY_NAMES,
     DEFAULT_DAYS,
@@ -444,7 +445,9 @@ def _test_connection(
     config: Config, base_url: str, username: str, password: str
 ) -> str:
     """Reproduit la connexion reelle avec le flux du watcher."""
-    candidate = _with_credentials(config, base_url, username, password)
+    candidate = with_remote_selectors(
+        _with_credentials(config, base_url, username, password)
+    )
     _run_login(candidate)
     return "Connexion reussie."
 

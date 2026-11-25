@@ -45,6 +45,10 @@ def default_http_cookies_file() -> Path:
     return data_dir() / "http-cookies.json"
 
 
+def default_selectors_cache_file() -> Path:
+    return data_dir() / "selectors-cache.json"
+
+
 def default_log_file() -> Path:
     return log_dir() / "checkmate-watcher.log"
 
