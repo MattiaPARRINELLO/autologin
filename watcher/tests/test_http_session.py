@@ -4,8 +4,10 @@ import asyncio
 import html
 import json
 import stat
+from dataclasses import replace
 
 import pytest
+from curl_cffi.requests.cookies import Cookies
 
 from checkmate_watcher import http_session
 from checkmate_watcher.config import (
@@ -36,24 +38,10 @@ class FakeResponse:
         self.headers = headers or {}
 
 
-class FakeCookies:
-    def __init__(self, values: dict[str, str] | None = None) -> None:
-        self.values = dict(values or {})
-
-    def update(self, values: dict[str, str]) -> None:
-        self.values.update(values)
-
-    def get(self, name: str):
-        return self.values.get(name)
-
-    def get_dict(self) -> dict[str, str]:
-        return dict(self.values)
-
-
 class FakeSession:
     def __init__(self, responses: list[FakeResponse]) -> None:
         self.responses = list(responses)
-        self.cookies = FakeCookies()
+        self.cookies = Cookies()
         self.calls: list[tuple[str, str, dict]] = []
         self.closed = False
 
@@ -248,7 +236,7 @@ def test_session_expiree_relance_le_login(tmp_path):
             FakeResponse(dashboard),
         ]
     )
-    fake.cookies.update({"PHPSESSID": "expired"})
+    fake.cookies.set("PHPSESSID", "expired", domain="cesar.example.fr", secure=True)
     session = HttpCesarSession(config)
     session._session = fake
 
@@ -308,14 +296,20 @@ def test_cookies_http_sont_persistes_avec_permissions_restreintes(tmp_path):
             FakeResponse("<html>Accueil</html>"),
         ]
     )
-    fake.cookies.update({"PHPSESSID": "session-secret"})
+    fake.cookies.set(
+        "PHPSESSID", "session-secret", domain="cesar.example.fr", secure=True
+    )
     session = HttpCesarSession(config)
     session._session = fake
 
     session._login()
 
     saved = json.loads(config.watcher.http_cookies_file.read_text(encoding="utf-8"))
-    assert saved["PHPSESSID"] == "session-secret"
+    assert saved[0]["name"] == "PHPSESSID"
+    assert saved[0]["value"] == "session-secret"
+    assert saved[0]["domain"] == "cesar.example.fr"
+    assert saved[0]["path"] == "/"
+    assert saved[0]["secure"] is True
     mode = stat.S_IMODE(config.watcher.http_cookies_file.stat().st_mode)
     assert mode == 0o600
 
@@ -323,7 +317,19 @@ def test_cookies_http_sont_persistes_avec_permissions_restreintes(tmp_path):
 def test_cookies_persistants_evitent_un_nouveau_login(tmp_path, monkeypatch):
     config = make_config(tmp_path)
     config.watcher.http_cookies_file.write_text(
-        json.dumps({"PHPSESSID": "saved"}),
+        json.dumps(
+            [
+                {
+                    "name": "PHPSESSID",
+                    "value": "saved",
+                    "domain": "cesar.example.fr",
+                    "path": "/",
+                    "secure": True,
+                    "expires": None,
+                    "rest": {},
+                }
+            ]
+        ),
         encoding="utf-8",
     )
     fake = FakeSession([])
@@ -334,6 +340,67 @@ def test_cookies_persistants_evitent_un_nouveau_login(tmp_path, monkeypatch):
 
     assert fake.calls == []
     assert fake.cookies.get("PHPSESSID") == "saved"
+
+
+def test_cookies_d_un_autre_domaine_sont_ignores(tmp_path, monkeypatch):
+    config = make_config(tmp_path)
+    config.watcher.http_cookies_file.write_text(
+        json.dumps(
+            [
+                {
+                    "name": "PHPSESSID",
+                    "value": "saved",
+                    "domain": "cesar.example.fr",
+                    "path": "/",
+                    "secure": True,
+                    "expires": None,
+                    "rest": {},
+                },
+                {
+                    "name": "FOREIGN",
+                    "value": "secret",
+                    "domain": "example.org",
+                    "path": "/",
+                    "secure": True,
+                    "expires": None,
+                    "rest": {},
+                },
+            ]
+        ),
+        encoding="utf-8",
+    )
+    fake = FakeSession([])
+    monkeypatch.setattr(http_session.curl_requests, "Session", lambda **kwargs: fake)
+    session = HttpCesarSession(config)
+
+    asyncio.run(session.open())
+
+    names = {cookie.name for cookie in fake.cookies.jar}
+    assert names == {"PHPSESSID"}
+
+
+def test_cookie_http_non_secure_reste_non_secure_dans_chrome(tmp_path, monkeypatch):
+    browsers: list[FakeBrowser] = []
+
+    def browser_factory(config):
+        browser = FakeBrowser(config)
+        browsers.append(browser)
+        return browser
+
+    config = make_config(tmp_path)
+    config = replace(
+        config, cesar=replace(config.cesar, base_url="http://cesar.example.fr")
+    )
+    monkeypatch.setattr(http_session, "CesarSession", browser_factory)
+    session = HttpCesarSession(config)
+    session._session = FakeSession([])
+    session._session.cookies.set(
+        "PHPSESSID", "shared-session", domain="cesar.example.fr", secure=False
+    )
+
+    asyncio.run(session.switch_headless(False))
+
+    assert browsers[0]._context.cookies[0]["secure"] is False
 
 
 def test_cookie_http_est_injecte_dans_chrome(tmp_path, monkeypatch):
@@ -347,7 +414,9 @@ def test_cookie_http_est_injecte_dans_chrome(tmp_path, monkeypatch):
     monkeypatch.setattr(http_session, "CesarSession", browser_factory)
     session = HttpCesarSession(make_config(tmp_path))
     session._session = FakeSession([])
-    session._session.cookies.update({"PHPSESSID": "shared-session"})
+    session._session.cookies.set(
+        "PHPSESSID", "shared-session", domain="cesar.example.fr", secure=True
+    )
 
     asyncio.run(session.switch_headless(False))
 
@@ -368,7 +437,9 @@ def test_signature_invisible_ouvvre_et_ferme_chrome(tmp_path, monkeypatch):
     monkeypatch.setattr(http_session, "CesarSession", browser_factory)
     session = HttpCesarSession(make_config(tmp_path, headless=True))
     session._session = FakeSession([])
-    session._session.cookies.update({"PHPSESSID": "shared-session"})
+    session._session.cookies.set(
+        "PHPSESSID", "shared-session", domain="cesar.example.fr", secure=True
+    )
 
     result = asyncio.run(session.sign([]))
 

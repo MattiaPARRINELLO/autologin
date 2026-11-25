@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
-import html
 import json
 import logging
+import os
+import time
 from html.parser import HTMLParser
+from http.cookiejar import Cookie
 from urllib.parse import urlsplit
 
 from curl_cffi import requests as curl_requests
@@ -88,7 +90,7 @@ def _parse_calendar(text: str) -> dict[str, str]:
 
 def _load_json(raw: str, description: str):
     try:
-        return json.loads(html.unescape(raw))
+        return json.loads(raw)
     except (TypeError, json.JSONDecodeError) as exc:
         raise HttpTransportError(f"JSON {description} invalide") from exc
 
@@ -179,6 +181,46 @@ def _calendar_signal(attrs: dict[str, str]) -> AttendanceSignal | None:
     return None
 
 
+def _cookie_data(cookie: Cookie) -> dict:
+    return {
+        "name": cookie.name,
+        "value": cookie.value,
+        "domain": cookie.domain,
+        "path": cookie.path,
+        "secure": cookie.secure,
+        "expires": cookie.expires,
+        "discard": cookie.discard,
+        "rest": dict(cookie._rest),
+    }
+
+
+def _cookie_from_data(data: dict) -> Cookie:
+    return Cookie(
+        version=0,
+        name=data["name"],
+        value=data["value"],
+        port=None,
+        port_specified=False,
+        domain=data["domain"],
+        domain_specified=True,
+        domain_initial_dot=data["domain"].startswith("."),
+        path=data["path"],
+        path_specified=True,
+        secure=data["secure"],
+        expires=data.get("expires"),
+        discard=data.get("discard", True),
+        comment=None,
+        comment_url=None,
+        rest=data.get("rest") or {},
+        rfc2109=False,
+    )
+
+
+def _domain_allowed(host: str, domain: str) -> bool:
+    normalized = domain.lstrip(".").lower()
+    return host == normalized or host.endswith("." + normalized)
+
+
 class HttpCesarSession:
     """Session HTTP pour detecter, session Chrome pour signer."""
 
@@ -199,26 +241,42 @@ class HttpCesarSession:
 
     def _open_http(self) -> None:
         self._session = curl_requests.Session(impersonate="chrome")
-        cookies = self._load_cookies()
-        if cookies:
-            self._session.cookies.update(cookies)
-        if not cookies.get("PHPSESSID"):
+        for cookie in self._load_cookies():
+            self._session.cookies.jar.set_cookie(cookie)
+        if not self._session.cookies.get("PHPSESSID"):
             self._login()
 
-    def _load_cookies(self) -> dict[str, str]:
+    def _load_cookies(self) -> list[Cookie]:
         path = self.config.watcher.http_cookies_file
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
         except (FileNotFoundError, json.JSONDecodeError, OSError):
-            return {}
-        if not isinstance(data, dict):
-            return {}
-        if not all(
-            isinstance(key, str) and isinstance(value, str)
-            for key, value in data.items()
-        ):
-            return {}
-        return data
+            return []
+        if not isinstance(data, list):
+            return []
+        host = urlsplit(self.config.cesar.base_url).hostname or ""
+        cookies = []
+        for item in data:
+            if not isinstance(item, dict):
+                continue
+            if not all(
+                isinstance(item.get(key), str)
+                for key in ("name", "value", "domain", "path")
+            ):
+                continue
+            if not isinstance(item.get("secure"), bool):
+                continue
+            if not item["domain"] or not _domain_allowed(host, item["domain"]):
+                continue
+            expires = item.get("expires")
+            if expires is not None and not isinstance(expires, (int, float)):
+                continue
+            if expires is not None and expires <= time.time():
+                continue
+            if not isinstance(item.get("rest", {}), dict):
+                continue
+            cookies.append(_cookie_from_data(item))
+        return cookies
 
     def _save_cookies(self) -> None:
         if self._session is None:
@@ -226,12 +284,16 @@ class HttpCesarSession:
         path = self.config.watcher.http_cookies_file
         path.parent.mkdir(parents=True, exist_ok=True)
         temporary = path.with_name(path.name + ".tmp")
+        cookies = [_cookie_data(cookie) for cookie in self._session.cookies.jar]
         try:
-            temporary.write_text(
-                json.dumps(self._session.cookies.get_dict()),
-                encoding="utf-8",
+            temporary.unlink(missing_ok=True)
+            descriptor = os.open(
+                temporary,
+                os.O_WRONLY | os.O_CREAT | os.O_TRUNC,
+                0o600,
             )
-            temporary.chmod(0o600)
+            with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+                json.dump(cookies, handle)
             temporary.replace(path)
             path.chmod(0o600)
         except OSError:
@@ -357,22 +419,31 @@ class HttpCesarSession:
     async def _inject_cookie(self, browser: CesarSession) -> None:
         if self._session is None or browser._context is None:
             raise HttpTransportError("session HTTP ou navigateur indisponible")
-        cookie = self._session.cookies.get("PHPSESSID")
-        if not cookie:
-            raise HttpTransportError("cookie de session HTTP absent")
         host = urlsplit(self.config.cesar.base_url).hostname
         if not host:
             raise HttpTransportError("hote CESAR invalide")
+        cookie = next(
+            (
+                item
+                for item in self._session.cookies.jar
+                if item.name == "PHPSESSID" and _domain_allowed(host, item.domain)
+            ),
+            None,
+        )
+        if cookie is None:
+            raise HttpTransportError("cookie de session HTTP absent")
+        same_site = cookie._rest.get("SameSite") or "Lax"
         await browser._context.add_cookies(
             [
                 {
-                    "name": "PHPSESSID",
-                    "value": cookie,
-                    "domain": host,
-                    "path": "/",
-                    "secure": True,
-                    "httpOnly": True,
-                    "sameSite": "Lax",
+                    "name": cookie.name,
+                    "value": cookie.value,
+                    "domain": cookie.domain,
+                    "path": cookie.path,
+                    "secure": cookie.secure,
+                    "expires": cookie.expires or -1,
+                    "httpOnly": "HttpOnly" in cookie._rest,
+                    "sameSite": same_site,
                 }
             ]
         )
