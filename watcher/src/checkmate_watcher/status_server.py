@@ -242,14 +242,18 @@ class StatusSession:
     def _send_test_notification(self, notifier: Notifier) -> bool:
         return notifier.send(
             "CheckMate",
-            "Test de notification. Si tu ne la vois pas, coupe le mode silencieux.",
+            "Test de notification. Si tu ne la vois pas, "
+            "coupe le mode silencieux.",
             urgency="normal",
         )
 
     def _test_notification_result(self) -> dict:
         return {
             "ok": True,
-            "message": "Notification envoyée. Si tu ne la vois pas, coupe le mode silencieux.",
+            "message": (
+                "Notification envoyée. Si tu ne la vois pas, "
+                "coupe le mode silencieux."
+            ),
         }
 
     def test_notification(self) -> dict:

@@ -114,7 +114,11 @@ INK_SNAPSHOT_JS = """
   if (!width || !height) return false;
   try {
     const data = context.getImageData(0, 0, width, height).data;
-    window.__checkmateInk = { data: new Uint8ClampedArray(data), width, height };
+    window.__checkmateInk = {
+      data: new Uint8ClampedArray(data),
+      width,
+      height,
+    };
     return true;
   } catch (error) {
     return false;
@@ -127,7 +131,10 @@ INK_DIFF_JS = """
   const snapshot = window.__checkmateInk;
   const context = canvas.getContext('2d');
   if (!snapshot || !context) return null;
-  if (canvas.width !== snapshot.width || canvas.height !== snapshot.height) return null;
+  if (
+    canvas.width !== snapshot.width ||
+    canvas.height !== snapshot.height
+  ) return null;
   let data;
   try {
     data = context.getImageData(0, 0, snapshot.width, snapshot.height).data;
@@ -196,9 +203,15 @@ SIGNATURE_OVERLAY_SHOW_JS = """
         opacity: 0;
         transition: opacity 0.35s ease;
         background:
-          radial-gradient(1200px 600px at 10% 10%, rgba(124,58,237,.20), transparent 60%),
-          radial-gradient(900px 500px at 90% 90%, rgba(167,139,250,.16), transparent 60%),
-          repeating-linear-gradient(45deg, rgba(139,92,246,.04) 0 18px, transparent 18px 36px);
+          radial-gradient(
+            1200px 600px at 10% 10%, rgba(124,58,237,.20), transparent 60%
+          ),
+          radial-gradient(
+            900px 500px at 90% 90%, rgba(167,139,250,.16), transparent 60%
+          ),
+          repeating-linear-gradient(
+            45deg, rgba(139,92,246,.04) 0 18px, transparent 18px 36px
+          );
         overflow: hidden;
       }
       #${overlayId}.cm-visible { opacity: 1; }
@@ -223,7 +236,9 @@ SIGNATURE_OVERLAY_SHOW_JS = """
         gap: 14px;
         padding: 14px 18px;
         border-radius: 18px;
-        background: linear-gradient(135deg, rgba(30,20,60,.90), rgba(49,46,129,.82));
+        background: linear-gradient(
+          135deg, rgba(30,20,60,.90), rgba(49,46,129,.82)
+        );
         border: 1px solid rgba(167,139,250,.55);
         color: #f5f3ff;
         font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
@@ -323,13 +338,16 @@ SIGNATURE_OVERLAY_SHOW_JS = """
       const left = Math.round(Math.random() * 100);
       const top = Math.round(Math.random() * 100);
       const delay = (Math.random() * 5).toFixed(2);
-      particles += `<span class="cm-particle" style="left:${left}%;top:${top}%;animation-delay:${delay}s">${pieces[index % pieces.length]}</span>`;
+      particles += `<span class="cm-particle" style="left:${left}%;` +
+        `top:${top}%;animation-delay:${delay}s">` +
+        `${pieces[index % pieces.length]}</span>`;
     }
     let cells = '';
     for (let index = 0; index < 16; index += 1) {
       const row = Math.floor(index / 4);
       const col = index % 4;
-      cells += `<span class="cm-cell${(row + col) % 2 ? ' light' : ''}"></span>`;
+      cells += `<span class="cm-cell${
+        (row + col) % 2 ? ' light' : ''}"></span>`;
     }
     overlay.innerHTML = `
       <div class="cm-particles">${particles}</div>
@@ -358,8 +376,10 @@ SIGNATURE_OVERLAY_SHOW_JS = """
     const width = window.innerWidth;
     const height = window.innerHeight;
     overlay.style.clipPath =
-      `polygon(evenodd, 0 0, ${width}px 0, ${width}px ${height}px, 0 ${height}px, ` +
-      `0 0, ${x1}px ${y1}px, ${x1}px ${y2}px, ${x2}px ${y2}px, ${x2}px ${y1}px, ${x1}px ${y1}px)`;
+      `polygon(evenodd, 0 0, ${width}px 0, ` +
+      `${width}px ${height}px, 0 ${height}px, 0 0, ` +
+      `${x1}px ${y1}px, ${x1}px ${y2}px, ` +
+      `${x2}px ${y2}px, ${x2}px ${y1}px, ${x1}px ${y1}px)`;
   };
   cutout();
   window.__checkmateSignatureCutout = cutout;
@@ -438,7 +458,10 @@ async (canvas, coordinates) => {
     };
     for (const [key, value] of Object.entries(values)) {
       try {
-        Object.defineProperty(event, key, { configurable: true, get: () => value });
+        Object.defineProperty(event, key, {
+          configurable: true,
+          get: () => value,
+        });
       } catch (error) {
         // Certaines implementations verrouillent deja ces proprietes.
       }
@@ -460,7 +483,9 @@ async (canvas, coordinates) => {
       buttons,
     };
     const names = { down: 'mousedown', move: 'mousemove', up: 'mouseup' };
-    canvas.dispatchEvent(withOffsets(new MouseEvent(names[kind], options), x, y));
+    canvas.dispatchEvent(
+      withOffsets(new MouseEvent(names[kind], options), x, y)
+    );
     try {
       canvas.dispatchEvent(
         withOffsets(
@@ -551,7 +576,7 @@ def _fallback_signal_key(payload: dict[str, str]) -> str:
 
 
 def signal_key(payload: dict[str, str]) -> str:
-    """Cle stable pour dedupliquer un emargement entre deux rafraichissements."""
+    """Cle stable pour dedupliquer un emargement entre deux cycles."""
     course_uuid = _signal_text(payload.get("course_uuid"))
     line_uuid = _signal_text(payload.get("line_uuid"))
     if course_uuid and line_uuid:
@@ -602,7 +627,8 @@ class CesarSession:
     async def switch_headless(self, headless: bool) -> None:
         """Relance le navigateur dans le mode demande.
 
-        Le profil persistant conserve la session, donc aucunlogin n'est necessaire.
+        Le profil persistant conserve la session, donc aucun login
+        n'est necessaire.
         """
         if self._context is not None and self.headless == headless:
             return
@@ -746,10 +772,16 @@ class CesarSession:
             payload = await button.evaluate(
                 """(el) => {
                     const attrs = {};
-                    for (const attr of el.attributes) attrs[attr.name] = attr.value;
-                    const row = el.closest('tr, li, .card, [data-course-id], [data-session-id]');
+                    for (const attr of el.attributes) {
+                      attrs[attr.name] = attr.value;
+                    }
+                    const row = el.closest(
+                      'tr, li, .card, [data-course-id], [data-session-id]'
+                    );
                     return {
-                        action: attrs['data-live-action-param'] || attrs['data-course-id'] || attrs['data-session-id'] || '',
+                        action: attrs['data-live-action-param'] ||
+                          attrs['data-course-id'] ||
+                          attrs['data-session-id'] || '',
                         row: row ? (row.innerText || '').slice(0, 300) : '',
                         label: (el.innerText || '').trim(),
                     };
@@ -825,7 +857,8 @@ class CesarSession:
         )
         elapsed = time.monotonic() - started
         if not hidden:
-            # Sur le vrai CESAR, apres l'enregistrement un nouveau popup s'ouvre
+            # Sur le vrai CESAR, apres l'enregistrement un nouveau
+            # popup s'ouvre
             # et ferme l'ancien sans retirer le bouton d'emargement du DOM. On
             # rafraichit alors la page : si l'emargement a bien ete pris en
             # compte, le bouton n'est plus present.
@@ -847,10 +880,12 @@ class CesarSession:
             )
             if still_visible is not None:
                 raise SignError(
-                    "bouton d'emargement toujours visible 15 s apres la signature"
+                    "bouton d'emargement toujours visible "
+                    "15 s apres la signature"
                 )
             logger.info(
-                "bouton disparu apres rafraichissement, emargement pris en compte"
+                "bouton disparu apres rafraichissement, "
+                "emargement pris en compte"
             )
         logger.info(
             "bouton d'emargement disparu apres %.1f s (confirmation : %s)",
@@ -959,7 +994,8 @@ class CesarSession:
         """Attend que l'animation de la popup decouvre le canvas.
 
         Pendant l'animation, une couche du site peut recouvrir le canvas : les
-        clics de la souris partent alors sur cette couche et le trace est perdu.
+        clics de la souris partent alors sur cette couche et le trace
+        est perdu.
         """
         if self.page is None:
             return await self._canvas_is_hittable(canvas)
@@ -1062,7 +1098,8 @@ class CesarSession:
                 return locator
             await self.page.wait_for_timeout(250)
         raise SignError(
-            f"element introuvable apres {timeout_ms}ms : {' | '.join(selectors)}"
+            f"element introuvable apres {timeout_ms}ms : "
+            f"{' | '.join(selectors)}"
         )
 
     async def _wait_for_hidden(

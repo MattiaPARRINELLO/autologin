@@ -63,13 +63,17 @@ CAPTURE_HTML = """
 <title>CheckMate - capture de signature</title>
 <style>
   body { margin: 0; min-height: 100vh; display: grid; place-items: center;
-         background: #0f172a; color: #e2e8f0; font-family: system-ui, sans-serif; }
-  .card { background: #1e293b; padding: 28px; border-radius: 18px; box-shadow: 0 20px 60px rgba(0,0,0,.45); }
+         background: #0f172a; color: #e2e8f0;
+         font-family: system-ui, sans-serif; }
+  .card { background: #1e293b; padding: 28px; border-radius: 18px;
+    box-shadow: 0 20px 60px rgba(0,0,0,.45); }
   h1 { margin: 0 0 6px; font-size: 20px; }
   p { margin: 0 0 18px; color: #94a3b8; font-size: 14px; }
-  canvas { background: #fff; border-radius: 12px; cursor: crosshair; touch-action: none; display: block; }
+  canvas { background: #fff; border-radius: 12px; cursor: crosshair;
+    touch-action: none; display: block; }
   .actions { display: flex; gap: 12px; margin-top: 16px; }
-  button { flex: 1; padding: 12px; border-radius: 10px; border: 0; font-weight: 700; cursor: pointer; font-size: 15px; }
+  button { flex: 1; padding: 12px; border-radius: 10px; border: 0;
+    font-weight: 700; cursor: pointer; font-size: 15px; }
   #save { background: #22c55e; color: #04220f; }
   #clear { background: #334155; color: #e2e8f0; }
 </style>
@@ -244,7 +248,9 @@ def _add_meta_args(parser: argparse.ArgumentParser) -> None:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="checkmate-watcher",
-        description="Surveille CESAR Emineo et propose de signer l'emargement.",
+        description=(
+            "Surveille CESAR Emineo et propose de signer l'emargement."
+        ),
     )
     _add_common_args(parser)
     _add_run_args(parser)
@@ -353,7 +359,8 @@ async def command_capture(config: Config) -> int:
         await page.set_content(CAPTURE_HTML)
         try:
             await page.wait_for_function(
-                "window.__signatureCapture && window.__signatureCapture.done === true",
+                "window.__signatureCapture && "
+                "window.__signatureCapture.done === true",
                 timeout=300_000,
             )
             raw = await page.evaluate("window.__signatureCapture.points")
@@ -371,7 +378,8 @@ async def command_capture(config: Config) -> int:
 
     save_signature(config.signature.file, points)
     print(
-        f"Signature enregistree ({len(points)} points) dans {config.signature.file}"
+        f"Signature enregistree ({len(points)} points) "
+        f"dans {config.signature.file}"
     )
     return 0
 
@@ -722,7 +730,8 @@ def _afficher_check_update(channel, policy, erreur=None) -> None:
 
 def _afficher_migration(release) -> None:
     print(
-        f"Migration a passer d'abord : {release.tag} ({release.migration_reason})"
+        f"Migration a passer d'abord : {release.tag} "
+        f"({release.migration_reason})"
     )
 
 
@@ -853,7 +862,8 @@ def _afficher_autostart_installe(
     executable: object, config_path: Path
 ) -> None:
     print(
-        f"demarrage automatique installe : {executable} --config {config_path} run"
+        f"demarrage automatique installe : {executable} "
+        f"--config {config_path} run"
     )
 
 

@@ -1,4 +1,4 @@
-"""Etat persistant pour eviter de notifier plusieurs fois le meme emargement."""
+"""Etat persistant pour eviter les notifications repetees."""
 
 from __future__ import annotations
 

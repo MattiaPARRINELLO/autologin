@@ -10,7 +10,7 @@ from pathlib import Path
 VALID_KINDS = ("start", "move", "end")
 MIN_PADDING_RATIO = 0.1
 MAX_PADDING_RATIO = 1.0
-# En dessous de cette etendue, le trace n'est qu'un point (clic sans mouvement).
+# Sous cette etendue, le trace n'est qu'un point (clic sans mouvement).
 MIN_EXTENT = 2.0
 
 
@@ -116,7 +116,8 @@ def _require_fit_inputs(
         raise SignatureError("dimensions de canvas invalides")
     if padding < MIN_PADDING_RATIO or padding > MAX_PADDING_RATIO:
         raise SignatureError(
-            f"padding_ratio doit etre entre {MIN_PADDING_RATIO} et {MAX_PADDING_RATIO}"
+            f"padding_ratio doit etre entre {MIN_PADDING_RATIO} "
+            f"et {MAX_PADDING_RATIO}"
         )
 
 
@@ -148,7 +149,7 @@ def _fit_point(point, min_x, min_y, offset_x, offset_y, scale, width, height):
 
 
 def fit_points(points, width, height, padding_ratio=0.9) -> list[FittedPoint]:
-    """Centre et met a l'echelle la signature dans un canvas de taille CSS donnee."""
+    """Centre et met a l'echelle la signature dans le canvas CSS."""
     _require_fit_inputs(points, width, height, padding_ratio)
     min_x, max_x, min_y, max_y = _bounds(points)
     offset_x, offset_y, scale = _fit_offsets(

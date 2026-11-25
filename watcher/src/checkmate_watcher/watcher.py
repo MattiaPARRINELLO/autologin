@@ -278,7 +278,7 @@ async def sign_with_visibility(
     session: CesarSession | HttpCesarSession,
     points: list,
 ) -> str:
-    """Signe en mode invisible, ou en ouvrant une fenetre uniquement pour signer."""
+    """Signe en mode invisible ou avec une fenetre de signature."""
     if not config.watcher.visible_on_sign:
         return await session.sign(points)
 
@@ -365,7 +365,8 @@ async def handle_signal(
     await _send(
         config,
         "Emargement en attente",
-        "Pas de reponse. Une nouvelle demande sera faite dans quelques minutes.",
+        "Pas de reponse. Une nouvelle demande sera faite "
+        "dans quelques minutes.",
         icon=config.notifications.icon,
         urgency="normal",
     )
@@ -483,7 +484,8 @@ async def run_loop(
                     window = schedule.active_window(now)
                     if window is not None:
                         logger.info(
-                            "surveillance active sur le creneau %s (toutes les %ss)",
+                            "surveillance active sur le creneau %s "
+                            "(toutes les %ss)",
                             window,
                             config.watcher.poll_interval,
                         )

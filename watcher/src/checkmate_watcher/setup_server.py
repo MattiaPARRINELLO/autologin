@@ -442,7 +442,7 @@ def _run_login(candidate: Config) -> None:
 def _test_connection(
     config: Config, base_url: str, username: str, password: str
 ) -> str:
-    """Reproduit la connexion reelle, avec les selecteurs et le flux du watcher."""
+    """Reproduit la connexion reelle avec le flux du watcher."""
     candidate = _with_credentials(config, base_url, username, password)
     _run_login(candidate)
     return "Connexion reussie."

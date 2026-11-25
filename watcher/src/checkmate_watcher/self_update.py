@@ -226,7 +226,7 @@ def _transient_unit_active(unit: str, attempts: int = 5) -> bool:
 
 
 def prepare(config) -> tuple[Release, Path]:
-    """Telecharge la migration a passer en priorite, sinon la derniere version."""
+    """Telecharge la migration prioritaire ou la derniere version."""
     policy = update_policy(__version__, channel=config.updates.channel)
     release = policy.install_target
     if release is None:
@@ -237,7 +237,7 @@ def prepare(config) -> tuple[Release, Path]:
 
 
 def update_now(config) -> str:
-    """Prepare puis lance l'installation. Rend le numero de version installe."""
+    """Prepare l'installation et rend le numero de version cible."""
     release, archive = prepare(config)
     install(archive)
     return release.version_text

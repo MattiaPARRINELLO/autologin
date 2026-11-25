@@ -60,13 +60,14 @@ def _channel_from_version(version: Version) -> ReleaseChannel:
 
 
 def channel_for_tag(tag: str) -> ReleaseChannel:
-    """Rend le canal attendu pour un tag, ou leve ValueError si le tag est invalide."""
+    """Rend le canal attendu, ou leve ValueError si le tag est invalide."""
     return _channel_from_version(_version_from_tag(tag))
 
 
 def _afficher_usage() -> None:
     print(
-        f"usage : python -m checkmate_watcher.release_channel {TAG_PREFIX}vX.Y.Z",
+        f"usage : python -m checkmate_watcher.release_channel "
+        f"{TAG_PREFIX}vX.Y.Z",
         file=sys.stderr,
     )
 
@@ -83,7 +84,7 @@ def _afficher_canal(channel: ReleaseChannel) -> None:
 
 
 def _parse_args(argv: list[str] | None) -> list[str]:
-    """Rend les arguments a analyser, par defaut ceux de la ligne de commande."""
+    """Rend les arguments, par defaut ceux de la ligne de commande."""
     return sys.argv[1:] if argv is None else argv
 
 

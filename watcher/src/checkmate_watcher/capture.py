@@ -58,7 +58,10 @@ STEPS = (
     (STEP_CONNEXION, "Arrive sur la page de connexion, sans te connecter"),
     (
         STEP_DASHBOARD,
-        "Connecte-toi, puis attends le tableau de bord avec le bouton d'emargement",
+        (
+            "Connecte-toi, puis attends le tableau de bord "
+            "avec le bouton d'emargement"
+        ),
     ),
     (
         STEP_SIGNATURE,
@@ -70,7 +73,10 @@ STEPS = (
     ),
     (
         STEP_SIGNED,
-        "Ferme le message et reviens au tableau de bord sans bouton d'emargement",
+        (
+            "Ferme le message et reviens au tableau de bord "
+            "sans bouton d'emargement"
+        ),
     ),
 )
 

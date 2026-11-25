@@ -174,7 +174,8 @@ def _ink_text(ink: dict) -> str:
         return "encre non mesuree"
     return (
         f"encre {ink.get('count')}"
-        f" [{ink.get('minX')},{ink.get('minY')}-{ink.get('maxX')},{ink.get('maxY')}]"
+        f" [{ink.get('minX')},{ink.get('minY')}-"
+        f"{ink.get('maxX')},{ink.get('maxY')}]"
     )
 
 

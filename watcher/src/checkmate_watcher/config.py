@@ -176,7 +176,7 @@ def _validate_channel(channel: str) -> str:
 
 
 def parse_updates_channel(table: dict) -> str:
-    """Lit `[updates] channel`, avec `include_prerelease` en alias historique."""
+    """Lit le canal, avec `include_prerelease` comme alias historique."""
     raw = table.get("channel")
     if raw is None:
         legacy = _legacy_channel(table)

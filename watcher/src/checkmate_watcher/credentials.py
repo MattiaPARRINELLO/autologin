@@ -11,7 +11,7 @@ DEFAULT_SERVICE = "checkmate-watcher"
 
 
 def prefer_keyring() -> bool:
-    """Le trousseau est fiable sur Windows et macOS ; Linux passe par le fichier env."""
+    """Le trousseau est fiable sur Windows/macOS, Linux utilise env."""
     return sys.platform.startswith(("win", "darwin"))
 
 

@@ -76,7 +76,7 @@ class Schedule:
     def situation(
         self, moment: datetime, is_signed: Callable[[str], bool]
     ) -> Situation:
-        """Decrit le creneau courant : desactive, hors plage, signe ou actif."""
+        """Decrit le creneau : desactive, hors plage, signe ou actif."""
         if not self.enabled:
             return Situation("disabled")
         return self._situation_in_window(moment, is_signed)

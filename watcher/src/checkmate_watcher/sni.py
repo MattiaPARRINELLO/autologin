@@ -81,7 +81,7 @@ def _framed(image, size: int):
 
 
 def pixmaps(image, sizes: tuple[int, ...] = (64, 32)) -> list:
-    """Prepare les pixmaps attendus par IconPixmap : (largeur, hauteur, ARGB32)."""
+    """Prepare les pixmaps IconPixmap : (largeur, hauteur, ARGB32)."""
     return [[size, size, _argb32(_framed(image, size))] for size in sizes]
 
 

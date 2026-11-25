@@ -93,13 +93,13 @@ def _start_close_watcher(
 def _startup_options() -> dict[str, Any]:
     options: dict[str, Any] = {}
     if sys.platform.startswith("linux"):
-        # Force GTK : evite la sonde Qt de pywebview et ses traces au demarrage.
+        # Force GTK pour eviter la sonde Qt et ses traces au demarrage.
         options["gui"] = "gtk"
     return options
 
 
 def show(url: str, *, close_event: threading.Event | None = None) -> bool:
-    """Ouvre une fenetre native, ou rend False si le moteur est indisponible."""
+    """Ouvre une fenetre native, ou rend False si le moteur manque."""
     backend = _load_backend()
     if backend is None:
         return False

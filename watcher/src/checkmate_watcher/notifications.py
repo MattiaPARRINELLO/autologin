@@ -18,24 +18,33 @@ START_MENU_LINK = "Microsoft\\Windows\\Start Menu\\Programs\\{name}.lnk"
 
 
 class DialogUnavailable(Exception):
-    """L'outil de dialogue n'est pas disponible ; un autre peut le remplacer."""
+    """L'outil de dialogue manque, un autre peut le remplacer."""
 
 
 CHECKMATE_APP_ID = "CheckMate.Watcher"
 
-POWERSHELL_APP_ID = "{1AC14E77-02E7-4E5D-B744-2EB1AE5198B7}\\WindowsPowerShell\\v1.0\\powershell.exe"
+POWERSHELL_APP_ID = (
+    "{1AC14E77-02E7-4E5D-B744-2EB1AE5198B7}"
+    "\\WindowsPowerShell\\v1.0\\powershell.exe"
+)
 
 TOAST_SCRIPT = """
 $ErrorActionPreference = 'Stop'
-[Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime] | Out-Null
-[Windows.Data.Xml.Dom.XmlDocument, Windows.Data.Xml.Dom.XmlDocument, ContentType = WindowsRuntime] | Out-Null
+[Windows.UI.Notifications.ToastNotificationManager,
+ Windows.UI.Notifications, ContentType = WindowsRuntime] `
+| Out-Null
+[Windows.Data.Xml.Dom.XmlDocument,
+ Windows.Data.Xml.Dom.XmlDocument, ContentType = WindowsRuntime] `
+| Out-Null
 $title = [System.Security.SecurityElement]::Escape($env:CHECKMATE_TITLE)
 $message = [System.Security.SecurityElement]::Escape($env:CHECKMATE_MESSAGE)
-$template = "<toast><visual><binding template='ToastGeneric'><text>$title</text><text>$message</text></binding></visual></toast>"
+$template = "<toast><visual><binding template='ToastGeneric'>" +
+  "<text>$title</text><text>$message</text></binding></visual></toast>"
 $xml = New-Object Windows.Data.Xml.Dom.XmlDocument
 $xml.LoadXml($template)
 $toast = New-Object Windows.UI.Notifications.ToastNotification $xml
-$notifier = [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier($env:CHECKMATE_APP_ID)
+$notifier = [Windows.UI.Notifications.ToastNotificationManager]::`
+  CreateToastNotifier($env:CHECKMATE_APP_ID)
 $notifier.Show($toast)
 """
 
@@ -275,7 +284,8 @@ def send_windows(title, message, *, app_name):
 def _macos_script(title: str, message: str) -> str:
     return (
         "display notification "
-        f"{_applescript_string(message)} with title {_applescript_string(title)}"
+        f"{_applescript_string(message)} with title "
+        f"{_applescript_string(title)}"
     )
 
 
