@@ -81,6 +81,11 @@ def _first_input(inputs: dict[str, list[str]], name: str) -> str:
     return values[0]
 
 
+def _cvec_payload(response) -> dict:
+    token = _first_input(_parse_inputs(response.text), "cvec_file[_token]")
+    return {"cvec_file[skip]": "skip", "cvec_file[_token]": token}
+
+
 def _parse_calendar(text: str) -> dict[str, str]:
     parser = _CalendarParser()
     parser.feed(text)
@@ -256,6 +261,13 @@ def _read_cookie_data(path) -> list[dict]:
     return data if isinstance(data, list) else []
 
 
+def _cookie_data_expired(item: dict) -> bool:
+    expires = item.get("expires")
+    if expires is not None and not isinstance(expires, (int, float)):
+        return True
+    return expires is not None and expires <= time.time()
+
+
 def _cookie_data_valid(item: dict, host: str) -> bool:
     if not isinstance(item, dict):
         return False
@@ -267,24 +279,25 @@ def _cookie_data_valid(item: dict, host: str) -> bool:
         return False
     if not item["domain"] or not _domain_allowed(host, item["domain"]):
         return False
-    expires = item.get("expires")
-    if expires is not None and not isinstance(expires, (int, float)):
-        return False
-    if expires is not None and expires <= time.time():
+    if _cookie_data_expired(item):
         return False
     return isinstance(item.get("rest", {}), dict)
+
+
+def _replace_private_json(temporary, path, data) -> None:
+    temporary.unlink(missing_ok=True)
+    descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+        json.dump(data, handle)
+    temporary.replace(path)
+    path.chmod(0o600)
 
 
 def _write_private_json(path, data) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(path.name + ".tmp")
     try:
-        temporary.unlink(missing_ok=True)
-        descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
-            json.dump(data, handle)
-        temporary.replace(path)
-        path.chmod(0o600)
+        _replace_private_json(temporary, path, data)
     except OSError:
         temporary.unlink(missing_ok=True)
         raise
@@ -424,14 +437,10 @@ class HttpCesarSession:
         self._finish_login(self._post_login(csrf))
 
     def _post_cvec_skip(self, response):
-        token = _first_input(_parse_inputs(response.text), "cvec_file[_token]")
         session = self._require_http_session()
         return session.post(
             response.url,
-            data={
-                "cvec_file[skip]": "skip",
-                "cvec_file[_token]": token,
-            },
+            data=_cvec_payload(response),
             timeout=45,
             allow_redirects=True,
         )
