@@ -28,25 +28,26 @@ POWERSHELL_APP_ID = (
     "\\WindowsPowerShell\\v1.0\\powershell.exe"
 )
 
-TOAST_SCRIPT = """
-$ErrorActionPreference = 'Stop'
-[Windows.UI.Notifications.ToastNotificationManager,
- Windows.UI.Notifications, ContentType = WindowsRuntime] `
-| Out-Null
-[Windows.Data.Xml.Dom.XmlDocument,
- Windows.Data.Xml.Dom.XmlDocument, ContentType = WindowsRuntime] `
-| Out-Null
-$title = [System.Security.SecurityElement]::Escape($env:CHECKMATE_TITLE)
-$message = [System.Security.SecurityElement]::Escape($env:CHECKMATE_MESSAGE)
-$template = "<toast><visual><binding template='ToastGeneric'>" +
-  "<text>$title</text><text>$message</text></binding></visual></toast>"
-$xml = New-Object Windows.Data.Xml.Dom.XmlDocument
-$xml.LoadXml($template)
-$toast = New-Object Windows.UI.Notifications.ToastNotification $xml
-$notifier = [Windows.UI.Notifications.ToastNotificationManager]::`
-  CreateToastNotifier($env:CHECKMATE_APP_ID)
-$notifier.Show($toast)
-"""
+TOAST_SCRIPT = (
+    "\n"
+    "$ErrorActionPreference = 'Stop'\n"
+    "[Windows.UI.Notifications.ToastNotificationManager, "
+    "Windows.UI.Notifications, ContentType = WindowsRuntime] | Out-Null\n"
+    "[Windows.Data.Xml.Dom.XmlDocument, "
+    "Windows.Data.Xml.Dom.XmlDocument, ContentType = WindowsRuntime] | Out-Null\n"
+    "$title = [System.Security.SecurityElement]::Escape("
+    "$env:CHECKMATE_TITLE)\n"
+    "$message = [System.Security.SecurityElement]::Escape("
+    "$env:CHECKMATE_MESSAGE)\n"
+    "$template = \"<toast><visual><binding template='ToastGeneric'>"
+    '<text>$title</text><text>$message</text></binding></visual></toast>"\n'
+    "$xml = New-Object Windows.Data.Xml.Dom.XmlDocument\n"
+    "$xml.LoadXml($template)\n"
+    "$toast = New-Object Windows.UI.Notifications.ToastNotification $xml\n"
+    "$notifier = [Windows.UI.Notifications.ToastNotificationManager]::"
+    "CreateToastNotifier($env:CHECKMATE_APP_ID)\n"
+    "$notifier.Show($toast)\n"
+)
 
 
 def _clean_env() -> dict[str, str]:
