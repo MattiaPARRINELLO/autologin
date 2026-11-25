@@ -261,6 +261,7 @@ class HttpCesarSession:
         except HttpTransportError:
             raise
         except Exception as exc:
+            logger.debug("echec de l'ouverture HTTP", exc_info=True)
             raise HttpTransportError("ouverture de la session HTTP impossible") from exc
 
     def _open_http(self) -> None:
@@ -428,6 +429,7 @@ class HttpCesarSession:
         except HttpTransportError:
             raise
         except Exception as exc:
+            logger.debug("echec de la detection HTTP", exc_info=True)
             raise HttpTransportError("detection HTTP CESAR impossible") from exc
 
     async def _open_browser(self, headless: bool) -> None:
