@@ -49,7 +49,7 @@ active.
 | `tray.py`, `sni.py` | icone de notification : `pystray` et StatusNotifierItem Linux |
 | `autostart.py` | service systemd utilisateur ou tache planifiee Windows |
 | `updates.py` | lecture des releases GitHub, marqueurs de release, canal, version minimale et migration |
-| `release_notes.py` | resumes versionnes des nouveautés affiches après les mises a jour stables majeures ou mineures |
+| `release_notes.py` | resumes versionnes des nouveautés et micro-resumes affiches après les mises a jour stables majeures ou mineures |
 | `analytics.py` | compteurs d'usage anonymes : installation et signature |
 | `self_update.py` | installation de la cible de mise a jour par un processus detache |
 | `support.py` | archive de diagnostic sans mot de passe ni signature |
@@ -199,6 +199,12 @@ nouveautes. La version lancee et la version fermee sont conservees dans `state.p
 Le tableau de bord recoit le resume dans `/api/status`, puis l'action
 `dismiss-release` memorise sa fermeture. Le popup est rendu dans `status_ui.py`
 avec focus piege, touche Echap et mouvement reduit.
+
+Le champ `teaser` du meme fichier fournit un micro-resume court. Le workflow de
+release l'ajoute aux notes GitHub avec le marqueur `CHECKMATE-SUMMARY`. Les
+versions deja installees lisent donc ce marqueur via l'API GitHub et peuvent
+afficher la raison de mettre a jour avant l'installation, sans attendre d'embarquer
+le nouveau resume complet.
 
 Cote publication, `.github/release-markers.txt` porte les deux valeurs de la
 prochaine release. Le workflow refuse un marqueur absent ou vide. Un marqueur

@@ -4,6 +4,7 @@
     "importance": "important",
     "title": "Mise à jour terminée.",
     "summary": "CheckMate surveille tes émargements avec beaucoup moins de ressources, sans changer la façon de signer.",
+    "teaser": "Chrome reste fermé pendant la surveillance : détection 2,3× plus rapide et 15× plus léger.",
     "metrics": [
       {
         "value": "2,3×",

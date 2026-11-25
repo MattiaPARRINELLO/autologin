@@ -769,8 +769,12 @@ def _afficher_update_a_jour(channel: str) -> None:
     print(f"CheckMate {__version__} est a jour (canal {channel})")
 
 
-def _afficher_update_disponible(tag: str, channel: str) -> None:
+def _afficher_update_disponible(
+    tag: str, channel: str, teaser: str | None = None
+) -> None:
     print(f"Mise a jour disponible : {tag} (canal {channel})")
+    if teaser:
+        print(f"Pourquoi mettre a jour : {teaser}")
 
 
 def _afficher_update_url(url: str) -> None:
@@ -819,7 +823,7 @@ def _release_ou_code(config: Config):
 
 
 def _update_disponible(release, channel: str, check_only: bool) -> int | None:
-    _afficher_update_disponible(release.tag, channel)
+    _afficher_update_disponible(release.tag, channel, release.teaser)
     if check_only:
         _afficher_update_url(release.url)
         return 0

@@ -76,6 +76,31 @@ def test_erreur_reseau_ne_bloque_pas(monkeypatch):
     assert asyncio.run(watcher._startup_policy(_Config())) is None
 
 
+def test_notification_de_mise_a_jour_avec_micro_resume(tmp_path, monkeypatch):
+    release = Release(
+        "watcher-v0.7.0",
+        Version(0, 7, 0),
+        "https://example.com/release",
+        "stable",
+        False,
+        teaser="Detection 2,3 fois plus rapide.",
+    )
+    sent = []
+
+    async def fake_send(config, title, message, **kwargs):
+        sent.append((title, message))
+
+    monkeypatch.setattr(watcher, "check_for_update", lambda *a, **k: release)
+    monkeypatch.setattr(watcher, "_send", fake_send)
+    state = StateStore(tmp_path / "state.json")
+
+    asyncio.run(watcher._check_update(_Config(), state))
+
+    assert len(sent) == 1
+    assert release.teaser in sent[0][1]
+    assert state.get_meta("update_notified") == release.tag
+
+
 def test_pas_de_pause_hors_planning(tmp_path):
     assert (
         _pause_reason(
