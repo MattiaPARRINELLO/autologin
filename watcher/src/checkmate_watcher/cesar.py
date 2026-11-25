@@ -25,6 +25,70 @@ READY_SELECTORS = (
     "div.toastui-calendar-layout",
 )
 
+CALENDAR_IDENTITY_JS = """
+() => {
+    const calendar = document.querySelector(
+        '[data-tui-calendar-event-lesson-schedules-value]'
+    );
+    if (!calendar) return {};
+    try {
+        const student = JSON.parse(calendar.getAttribute(
+            'data-tui-calendar-student-registration-value'
+        ) || '{}');
+        const courses = JSON.parse(calendar.getAttribute(
+            'data-tui-calendar-event-lesson-schedules-value'
+        ) || '[]');
+        const maxMinutes = Number(calendar.getAttribute(
+            'data-tui-calendar-max-time-attendance-value'
+        ));
+        const serverNow = Number(calendar.getAttribute(
+            'data-tui-calendar-time-server-value'
+        ));
+        const find = (node, course) => {
+            if (Array.isArray(node)) {
+                for (const item of node) {
+                    const found = find(item, course);
+                    if (found) return found;
+                }
+                return null;
+            }
+            if (!node || typeof node !== 'object') return null;
+            if (Array.isArray(node.attendanceSheetLines)) {
+                for (const line of node.attendanceSheetLines) {
+                    const registration = line.planningGroupSubscription
+                        ?.studentRegistration;
+                    const signed = line.signature?.signed === true
+                        || line.attendanceWithoutSignature === true;
+                    const secondsLeft = Math.round((
+                        line.createdAt + maxMinutes * 60000 - serverNow * 1000
+                    ) / 1000);
+                    if (registration?.uuid === student.uuid
+                        && line.signingOff === true && !signed
+                        && secondsLeft > 0) {
+                        return {
+                            course_uuid: course?.uuid || '',
+                            line_uuid: line.uuid || '',
+                        };
+                    }
+                }
+            }
+            for (const value of Object.values(node)) {
+                const found = find(value, course);
+                if (found) return found;
+            }
+            return null;
+        };
+        for (const course of courses) {
+            const found = find(course, course);
+            if (found) return found;
+        }
+    } catch (error) {
+        return {};
+    }
+    return {};
+}
+"""
+
 # En dessous de ce ratio sur un des deux axes, le trace n'a pas la forme d'une
 # signature, point (clic sans mouvement) ou ligne (canvas mesure pendant une
 # animation, mouvements ignores par la librairie du site).
@@ -223,6 +287,11 @@ def _ink_ratio(ink: dict, low: str, high: str, size: str) -> float:
 
 def signal_key(payload: dict[str, str]) -> str:
     """Cle stable pour dedupliquer un emargement entre deux rafraichissements."""
+    course_uuid = _signal_text(payload.get("course_uuid"))
+    line_uuid = _signal_text(payload.get("line_uuid"))
+    if course_uuid and line_uuid:
+        basis = f"{course_uuid}|{line_uuid}"
+        return hashlib.sha256(basis.encode("utf-8")).hexdigest()[:16]
     action = _signal_text(payload.get("action"))
     row = _signal_text(payload.get("row"))
     label = _signal_text(payload.get("label"))
@@ -416,6 +485,12 @@ class CesarSession:
             )
         except Exception:
             payload = {"action": "", "row": "", "label": ""}
+
+        try:
+            identity = await self.page.evaluate(CALENDAR_IDENTITY_JS)
+            payload.update(identity)
+        except Exception:
+            logger.debug("identifiants calendrier indisponibles", exc_info=True)
 
         label = (payload.get("label") or "").strip() or "Emargement ouvert"
         key = signal_key(payload)

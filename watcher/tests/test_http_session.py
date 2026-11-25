@@ -192,6 +192,9 @@ def test_detecte_uniquement_l_emargement_ouvert_de_l_etudiant(tmp_path):
         courses[-1]["attendanceSheet"]["attendanceSheetLines"][0],
         signal.label,
     )
+    assert signal.key == http_session.signal_key(
+        {"course_uuid": "open", "line_uuid": "open-line"}
+    )
 
 
 def test_absence_de_calendrier_ne_renvoie_pas_aucun_emargement(tmp_path):

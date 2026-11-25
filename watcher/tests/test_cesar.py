@@ -4,7 +4,13 @@ import asyncio
 
 import pytest
 
-from checkmate_watcher.cesar import CANVAS_HITTABLE_JS, CesarSession, draw_coordinates
+from checkmate_watcher.cesar import (
+    CALENDAR_IDENTITY_JS,
+    CANVAS_HITTABLE_JS,
+    CesarSession,
+    draw_coordinates,
+    signal_key,
+)
 from checkmate_watcher.config import (
     CesarConfig,
     Config,
@@ -191,6 +197,51 @@ def test_draw_coordinates_arrondit_les_points():
     fitted = [FittedPoint(x=1.234, y=5.678), FittedPoint(x=9.0, y=0.5)]
 
     assert draw_coordinates(fitted) == [[1.23, 5.68], [9.0, 0.5]]
+
+
+def test_signal_key_utilise_les_uuuids_du_calendrier():
+    payload = {
+        "course_uuid": "course-1",
+        "line_uuid": "line-1",
+        "label": "Libelle variable",
+        "row": "texte variable",
+    }
+    other = {**payload, "label": "Autre libelle", "row": "Autre texte"}
+
+    assert signal_key(payload) == signal_key(other)
+
+
+def test_signal_key_conserve_le_repli_sans_uuid():
+    payload = {"action": "present", "row": "cours", "label": "Emargement"}
+
+    assert signal_key(payload)
+
+
+def test_check_navigateur_utilise_les_uuuids_du_calendrier():
+    class Button:
+        async def evaluate(self, script):
+            return {"action": "present", "row": "cours", "label": "Emargement"}
+
+    class Page:
+        async def evaluate(self, script):
+            assert script == CALENDAR_IDENTITY_JS
+            return {"course_uuid": "course-1", "line_uuid": "line-1"}
+
+    async def no_op():
+        return None
+
+    async def button_after_wait(selectors, timeout_ms):
+        return Button()
+
+    session = make_session(FakePage())
+    session.page = Page()
+    session._goto_dashboard = no_op
+    session._ensure_logged_in = no_op
+    session._find_with_wait = button_after_wait
+
+    signal = asyncio.run(session.check())
+
+    assert signal.key == signal_key({"course_uuid": "course-1", "line_uuid": "line-1"})
 
 
 class FakeHitCanvas:

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import hashlib
 import json
 import logging
 import os
@@ -14,7 +13,13 @@ from urllib.parse import urlsplit
 
 from curl_cffi import requests as curl_requests
 
-from .cesar import AttendanceSignal, CesarError, CesarSession, SignError
+from .cesar import (
+    AttendanceSignal,
+    CesarError,
+    CesarSession,
+    SignError,
+    signal_key,
+)
 from .config import Config
 
 logger = logging.getLogger(__name__)
@@ -123,13 +128,14 @@ def _course_label(course: dict) -> str:
 
 
 def _signal_key(course: dict, line: dict, label: str) -> str:
-    course_uuid = str(course.get("uuid") or "")
-    line_uuid = str(line.get("uuid") or "")
-    if course_uuid and line_uuid:
-        basis = f"{course_uuid}|{line_uuid}"
-    else:
-        basis = "|".join((course_uuid, line_uuid, str(line.get("createdAt")), label))
-    return hashlib.sha256(basis.encode("utf-8")).hexdigest()[:16]
+    return signal_key(
+        {
+            "course_uuid": str(course.get("uuid") or ""),
+            "line_uuid": str(line.get("uuid") or ""),
+            "label": label,
+            "row": str(line.get("createdAt") or ""),
+        }
+    )
 
 
 def _calendar_signal(attrs: dict[str, str]) -> AttendanceSignal | None:
