@@ -73,7 +73,9 @@ class Emulator:
         with self.lock:
             if not self.state.open:
                 self.state.session_id += 1
-                self.state.opened_at = datetime.now().isoformat(timespec="seconds")
+                self.state.opened_at = datetime.now().isoformat(
+                    timespec="seconds"
+                )
             self._reset_attendance_state()
             return self.state
 
@@ -367,7 +369,9 @@ def _page_values(title: str, body: str, script: str, style: str) -> dict:
     }
 
 
-def render_page(title: str, body: str, *, script: str = "", style: str = "") -> bytes:
+def render_page(
+    title: str, body: str, *, script: str = "", style: str = ""
+) -> bytes:
     html = PAGE_TEMPLATE.format(**_page_values(title, body, script, style))
     return html.encode("utf-8")
 
@@ -570,7 +574,9 @@ class Handler(BaseHTTPRequestHandler):
     ) -> None:
         self.send_bytes(payload, "text/html; charset=utf-8", status, headers)
 
-    def send_bytes(self, payload, content_type, status=200, headers=None) -> None:
+    def send_bytes(
+        self, payload, content_type, status=200, headers=None
+    ) -> None:
         self.send_response(status)
         self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(payload)))
@@ -691,7 +697,10 @@ class Handler(BaseHTTPRequestHandler):
 
     def _post_login(self) -> None:
         username, password = self._login_fields()
-        if username != self.emulator.username or password != self.emulator.password:
+        if (
+            username != self.emulator.username
+            or password != self.emulator.password
+        ):
             self.redirect("/connexion?error=1")
             return
         self._send_login_cookie()
@@ -706,7 +715,10 @@ class Handler(BaseHTTPRequestHandler):
         return username, password
 
     def _send_login_cookie(self) -> None:
-        cookie = f"{COOKIE_NAME}={self.emulator.token}; Path=/; HttpOnly; SameSite=Lax"
+        cookie = (
+            f"{COOKIE_NAME}={self.emulator.token}; Path=/; "
+            "HttpOnly; SameSite=Lax"
+        )
         self.send_response(303)
         self.send_header("Location", "/")
         self.send_header("Set-Cookie", cookie)
@@ -858,7 +870,9 @@ def _add_variant_arg(parser) -> None:
 
 
 def _build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Emulateur local de CESAR Emineo")
+    parser = argparse.ArgumentParser(
+        description="Emulateur local de CESAR Emineo"
+    )
     _add_network_args(parser)
     _add_session_args(parser)
     _add_delay_arg(parser)
