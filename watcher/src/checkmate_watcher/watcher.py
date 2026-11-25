@@ -157,6 +157,13 @@ async def _wait_for_new_window(
         await asyncio.sleep(min(max(remaining, 0.5), 5.0))
 
 
+def _update_message(release) -> str:
+    message = f"CheckMate {release.version_text} est disponible."
+    if release.teaser:
+        message += f"\n{release.teaser}"
+    return f"{message}\n{release.url}"
+
+
 async def _check_update(config: Config, state: StateStore) -> None:
     if not config.updates.enabled:
         return
@@ -180,7 +187,7 @@ async def _check_update(config: Config, state: StateStore) -> None:
     await _send(
         config,
         "Mise a jour disponible",
-        f"CheckMate {release.version_text} est disponible.\n{release.url}",
+        _update_message(release),
         icon="dialog-information",
         urgency="normal",
     )

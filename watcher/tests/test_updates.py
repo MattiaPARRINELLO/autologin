@@ -84,6 +84,26 @@ def test_parse_release_conserve_les_raisons():
     assert parsed.required_reason == "securite"
 
 
+def test_parse_release_lit_le_micro_resume():
+    body = (
+        "CHECKMATE-MIGRATION: 0\n"
+        "CHECKMATE-REQUIRED: 0\n"
+        "CHECKMATE-SUMMARY: Chrome reste ferme pendant la surveillance."
+    )
+    parsed = parse_release({"tag_name": "watcher-v0.7.0", "body": body})
+    assert parsed is not None
+    assert parsed.teaser == "Chrome reste ferme pendant la surveillance."
+
+
+def test_parse_release_ignore_un_micro_resume_desactive():
+    body = (
+        "CHECKMATE-MIGRATION: 0\nCHECKMATE-REQUIRED: 0\nCHECKMATE-SUMMARY: 0"
+    )
+    parsed = parse_release({"tag_name": "watcher-v0.7.1", "body": body})
+    assert parsed is not None
+    assert parsed.teaser is None
+
+
 def test_update_policy_detecte_migration_et_obligation():
     releases = [
         _marked("watcher-v0.7.0-beta.1", migration="format v2"),

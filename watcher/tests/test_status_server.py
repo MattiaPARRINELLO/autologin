@@ -269,6 +269,26 @@ def test_le_canal_beta_se_change_et_se_persiste(tmp_path):
     assert load_config(path).updates.channel == "beta"
 
 
+def test_check_update_affiche_le_micro_resume(tmp_path, monkeypatch):
+    release = Release(
+        "watcher-v0.7.0",
+        parse_version("0.7.0"),
+        "https://example.com/release",
+        "stable",
+        False,
+        teaser="Detection 2,3 fois plus rapide.",
+    )
+    monkeypatch.setattr(status_server, "__version__", "0.6.6")
+    monkeypatch.setattr(
+        status_server, "check_for_update", lambda *a, **k: release
+    )
+
+    result = _session(tmp_path).check_update()
+
+    assert result["teaser"] == "Detection 2,3 fois plus rapide."
+    assert result["teaser"] in result["message"]
+
+
 def test_check_update_utilise_le_canal(tmp_path, monkeypatch):
     session = _beta_session(tmp_path)
     seen = _capture_channel(monkeypatch)

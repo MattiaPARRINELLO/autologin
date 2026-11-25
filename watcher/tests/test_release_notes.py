@@ -38,6 +38,7 @@ def test_le_resume_0_7_0_contient_les_gains_mesures():
 
     assert note is not None
     assert note["version"] == "0.7.0"
+    assert "2,3×" in note["teaser"]
     assert [item["value"] for item in note["metrics"]] == ["2,3×", "15×", "0"]
     assert len(note["features"]) == 5
     assert note["performance"]["items"][0]["before"] == 657

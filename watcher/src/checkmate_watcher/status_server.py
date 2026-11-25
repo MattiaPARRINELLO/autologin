@@ -301,6 +301,9 @@ class StatusSession:
         }
 
     def _update_available_response(self, release) -> dict:
+        message = f"Mise à jour disponible : {release.tag}"
+        if release.teaser:
+            message += f"\n{release.teaser}"
         return {
             "ok": True,
             "available": True,
@@ -308,7 +311,8 @@ class StatusSession:
             "version": release.version_text,
             "tag": release.tag,
             "url": release.url,
-            "message": f"Mise à jour disponible : {release.tag}",
+            "teaser": release.teaser,
+            "message": message,
         }
 
     def install_update(self) -> dict:

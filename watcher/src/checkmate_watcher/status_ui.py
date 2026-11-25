@@ -128,7 +128,7 @@ STATUS_HTML = """<!doctype html>
   .ghost { background: transparent; color: var(--muted); }
   .ghost:hover { background: var(--raised); color: var(--ink); }
   .message { min-height: 20px; margin-top: 16px; font-size: 13px; color:
-  var(--ink-2); }
+  var(--ink-2); white-space: pre-line; }
   .message:not(:empty)::before { content: ""; display: inline-block; width:
   6px; height: 6px; border-radius: 50%; background: currentColor; margin-right:
   8px; vertical-align: 1px; }
