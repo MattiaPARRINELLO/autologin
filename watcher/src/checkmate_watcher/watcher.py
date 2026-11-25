@@ -18,6 +18,7 @@ from .cesar import (
 )
 from .config import Config
 from .errors import describe_error
+from .http_session import HttpCesarSession, HttpTransportError
 from .notifications import Notifier
 from .paths import default_config_path
 from .signature import load_signature
@@ -212,9 +213,46 @@ def _announce_migration(status_session, policy) -> None:
     status_session.set_migration(policy.migration)
 
 
+def _new_session(config: Config) -> CesarSession | HttpCesarSession:
+    if config.watcher.transport == "http":
+        return HttpCesarSession(config)
+    return CesarSession(config)
+
+
+async def _browser_fallback(
+    config: Config,
+    session: CesarSession | HttpCesarSession,
+    headless: bool,
+    error: HttpTransportError,
+) -> CesarSession:
+    await session.close()
+    logger.warning("transport HTTP indisponible (%s), bascule navigateur", error)
+    await _send(
+        config,
+        "Detection CESAR",
+        "Transport HTTP indisponible, passage au navigateur.",
+        icon="dialog-warning",
+        urgency="normal",
+    )
+    browser = CesarSession(config)
+    await browser.open(headless=headless)
+    return browser
+
+
+async def _open_session(
+    config: Config, headless: bool
+) -> CesarSession | HttpCesarSession:
+    session = _new_session(config)
+    try:
+        await session.open(headless=headless)
+    except HttpTransportError as exc:
+        return await _browser_fallback(config, session, headless, exc)
+    return session
+
+
 async def sign_with_visibility(
     config: Config,
-    session: CesarSession,
+    session: CesarSession | HttpCesarSession,
     points: list,
 ) -> str:
     """Signe en mode invisible, ou en ouvrant une fenetre uniquement pour signer."""
@@ -359,7 +397,6 @@ async def run_loop(
             )
         _announce_migration(status_session, policy)
         await _check_update(config, state)
-        session = CesarSession(config)
         poll_headless = (
             True if config.watcher.visible_on_sign else config.watcher.headless
         )
@@ -384,7 +421,7 @@ async def run_loop(
 
         if stop_event is not None and stop_event.is_set():
             return 0
-        await session.open(headless=poll_headless)
+        session = await _open_session(config, poll_headless)
 
         consecutive_errors = 0
         prompt_cooldowns: dict[str, float] = {}
@@ -413,7 +450,7 @@ async def run_loop(
                     )
                     await session.close()
                     await _wait_for_new_window(schedule, pause.window_key, stop_event)
-                    await session.open(headless=poll_headless)
+                    session = await _open_session(config, poll_headless)
                     continue
 
                 window_key = schedule.window_key(now)
@@ -509,6 +546,14 @@ async def run_loop(
                                         icon="dialog-warning",
                                     )
 
+                except HttpTransportError as exc:
+                    state.increment("stats.errors")
+                    _record_error(state, exc)
+                    session = await _browser_fallback(
+                        config, session, poll_headless, exc
+                    )
+                    consecutive_errors = 0
+                    continue
                 except StopRequested:
                     return 0
                 except Exception as exc:
