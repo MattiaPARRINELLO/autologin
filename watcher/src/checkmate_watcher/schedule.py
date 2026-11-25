@@ -74,22 +74,30 @@ class Schedule:
         return f"{moment.date().isoformat()}#{index}"
 
     def situation(
-        self, moment: datetime, is_signed: Callable[[str], bool]
+        self,
+        moment: datetime,
+        is_done: Callable[[str], bool],
+        reason_for: Callable[[str], str | None] | None = None,
     ) -> Situation:
-        """Decrit le creneau : desactive, hors plage, signe ou actif."""
+        """Decrit le creneau : desactive, hors plage, termine ou actif."""
         if not self.enabled:
             return Situation("disabled")
-        return self._situation_in_window(moment, is_signed)
+        return self._situation_in_window(moment, is_done, reason_for)
 
     def _situation_in_window(
-        self, moment: datetime, is_signed: Callable[[str], bool]
+        self,
+        moment: datetime,
+        is_done: Callable[[str], bool],
+        reason_for: Callable[[str], str | None] | None = None,
     ) -> Situation:
         window = self.active_window(moment)
         if window is None:
             return Situation("outside")
         key = self.window_key(moment)
-        reason = "signed" if key and is_signed(key) else "active"
-        return Situation(reason, window, key)
+        reason = "active"
+        if key and is_done(key):
+            reason = reason_for(key) if reason_for else "signed"
+        return Situation(reason or "signed", window, key)
 
     def _upcoming_days(self, start: date) -> Iterator[date]:
         for offset in range(8):

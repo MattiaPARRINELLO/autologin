@@ -63,6 +63,15 @@ def test_window_key_change_par_creneau():
     assert SCHEDULE.window_key(at(0, 20)) is None
 
 
+def test_situation_conserve_le_motif_absent():
+    situation = SCHEDULE.situation(
+        at(0, 10), lambda key: True, lambda key: "absent"
+    )
+
+    assert situation.reason == "absent"
+    assert situation.key == "2026-11-16#0"
+
+
 def test_next_start_depuis_l_exterieur():
     assert SCHEDULE.next_start(at(0, 8)) == at(0, 9)
     assert SCHEDULE.next_start(at(0, 12, 30)) == at(0, 13, 30)
