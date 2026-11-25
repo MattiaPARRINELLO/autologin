@@ -17,6 +17,7 @@ _LABELS = {
     "active": "Surveillance active",
     "outside": "Hors créneau",
     "signed": "Créneau signé",
+    "absent": "Créneau déclaré absent",
 }
 _COUNTERS = ("starts", "detections", "signed", "errors")
 
@@ -136,7 +137,9 @@ def _build_context(
     moment = now or datetime.now()
     schedule = config.schedule
     args = (config, state, started_at, config_path, moment, schedule)
-    situation = schedule.situation(moment, state.window_done)
+    situation = schedule.situation(
+        moment, state.window_done, state.window_reason
+    )
     return _Context(*args, situation, blocked, migration)
 
 

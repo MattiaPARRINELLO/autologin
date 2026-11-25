@@ -57,6 +57,17 @@ def _record_error(state: StateStore, exc: BaseException) -> None:
     state.set_meta("last_error_message", message)
 
 
+def _mark_absent(
+    state: StateStore, signal_key: str, window_key: str | None
+) -> bool:
+    state.mark(signal_key)
+    if not window_key:
+        return False
+    state.mark_window(window_key, reason="absent")
+    state.set_meta("last_absent_at", _now_iso())
+    return True
+
+
 def _record_success(state: StateStore) -> None:
     """Note le retour a la normale pour retirer l'alerte au plus vite."""
     error_at = state.get_meta("last_error_at")
@@ -106,14 +117,16 @@ class Pause:
 
 
 def _pause_reason(schedule, state, now: datetime) -> Pause | None:
-    situation = schedule.situation(now, state.window_done)
-    if situation.reason not in {"outside", "signed"}:
+    situation = schedule.situation(now, state.window_done, state.window_reason)
+    if situation.reason not in {"outside", "signed", "absent"}:
         return None
     resume = now + timedelta(seconds=schedule.seconds_until_next(now))
-    label = (
-        "hors plage" if situation.reason == "outside" else "creneau deja signe"
-    )
-    return Pause(label, resume, situation.key)
+    labels = {
+        "outside": "hors plage",
+        "signed": "creneau deja signe",
+        "absent": "absence declaree",
+    }
+    return Pause(labels[situation.reason], resume, situation.key)
 
 
 def _log_next_open(pause: Pause) -> None:
@@ -532,7 +545,8 @@ async def run_loop(
                         if decision == DRY_RUN:
                             pass
                         elif decision == ABSENT:
-                            state.mark(signal.key)
+                            if _mark_absent(state, signal.key, window_key):
+                                continue
                         elif decision == NO_ANSWER:
                             prompt_cooldowns[signal.key] = (
                                 asyncio.get_running_loop().time()
