@@ -166,6 +166,19 @@ checkmate-watcher update --yes
 CheckMate télécharge le paquet, vérifie sa somme SHA256 et l'installe en
 arrière-plan. La configuration et la signature sont conservées.
 
+### Nouveautés après une mise à jour importante
+
+Après une mise à jour majeure ou mineure, CheckMate ouvre le tableau de bord et
+affiche une fenêtre animée avec les nouveautés. Le résumé explique les changements
+en langage simple et présente les gains mesurés avec leur contexte.
+
+Le résumé est livré avec l'application, pas téléchargé depuis GitHub. Les simples
+correctifs n'ouvrent pas cette fenêtre. Une fois fermée, elle ne réapparaît pas au
+redémarrage suivant. Le bouton "Voir les notes complètes" ouvre la release GitHub.
+
+La fenêtre se ferme avec "C'est parti", la croix ou la touche Échap. Elle est
+utilisable au clavier et respecte le réglage système de réduction des animations.
+
 ### Choisir le canal stable ou beta
 
 Par défaut, le canal suit la version installée : une version stable utilise le
