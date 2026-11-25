@@ -112,6 +112,14 @@ def _error_chain(exc: BaseException) -> list[BaseException]:
     return chain
 
 
+def _known_error(chain: list[BaseException]) -> tuple[str, str] | None:
+    for item in chain:
+        kind, message = _describe_known_error(item, _first_line(item))
+        if kind != "inconnue":
+            return kind, message
+    return None
+
+
 def describe_error(exc: BaseException) -> tuple[str, str]:
     """Retourne la catégorie et le message lisible d'une exception."""
     text = _first_line(exc)
@@ -120,8 +128,7 @@ def describe_error(exc: BaseException) -> tuple[str, str]:
         hint = _match(_first_line(item))
         if hint is not None:
             return hint
-    for item in chain:
-        kind, message = _describe_known_error(item, _first_line(item))
-        if kind != "inconnue":
-            return kind, message
+    known = _known_error(chain)
+    if known is not None:
+        return known
     return "inconnue", f"Erreur inattendue : {text}"
