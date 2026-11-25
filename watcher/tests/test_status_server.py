@@ -190,6 +190,19 @@ def _beta_session(tmp_path) -> StatusSession:
     )
 
 
+def test_le_resume_de_mise_a_jour_peut_etre_ferme(tmp_path):
+    session = _session(tmp_path)
+    note = {"version": "0.7.0", "title": "Mise a jour terminee."}
+    session.set_release_note(note)
+    assert session.snapshot()["release_note"] == note
+
+    result = session.dismiss_release()
+
+    assert result["ok"] is True
+    assert session.snapshot()["release_note"] is None
+    assert session.state.get_meta("release.celebrated_version") == "0.7.0"
+
+
 def test_le_message_stable_sur_beta_explique_le_maintien(monkeypatch):
     monkeypatch.setattr(status_server, "__version__", "0.7.0-beta.2")
     assert "restes" in status_server._channel_message("stable")

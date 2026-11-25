@@ -37,6 +37,20 @@ def snapshot_at(tmp_path, state, started, now, *, enabled=True):
     )
 
 
+def test_snapshot_expose_le_resume_de_mise_a_jour(tmp_path):
+    note = {"version": "0.7.0", "title": "Mise a jour terminee."}
+    snapshot = build_snapshot(
+        make_config(tmp_path),
+        make_state(tmp_path),
+        datetime(2026, 11, 16, 9, 55),
+        tmp_path / "config.toml",
+        now=datetime(2026, 11, 16, 10, 0),
+        release_note=note,
+    )
+
+    assert snapshot["release_note"] == note
+
+
 def test_snapshot_bloque_par_une_version_obligatoire(tmp_path):
     state = make_state(tmp_path)
     blocked = {"tag": "watcher-v0.8.0", "version": "0.8.0", "reason": "faille"}

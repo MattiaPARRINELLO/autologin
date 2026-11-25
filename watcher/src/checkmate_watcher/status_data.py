@@ -140,7 +140,7 @@ def _build_context(
     return _Context(*args, situation, blocked, migration)
 
 
-def _render(ctx: _Context) -> dict:
+def _render(ctx: _Context, release_note: dict | None) -> dict:
     return {
         **_base(ctx),
         **_activity(ctx),
@@ -148,6 +148,7 @@ def _render(ctx: _Context) -> dict:
         "restart_required": _restart_required(ctx.config_path, ctx.started_at),
         "blocked": ctx.blocked,
         "migration": ctx.migration,
+        "release_note": release_note,
         "log_file": str(default_log_file()),
     }
 
@@ -160,8 +161,9 @@ def build_snapshot(
     now: datetime | None = None,
     blocked: dict | None = None,
     migration: dict | None = None,
+    release_note: dict | None = None,
 ) -> dict:
     context = _build_context(
         config, state, started_at, config_path, now, blocked, migration
     )
-    return _render(context)
+    return _render(context, release_note)
