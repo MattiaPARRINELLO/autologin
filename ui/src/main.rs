@@ -111,6 +111,7 @@ impl App {
         match mode {
             "outside" => WARN,
             "signed" => INK,
+            "absent" => MUTED,
             "error" => ERR,
             _ => ACCENT,
         }
