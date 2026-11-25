@@ -114,14 +114,18 @@ def load_scenario(directory: Path, close_delay_ms: int = 0) -> Scenario:
     return _build_scenario(root, read_manifest(root), close_delay_ms)
 
 
-def read_manifest(root: Path) -> dict:
-    path = root / MANIFEST_NAME
+def _read_manifest_json(path: Path) -> object:
     try:
-        data = json.loads(path.read_text("utf-8"))
+        return json.loads(path.read_text("utf-8"))
     except FileNotFoundError as exc:
         raise ScenarioError(f"manifeste absent : {path}") from exc
     except json.JSONDecodeError as exc:
         raise ScenarioError(f"manifeste illisible ({path}) : {exc}") from exc
+
+
+def read_manifest(root: Path) -> dict:
+    path = root / MANIFEST_NAME
+    data = _read_manifest_json(path)
     if not isinstance(data, dict):
         raise ScenarioError(
             f"manifeste invalide ({path}) : objet JSON attendu"

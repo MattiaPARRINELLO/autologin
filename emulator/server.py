@@ -63,6 +63,12 @@ class Emulator:
         self.lock = threading.Lock()
         self.state = AttendanceState()
 
+    def _reset_attendance_state(self) -> None:
+        self.state.open = True
+        self.state.signed = False
+        self.state.signature_points = 0
+        self.state.signed_at = None
+
     def open_attendance(self) -> AttendanceState:
         with self.lock:
             if not self.state.open:
@@ -70,10 +76,7 @@ class Emulator:
                 self.state.opened_at = datetime.now().isoformat(
                     timespec="seconds"
                 )
-            self.state.open = True
-            self.state.signed = False
-            self.state.signature_points = 0
-            self.state.signed_at = None
+            self._reset_attendance_state()
             return self.state
 
     def close_attendance(self) -> AttendanceState:
@@ -355,17 +358,21 @@ LOGIN_TEMPLATE = """
 """
 
 
+def _page_values(title: str, body: str, script: str, style: str) -> dict:
+    extra_style = f"<style>{style}</style>" if style else ""
+    return {
+        "title": title,
+        "page_style": PAGE_STYLE,
+        "extra_style": extra_style,
+        "body": body,
+        "script": script,
+    }
+
+
 def render_page(
     title: str, body: str, *, script: str = "", style: str = ""
 ) -> bytes:
-    extra_style = f"<style>{style}</style>" if style else ""
-    html = PAGE_TEMPLATE.format(
-        title=title,
-        page_style=PAGE_STYLE,
-        extra_style=extra_style,
-        body=body,
-        script=script,
-    )
+    html = PAGE_TEMPLATE.format(**_page_values(title, body, script, style))
     return html.encode("utf-8")
 
 
@@ -717,15 +724,24 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Set-Cookie", cookie)
         self.end_headers()
 
-    def _post_signature(self) -> None:
+    def _read_signature_points(self) -> list | None:
         if not self.is_authenticated():
-            return self._reject(401, "Session expiree.")
+            self._reject(401, "Session expiree.")
+            return None
         payload = self.read_json()
         if payload is None:
-            return self._reject(400, "Corps JSON invalide.")
+            self._reject(400, "Corps JSON invalide.")
+            return None
         points = payload.get("points")
         if not isinstance(points, list) or not points:
-            return self._reject(400, "Signature vide.")
+            self._reject(400, "Signature vide.")
+            return None
+        return points
+
+    def _post_signature(self) -> None:
+        points = self._read_signature_points()
+        if points is None:
+            return
         ok, message = self.emulator.sign(points)
         self.send_json(
             {"success": ok, "message": message},

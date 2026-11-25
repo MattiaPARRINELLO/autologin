@@ -531,18 +531,22 @@ def _configure_logging() -> None:
     )
 
 
+def _server_options() -> dict:
+    return {
+        "ingest_key": os.environ.get("CHECKMATE_INGEST_KEY", ""),
+        "dashboard_user": os.environ.get(
+            "CHECKMATE_DASHBOARD_USER", "checkmate"
+        ),
+        "dashboard_password": (
+            os.environ.get("CHECKMATE_DASHBOARD_PASSWORD") or None
+        ),
+    }
+
+
 def _server_from_env() -> tuple[ThreadingHTTPServer, int]:
     port = int(os.environ.get("PORT", "8099"))
     store = Store(os.environ.get("CHECKMATE_STATS_DB", "stats.sqlite3"))
-    server = make_server(
-        port,
-        store,
-        ingest_key=os.environ.get("CHECKMATE_INGEST_KEY", ""),
-        dashboard_user=os.environ.get("CHECKMATE_DASHBOARD_USER", "checkmate"),
-        dashboard_password=(
-            os.environ.get("CHECKMATE_DASHBOARD_PASSWORD") or None
-        ),
-    )
+    server = make_server(port, store, **_server_options())
     return server, port
 
 
