@@ -31,6 +31,16 @@ from .updates import BETA_CHANNEL, STABLE_CHANNEL, UpdateError, check_for_update
 logger = logging.getLogger(__name__)
 
 RUNTIME_NAME = "runtime.json"
+BETA_MESSAGE = (
+    "Canal beta active. Les mises a jour arrivent souvent et la "
+    "stabilite du projet n'est pas garantie."
+)
+BETA_ON_STABLE_MESSAGE = (
+    "Canal stable active. Tu restes sur cette version beta : les "
+    "prochaines betas ne seront plus proposees, et la prochaine "
+    "version stable te sera proposee."
+)
+STABLE_MESSAGE = "Canal stable active : mises a jour moins frequentes."
 
 
 class StatusError(LocalError):
@@ -69,17 +79,10 @@ ACTIONS_BY_NAME = {action.name: action for action in ACTIONS}
 
 def _channel_message(channel: str) -> str:
     if channel == BETA_CHANNEL:
-        return (
-            "Canal beta active. Les mises a jour arrivent souvent et la "
-            "stabilite du projet n'est pas garantie."
-        )
+        return BETA_MESSAGE
     if "-beta" in __version__:
-        return (
-            "Canal stable active. Tu restes sur cette version beta : les "
-            "prochaines betas ne seront plus proposees, et la prochaine "
-            "version stable te sera proposee."
-        )
-    return "Canal stable active : mises a jour moins frequentes."
+        return BETA_ON_STABLE_MESSAGE
+    return STABLE_MESSAGE
 
 
 def _update_payload(release, reason) -> dict:
