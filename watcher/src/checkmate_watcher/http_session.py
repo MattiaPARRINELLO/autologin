@@ -221,30 +221,73 @@ def _cookie_data(cookie: Cookie) -> dict:
 
 
 def _cookie_from_data(data: dict) -> Cookie:
+    domain = data["domain"]
     return Cookie(
-        version=0,
-        name=data["name"],
-        value=data["value"],
-        port=None,
-        port_specified=False,
-        domain=data["domain"],
-        domain_specified=True,
-        domain_initial_dot=data["domain"].startswith("."),
-        path=data["path"],
-        path_specified=True,
-        secure=data["secure"],
-        expires=data.get("expires"),
-        discard=data.get("discard", True),
-        comment=None,
-        comment_url=None,
-        rest=data.get("rest") or {},
-        rfc2109=False,
+        0,
+        data["name"],
+        data["value"],
+        None,
+        False,
+        domain,
+        True,
+        domain.startswith("."),
+        data["path"],
+        True,
+        data["secure"],
+        data.get("expires"),
+        data.get("discard", True),
+        None,
+        None,
+        data.get("rest") or {},
+        False,
     )
 
 
 def _domain_allowed(host: str, domain: str) -> bool:
     normalized = domain.lstrip(".").lower()
     return host == normalized or host.endswith("." + normalized)
+
+
+def _read_cookie_data(path) -> list[dict]:
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (FileNotFoundError, json.JSONDecodeError, OSError):
+        return []
+    return data if isinstance(data, list) else []
+
+
+def _cookie_data_valid(item: dict, host: str) -> bool:
+    if not isinstance(item, dict):
+        return False
+    if not all(
+        isinstance(item.get(key), str) for key in ("name", "value", "domain", "path")
+    ):
+        return False
+    if not isinstance(item.get("secure"), bool):
+        return False
+    if not item["domain"] or not _domain_allowed(host, item["domain"]):
+        return False
+    expires = item.get("expires")
+    if expires is not None and not isinstance(expires, (int, float)):
+        return False
+    if expires is not None and expires <= time.time():
+        return False
+    return isinstance(item.get("rest", {}), dict)
+
+
+def _write_private_json(path, data) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(path.name + ".tmp")
+    try:
+        temporary.unlink(missing_ok=True)
+        descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+            json.dump(data, handle)
+        temporary.replace(path)
+        path.chmod(0o600)
+    except OSError:
+        temporary.unlink(missing_ok=True)
+        raise
 
 
 class HttpCesarSession:
@@ -292,58 +335,17 @@ class HttpCesarSession:
             self._login()
 
     def _load_cookies(self) -> list[Cookie]:
-        path = self.config.watcher.http_cookies_file
-        try:
-            data = json.loads(path.read_text(encoding="utf-8"))
-        except (FileNotFoundError, json.JSONDecodeError, OSError):
-            return []
-        if not isinstance(data, list):
-            return []
+        data = _read_cookie_data(self.config.watcher.http_cookies_file)
         host = urlsplit(self.config.cesar.base_url).hostname or ""
-        cookies = []
-        for item in data:
-            if not isinstance(item, dict):
-                continue
-            if not all(
-                isinstance(item.get(key), str)
-                for key in ("name", "value", "domain", "path")
-            ):
-                continue
-            if not isinstance(item.get("secure"), bool):
-                continue
-            if not item["domain"] or not _domain_allowed(host, item["domain"]):
-                continue
-            expires = item.get("expires")
-            if expires is not None and not isinstance(expires, (int, float)):
-                continue
-            if expires is not None and expires <= time.time():
-                continue
-            if not isinstance(item.get("rest", {}), dict):
-                continue
-            cookies.append(_cookie_from_data(item))
-        return cookies
+        return [
+            _cookie_from_data(item) for item in data if _cookie_data_valid(item, host)
+        ]
 
     def _save_cookies(self) -> None:
         if self._session is None:
             return
-        path = self.config.watcher.http_cookies_file
-        path.parent.mkdir(parents=True, exist_ok=True)
-        temporary = path.with_name(path.name + ".tmp")
         cookies = [_cookie_data(cookie) for cookie in self._session.cookies.jar]
-        try:
-            temporary.unlink(missing_ok=True)
-            descriptor = os.open(
-                temporary,
-                os.O_WRONLY | os.O_CREAT | os.O_TRUNC,
-                0o600,
-            )
-            with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
-                json.dump(cookies, handle)
-            temporary.replace(path)
-            path.chmod(0o600)
-        except OSError:
-            temporary.unlink(missing_ok=True)
-            raise
+        _write_private_json(self.config.watcher.http_cookies_file, cookies)
 
     def _raise_for_status(self, response) -> None:
         status = response.status_code
