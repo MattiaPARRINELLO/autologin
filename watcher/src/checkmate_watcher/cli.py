@@ -245,18 +245,26 @@ def _add_meta_args(parser: argparse.ArgumentParser) -> None:
     )
 
 
-def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
+def _build_parser() -> argparse.ArgumentParser:
+    return argparse.ArgumentParser(
         prog="checkmate-watcher",
         description=(
             "Surveille CESAR Emineo et propose de signer l'emargement."
         ),
     )
+
+
+def _configure_parser(parser: argparse.ArgumentParser) -> None:
     _add_common_args(parser)
     _add_run_args(parser)
     _add_update_args(parser)
     _add_command_args(parser)
     _add_meta_args(parser)
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = _build_parser()
+    _configure_parser(parser)
     return parser
 
 

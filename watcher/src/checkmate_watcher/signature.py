@@ -107,6 +107,14 @@ def _coerce_point(raw: object) -> Point:
     return Point(x=x, y=y, kind=_point_kind(raw))
 
 
+def _require_padding(padding: float) -> None:
+    if padding < MIN_PADDING_RATIO or padding > MAX_PADDING_RATIO:
+        raise SignatureError(
+            f"padding_ratio doit etre entre {MIN_PADDING_RATIO} "
+            f"et {MAX_PADDING_RATIO}"
+        )
+
+
 def _require_fit_inputs(
     points, width: float, height: float, padding: float
 ) -> None:
@@ -114,11 +122,7 @@ def _require_fit_inputs(
         raise SignatureError("aucun point a mettre a l'echelle")
     if width <= 0 or height <= 0:
         raise SignatureError("dimensions de canvas invalides")
-    if padding < MIN_PADDING_RATIO or padding > MAX_PADDING_RATIO:
-        raise SignatureError(
-            f"padding_ratio doit etre entre {MIN_PADDING_RATIO} "
-            f"et {MAX_PADDING_RATIO}"
-        )
+    _require_padding(padding)
 
 
 def _bounds(points) -> tuple[float, float, float, float]:
