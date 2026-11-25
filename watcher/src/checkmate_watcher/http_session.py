@@ -101,15 +101,23 @@ def _load_json(raw: str, description: str):
 
 
 def _attendance_lines(node):
+    if isinstance(node, list):
+        return _attendance_lines_from_list(node)
+    if not isinstance(node, dict):
+        return []
+    return _attendance_lines_from_dict(node)
+
+
+def _attendance_lines_from_list(values: list) -> list:
+    return [line for value in values for line in _attendance_lines(value)]
+
+
+def _attendance_lines_from_dict(values: dict) -> list:
     lines = []
-    if isinstance(node, dict):
-        for key, value in node.items():
-            if key == "attendanceSheetLines" and isinstance(value, list):
-                lines.extend(value)
-            else:
-                lines.extend(_attendance_lines(value))
-    elif isinstance(node, list):
-        for value in node:
+    for key, value in values.items():
+        if key == "attendanceSheetLines" and isinstance(value, list):
+            lines.extend(value)
+        else:
             lines.extend(_attendance_lines(value))
     return lines
 
@@ -138,7 +146,7 @@ def _signal_key(course: dict, line: dict, label: str) -> str:
     )
 
 
-def _calendar_signal(attrs: dict[str, str]) -> AttendanceSignal | None:
+def _calendar_settings(attrs: dict[str, str]) -> tuple[list, str, int, int]:
     schedules = _load_json(attrs[CALENDAR_ATTRIBUTES[0]], "des cours")
     student = _load_json(attrs[CALENDAR_ATTRIBUTES[1]], "de l'etudiant")
     if not isinstance(schedules, list):
@@ -150,36 +158,48 @@ def _calendar_signal(attrs: dict[str, str]) -> AttendanceSignal | None:
         server_now = int(attrs[CALENDAR_ATTRIBUTES[3]])
     except ValueError as exc:
         raise HttpTransportError("horloge du calendrier CESAR invalide") from exc
+    return schedules, student["uuid"], max_minutes, server_now
 
-    student_uuid = student["uuid"]
+
+def _matching_lines(course: dict, student_uuid: str) -> list[dict]:
+    lines = []
+    for line in _attendance_lines(course):
+        if not isinstance(line, dict):
+            continue
+        subscription = line.get("planningGroupSubscription") or {}
+        if not isinstance(subscription, dict):
+            raise HttpTransportError("inscription CESAR invalide")
+        registration = subscription.get("studentRegistration") or {}
+        if not isinstance(registration, dict):
+            raise HttpTransportError("inscription etudiant CESAR invalide")
+        if registration.get("uuid") == student_uuid:
+            lines.append(line)
+    return lines
+
+
+def _line_signed(line: dict) -> bool:
+    signature = line.get("signature")
+    if isinstance(signature, dict) and signature.get("signed") is True:
+        return True
+    return line.get("attendanceWithoutSignature") is True
+
+
+def _line_seconds_left(line: dict, max_minutes: int, server_now: int) -> int:
+    created_at = line.get("createdAt")
+    if not isinstance(created_at, int):
+        raise HttpTransportError("date d'emargement CESAR invalide")
+    return round((created_at + max_minutes * 60_000 - server_now * 1000) / 1000)
+
+
+def _calendar_signal(attrs: dict[str, str]) -> AttendanceSignal | None:
+    schedules, student_uuid, max_minutes, server_now = _calendar_settings(attrs)
     for course in schedules:
         if not isinstance(course, dict):
             continue
-        for line in _attendance_lines(course):
-            if not isinstance(line, dict):
+        for line in _matching_lines(course, student_uuid):
+            if _line_signed(line) or line.get("signingOff") is not True:
                 continue
-            subscription = line.get("planningGroupSubscription") or {}
-            if not isinstance(subscription, dict):
-                raise HttpTransportError("inscription CESAR invalide")
-            registration = subscription.get("studentRegistration") or {}
-            if not isinstance(registration, dict):
-                raise HttpTransportError("inscription etudiant CESAR invalide")
-            if registration.get("uuid") != student_uuid:
-                continue
-            signature = line.get("signature")
-            signed = bool(
-                (isinstance(signature, dict) and signature.get("signed") is True)
-                or line.get("attendanceWithoutSignature") is True
-            )
-            if signed or line.get("signingOff") is not True:
-                continue
-            created_at = line.get("createdAt")
-            if not isinstance(created_at, int):
-                raise HttpTransportError("date d'emargement CESAR invalide")
-            seconds_left = round(
-                (created_at + max_minutes * 60_000 - server_now * 1000) / 1000
-            )
-            if seconds_left <= 0:
+            if _line_seconds_left(line, max_minutes, server_now) <= 0:
                 continue
             label = _course_label(course)
             logger.info("emargement HTTP detecte : %s", label)
