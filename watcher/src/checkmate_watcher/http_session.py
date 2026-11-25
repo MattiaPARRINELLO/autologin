@@ -151,19 +151,39 @@ def _signal_key(course: dict, line: dict, label: str) -> str:
     )
 
 
-def _calendar_settings(attrs: dict[str, str]) -> tuple[list, str, int, int]:
+def _calendar_json(attrs: dict[str, str]) -> tuple[list, dict]:
     schedules = _load_json(attrs[CALENDAR_ATTRIBUTES[0]], "des cours")
     student = _load_json(attrs[CALENDAR_ATTRIBUTES[1]], "de l'etudiant")
     if not isinstance(schedules, list):
         raise HttpTransportError("format de la liste des cours inattendu")
     if not isinstance(student, dict) or not student.get("uuid"):
         raise HttpTransportError("identifiant etudiant absent du calendrier")
+    return schedules, student
+
+
+def _calendar_clock(attrs: dict[str, str]) -> tuple[int, int]:
     try:
         max_minutes = int(attrs[CALENDAR_ATTRIBUTES[2]])
         server_now = int(attrs[CALENDAR_ATTRIBUTES[3]])
     except ValueError as exc:
         raise HttpTransportError("horloge du calendrier CESAR invalide") from exc
+    return max_minutes, server_now
+
+
+def _calendar_settings(attrs: dict[str, str]) -> tuple[list, str, int, int]:
+    schedules, student = _calendar_json(attrs)
+    max_minutes, server_now = _calendar_clock(attrs)
     return schedules, student["uuid"], max_minutes, server_now
+
+
+def _line_registration(line: dict) -> dict:
+    subscription = line.get("planningGroupSubscription") or {}
+    if not isinstance(subscription, dict):
+        raise HttpTransportError("inscription CESAR invalide")
+    registration = subscription.get("studentRegistration") or {}
+    if not isinstance(registration, dict):
+        raise HttpTransportError("inscription etudiant CESAR invalide")
+    return registration
 
 
 def _matching_lines(course: dict, student_uuid: str) -> list[dict]:
@@ -171,13 +191,7 @@ def _matching_lines(course: dict, student_uuid: str) -> list[dict]:
     for line in _attendance_lines(course):
         if not isinstance(line, dict):
             continue
-        subscription = line.get("planningGroupSubscription") or {}
-        if not isinstance(subscription, dict):
-            raise HttpTransportError("inscription CESAR invalide")
-        registration = subscription.get("studentRegistration") or {}
-        if not isinstance(registration, dict):
-            raise HttpTransportError("inscription etudiant CESAR invalide")
-        if registration.get("uuid") == student_uuid:
+        if _line_registration(line).get("uuid") == student_uuid:
             lines.append(line)
     return lines
 
@@ -196,19 +210,26 @@ def _line_seconds_left(line: dict, max_minutes: int, server_now: int) -> int:
     return round((created_at + max_minutes * 60_000 - server_now * 1000) / 1000)
 
 
+def _open_line(course: dict, student_uuid: str, max_minutes: int, server_now: int):
+    for line in _matching_lines(course, student_uuid):
+        if _line_signed(line) or line.get("signingOff") is not True:
+            continue
+        if _line_seconds_left(line, max_minutes, server_now) > 0:
+            return line
+    return None
+
+
 def _calendar_signal(attrs: dict[str, str]) -> AttendanceSignal | None:
     schedules, student_uuid, max_minutes, server_now = _calendar_settings(attrs)
     for course in schedules:
         if not isinstance(course, dict):
             continue
-        for line in _matching_lines(course, student_uuid):
-            if _line_signed(line) or line.get("signingOff") is not True:
-                continue
-            if _line_seconds_left(line, max_minutes, server_now) <= 0:
-                continue
-            label = _course_label(course)
-            logger.info("emargement HTTP detecte : %s", label)
-            return AttendanceSignal(_signal_key(course, line, label), label)
+        line = _open_line(course, student_uuid, max_minutes, server_now)
+        if line is None:
+            continue
+        label = _course_label(course)
+        logger.info("emargement HTTP detecte : %s", label)
+        return AttendanceSignal(_signal_key(course, line, label), label)
     return None
 
 
@@ -227,25 +248,26 @@ def _cookie_data(cookie: Cookie) -> dict:
 
 def _cookie_from_data(data: dict) -> Cookie:
     domain = data["domain"]
-    return Cookie(
-        0,
-        data["name"],
-        data["value"],
-        None,
-        False,
-        domain,
-        True,
-        domain.startswith("."),
-        data["path"],
-        True,
-        data["secure"],
-        data.get("expires"),
-        data.get("discard", True),
-        None,
-        None,
-        data.get("rest") or {},
-        False,
-    )
+    kwargs = {
+        "version": 0,
+        "name": data["name"],
+        "value": data["value"],
+        "port": None,
+        "port_specified": False,
+        "domain": domain,
+        "domain_specified": True,
+        "domain_initial_dot": domain.startswith("."),
+        "path": data["path"],
+        "path_specified": True,
+        "secure": data["secure"],
+        "expires": data.get("expires"),
+        "discard": data.get("discard", True),
+        "comment": None,
+        "comment_url": None,
+        "rest": data.get("rest") or {},
+        "rfc2109": False,
+    }
+    return Cookie(**kwargs)
 
 
 def _domain_allowed(host: str, domain: str) -> bool:
@@ -268,12 +290,16 @@ def _cookie_data_expired(item: dict) -> bool:
     return expires is not None and expires <= time.time()
 
 
+def _cookie_strings_valid(item: dict) -> bool:
+    return all(
+        isinstance(item.get(key), str) for key in ("name", "value", "domain", "path")
+    )
+
+
 def _cookie_data_valid(item: dict, host: str) -> bool:
     if not isinstance(item, dict):
         return False
-    if not all(
-        isinstance(item.get(key), str) for key in ("name", "value", "domain", "path")
-    ):
+    if not _cookie_strings_valid(item):
         return False
     if not isinstance(item.get("secure"), bool):
         return False
