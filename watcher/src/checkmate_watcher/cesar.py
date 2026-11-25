@@ -532,18 +532,25 @@ def _ink_ratio(ink: dict, low: str, high: str, size: str) -> float:
     return (ink.get(high, -1) - ink.get(low, 0)) / max(1, ink.get(size, 1))
 
 
+def _hash_signal_basis(basis: str) -> str:
+    return hashlib.sha256(basis.encode("utf-8")).hexdigest()[:16]
+
+
+def _fallback_signal_key(payload: dict[str, str]) -> str:
+    action = _signal_text(payload.get("action"))
+    row = _signal_text(payload.get("row"))
+    label = _signal_text(payload.get("label"))
+    basis = "|".join([date.today().isoformat(), action or label, row])
+    return _hash_signal_basis(basis)
+
+
 def signal_key(payload: dict[str, str]) -> str:
     """Cle stable pour dedupliquer un emargement entre deux rafraichissements."""
     course_uuid = _signal_text(payload.get("course_uuid"))
     line_uuid = _signal_text(payload.get("line_uuid"))
     if course_uuid and line_uuid:
-        basis = f"{course_uuid}|{line_uuid}"
-        return hashlib.sha256(basis.encode("utf-8")).hexdigest()[:16]
-    action = _signal_text(payload.get("action"))
-    row = _signal_text(payload.get("row"))
-    label = _signal_text(payload.get("label"))
-    basis = "|".join([date.today().isoformat(), action or label, row])
-    return hashlib.sha256(basis.encode("utf-8")).hexdigest()[:16]
+        return _hash_signal_basis(f"{course_uuid}|{line_uuid}")
+    return _fallback_signal_key(payload)
 
 
 class CesarSession:
