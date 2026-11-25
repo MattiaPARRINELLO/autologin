@@ -109,8 +109,9 @@ STATUS_HTML = """<!doctype html>
   .event-row { display: flex; justify-content: space-between; gap: 16px;
   padding: 10px 0; border-bottom: 1px solid var(--line); font-size: 13px;
   color: var(--ink-2); }
-  .event-row strong { font-family: ui-monospace, "SFMono-Regular", "Cascadia
-  Mono", monospace; font-weight: 400; color: var(--ink); text-align: right; }
+  .event-row strong { font-family: ui-monospace, "SFMono-Regular",
+  "Cascadia Mono", monospace; font-weight: 400; color: var(--ink);
+  text-align: right; }
   .actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 28px; }
   button { font: inherit; font-size: 14px; font-weight: 500; height: 42px;
   padding: 0 16px; border-radius: 9px; border: 1px solid transparent; cursor:
