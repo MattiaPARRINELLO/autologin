@@ -95,14 +95,18 @@ def _notify_send_command(binary, title, message, *, app_name, icon, urgency):
     ]
 
 
-def _run_notify_send(command):
+def _run_command(command, failure: str):
     try:
         return subprocess.run(
             command, check=False, **_subprocess_options(15, _clean_env())
         )
     except (OSError, subprocess.SubprocessError) as exc:
-        logger.warning("notify-send a echoue : %s", exc)
+        logger.warning("%s : %s", failure, exc)
         return None
+
+
+def _run_notify_send(command):
+    return _run_command(command, "notify-send a echoue")
 
 
 def _log_notify_send_failure(result):
@@ -161,13 +165,7 @@ def _gdbus_command(binary, app_name, icon, title, message):
 
 
 def _run_gdbus(command):
-    try:
-        return subprocess.run(
-            command, check=False, **_subprocess_options(15, _clean_env())
-        )
-    except (OSError, subprocess.SubprocessError) as exc:
-        logger.warning("gdbus a echoue : %s", exc)
-        return None
+    return _run_command(command, "gdbus a echoue")
 
 
 def _gdbus_succeeded(result) -> bool:

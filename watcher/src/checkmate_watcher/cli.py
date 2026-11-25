@@ -743,12 +743,16 @@ def _afficher_migration(release) -> None:
     )
 
 
-def _release_status(config: Config) -> tuple[object, object]:
+def _load_release_policy(config: Config) -> tuple[object, object]:
     try:
         policy = update_policy(__version__, channel=config.updates.channel)
     except Exception as exc:
         return None, exc
     return policy, None
+
+
+def _release_status(config: Config) -> tuple[object, object]:
+    return _load_release_policy(config)
 
 
 def command_check_update(config: Config) -> int:
@@ -797,10 +801,9 @@ def _afficher_demander_confirmation(reponse: list[str]) -> None:
 
 
 def _release_pour_update(config: Config):
-    try:
-        policy = update_policy(__version__, channel=config.updates.channel)
-    except Exception as exc:
-        return None, exc
+    policy, erreur = _load_release_policy(config)
+    if erreur is not None:
+        return None, erreur
     return policy.install_target, None
 
 

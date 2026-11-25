@@ -124,6 +124,13 @@ def _log_next_open(pause: Pause) -> None:
     )
 
 
+def _once_pause(pause: Pause, once: bool) -> bool:
+    if not once:
+        return False
+    _log_next_open(pause)
+    return True
+
+
 async def _wait_for_new_window(
     schedule, current_key: str | None, stop_event=None
 ) -> None:
@@ -436,8 +443,7 @@ async def run_loop(
 
         pause = _pause_reason(schedule, state, datetime.now())
         if pause is not None:
-            if once:
-                _log_next_open(pause)
+            if _once_pause(pause, once):
                 return 0
             logger.info(
                 "%s (%s), reprise vers %s",
@@ -464,8 +470,7 @@ async def run_loop(
                 now = datetime.now()
                 pause = _pause_reason(schedule, state, now)
                 if pause is not None:
-                    if once:
-                        _log_next_open(pause)
+                    if _once_pause(pause, once):
                         return 0
                     logger.info(
                         "%s, pause jusqu'a %s",

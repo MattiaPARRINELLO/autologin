@@ -51,16 +51,7 @@ HINTS = (
         "reseau",
         "Le proxy configuré ne répond pas. Vérifie sa configuration.",
     ),
-    (
-        "ERR_CERT_",
-        "securite",
-        CERTIFICATE_MESSAGE,
-    ),
-    (
-        "certificate",
-        "securite",
-        CERTIFICATE_MESSAGE,
-    ),
+    ("cert", "securite", CERTIFICATE_MESSAGE),
     (
         "Executable doesn't exist",
         "navigateur",

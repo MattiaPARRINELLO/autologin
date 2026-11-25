@@ -195,11 +195,15 @@ class SetupSession:
             raise SetupError("mot de passe obligatoire")
         return password
 
-    def _login_inputs(self, payload: dict) -> tuple[str, str, str]:
+    def _credential_identity(self, payload: dict) -> tuple[str, str]:
         base_url = self._text(payload, "base_url", "adresse du site").rstrip(
             "/"
         )
         username = self._text(payload, "username", "identifiant")
+        return base_url, username
+
+    def _login_inputs(self, payload: dict) -> tuple[str, str, str]:
+        base_url, username = self._credential_identity(payload)
         return base_url, username, self._required_password(payload)
 
     def _require_credentials(self) -> None:
@@ -247,10 +251,7 @@ class SetupSession:
         return {"ok": True, "message": self._credential_message(stored)}
 
     def _credential_fields(self, payload: dict) -> tuple[str, str, str]:
-        base_url = self._text(payload, "base_url", "adresse du site").rstrip(
-            "/"
-        )
-        username = self._text(payload, "username", "identifiant")
+        base_url, username = self._credential_identity(payload)
         password = self._required_password(payload)
         if "\n" in password or "\r" in password:
             raise SetupError("mot de passe invalide")
