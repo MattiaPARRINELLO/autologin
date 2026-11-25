@@ -251,11 +251,14 @@ def fetch_releases(timeout: int = 10) -> list[Release]:
     return [r for r in (parse_release(i) for i in payload) if r is not None]
 
 
-# fmt: off
-def check_for_update(current: str = __version__, *, channel: str = STABLE_CHANNEL, releases: list[Release] | None = None) -> Release | None:
+def check_for_update(
+    current: str = __version__,
+    *,
+    channel: str = STABLE_CHANNEL,
+    releases: list[Release] | None = None,
+) -> Release | None:
     policy = update_policy(current, channel=channel, releases=releases)
     return policy.latest if policy.available else None
-# fmt: on
 
 
 def platform_asset(release: Release, platform: str) -> Asset | None:
@@ -331,16 +334,17 @@ def _download_update_asset(release, platform):
     return asset
 
 
-# fmt: off
-def download_update(release: Release, directory: Path, *, platform: str | None = None) -> Path:
+def download_update(
+    release: Release, directory: Path, *, platform: str | None = None
+) -> Path:
     """Telecharge l'artefact et verifie sa somme. Rend le chemin local."""
     platform = platform or sys.platform
     asset = _download_update_asset(release, platform)
     target = directory / asset.name
     download(asset.url, target)
     checksums_asset = release.asset(CHECKSUMS_NAME)
-    if checksums_asset is None: raise UpdateError("sommes de controle absentes de la release")
+    if checksums_asset is None:
+        raise UpdateError("sommes de controle absentes de la release")
     sums_path = download(checksums_asset.url, directory / CHECKSUMS_NAME)
     verify_checksum(target, parse_checksums(sums_path.read_text(encoding="utf-8")))
     return target
-# fmt: on

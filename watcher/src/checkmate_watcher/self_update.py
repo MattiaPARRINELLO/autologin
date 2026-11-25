@@ -116,17 +116,34 @@ def _install_linux(archive: Path, cleanup: Path) -> None:
 
 
 def _try_systemd_run(script, unit):
-    # fmt: off
     runner = shutil.which("systemd-run")
-    if runner is None: return False
+    if runner is None:
+        return False
     try:
-        subprocess.Popen([runner, "--user", "--collect", "--quiet", f"--unit={unit}", "--description=Installation d'une mise a jour CheckMate", "--setenv=CHECKMATE_UPDATE_DETACHED=1", "/bin/bash", script], close_fds=True, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.Popen(
+            [
+                runner,
+                "--user",
+                "--collect",
+                "--quiet",
+                f"--unit={unit}",
+                "--description=Installation d'une mise a jour CheckMate",
+                "--setenv=CHECKMATE_UPDATE_DETACHED=1",
+                "/bin/bash",
+                script,
+            ],
+            close_fds=True,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
     except OSError:
-        logger.warning("systemd-run indisponible, installation non detachee"); return False
-    if _transient_unit_active(unit): return True
+        logger.warning("systemd-run indisponible, installation non detachee")
+        return False
+    if _transient_unit_active(unit):
+        return True
     logger.warning("unite %s inactive, installation dans le cgroup du service", unit)
     return False
-    # fmt: on
 
 
 def _spawn_detached(argv: list[str]) -> None:
@@ -153,18 +170,31 @@ def _quote(value: str) -> str:
 
 
 def _transient_unit_active(unit: str, attempts: int = 5) -> bool:
-    # fmt: off
     for attempt in range(attempts):
         try:
-            result = subprocess.run(["systemctl", "--user", "show", "--property=ActiveState", "--value", unit], capture_output=True, text=True, timeout=2, check=False)
+            result = subprocess.run(
+                [
+                    "systemctl",
+                    "--user",
+                    "show",
+                    "--property=ActiveState",
+                    "--value",
+                    unit,
+                ],
+                capture_output=True,
+                text=True,
+                timeout=2,
+                check=False,
+            )
         except (OSError, subprocess.SubprocessError):
             return False
         state = result.stdout.strip()
-        if state in {"active", "activating"}: return True
-        if state in {"inactive", "failed"} and attempt >= 1: return False
+        if state in {"active", "activating"}:
+            return True
+        if state in {"inactive", "failed"} and attempt >= 1:
+            return False
         time.sleep(0.2)
     return False
-    # fmt: on
 
 
 def prepare(config) -> tuple[Release, Path]:

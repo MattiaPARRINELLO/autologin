@@ -68,20 +68,33 @@ def send_linux(
     return _send_gdbus(title, message, app_name=app_name, icon=icon)
 
 
-# fmt: off
 def _notify_send_command(binary, title, message, *, app_name, icon, urgency):
-    return [binary, "--app-name", app_name, "--urgency", urgency, "--icon", icon, title, message]
-# fmt: on
+    return [
+        binary,
+        "--app-name",
+        app_name,
+        "--urgency",
+        urgency,
+        "--icon",
+        icon,
+        title,
+        message,
+    ]
 
 
-# fmt: off
 def _run_notify_send(command):
     try:
-        return subprocess.run(command, check=False, timeout=15, capture_output=True, text=True, env=_clean_env())
+        return subprocess.run(
+            command,
+            check=False,
+            timeout=15,
+            capture_output=True,
+            text=True,
+            env=_clean_env(),
+        )
     except (OSError, subprocess.SubprocessError) as exc:
         logger.warning("notify-send a echoue : %s", exc)
         return None
-# fmt: on
 
 
 def _log_notify_send_failure(result):
@@ -92,37 +105,59 @@ def _log_notify_send_failure(result):
     )
 
 
-# fmt: off
 def _send_notify_send(title, message, *, app_name, icon, urgency):
     binary = shutil.which("notify-send")
     if not binary:
         return False
-    result = _run_notify_send(_notify_send_command(binary, title, message, app_name=app_name, icon=icon, urgency=urgency))
+    result = _run_notify_send(
+        _notify_send_command(
+            binary, title, message, app_name=app_name, icon=icon, urgency=urgency
+        )
+    )
     if result is None or result.returncode != 0:
         if result is not None:
             _log_notify_send_failure(result)
         return False
     return True
-# fmt: on
 
 
-# fmt: off
 def _gdbus_command(binary, app_name, icon, title, message):
-    return [binary, "call", "--session", "--dest", "org.freedesktop.Notifications", "--object-path", "/org/freedesktop/Notifications", "--method", "org.freedesktop.Notifications.Notify", _gvariant(app_name), "0", _gvariant(icon), _gvariant(title), _gvariant(message), "[]", "{}", "5000"]
-# fmt: on
+    return [
+        binary,
+        "call",
+        "--session",
+        "--dest",
+        "org.freedesktop.Notifications",
+        "--object-path",
+        "/org/freedesktop/Notifications",
+        "--method",
+        "org.freedesktop.Notifications.Notify",
+        _gvariant(app_name),
+        "0",
+        _gvariant(icon),
+        _gvariant(title),
+        _gvariant(message),
+        "[]",
+        "{}",
+        "5000",
+    ]
 
 
-# fmt: off
 def _run_gdbus(command):
     try:
-        return subprocess.run(command, check=False, timeout=15, capture_output=True, text=True, env=_clean_env())
+        return subprocess.run(
+            command,
+            check=False,
+            timeout=15,
+            capture_output=True,
+            text=True,
+            env=_clean_env(),
+        )
     except (OSError, subprocess.SubprocessError) as exc:
         logger.warning("gdbus a echoue : %s", exc)
         return None
-# fmt: on
 
 
-# fmt: off
 def _send_gdbus(title, message, *, app_name, icon):
     binary = shutil.which("gdbus")
     if not binary:
@@ -130,10 +165,11 @@ def _send_gdbus(title, message, *, app_name, icon):
     result = _run_gdbus(_gdbus_command(binary, app_name, icon, title, message))
     if result is None or result.returncode != 0:
         if result is not None:
-            logger.warning("gdbus code %s : %s", result.returncode, result.stderr.strip())
+            logger.warning(
+                "gdbus code %s : %s", result.returncode, result.stderr.strip()
+            )
         return False
     return True
-# fmt: on
 
 
 def _start_menu_shortcut(app_name: str) -> Path | None:
@@ -165,15 +201,20 @@ def _toast_command(powershell: str, encoded: str) -> list[str]:
     return [powershell, "-NoProfile", "-NonInteractive", "-EncodedCommand", encoded]
 
 
-# fmt: off
 def _run_toast(powershell, title, message, app_id):
     encoded = base64.b64encode(TOAST_SCRIPT.encode("utf-16-le")).decode("ascii")
     try:
-        return subprocess.run(_toast_command(powershell, encoded), check=False, timeout=20, capture_output=True, text=True, env=_toast_env(title, message, app_id))
+        return subprocess.run(
+            _toast_command(powershell, encoded),
+            check=False,
+            timeout=20,
+            capture_output=True,
+            text=True,
+            env=_toast_env(title, message, app_id),
+        )
     except (OSError, subprocess.SubprocessError) as exc:
         logger.warning("notification Windows echouee : %s", exc)
         return None
-# fmt: on
 
 
 def _log_toast_failure(result, app_id: str) -> None:
@@ -199,11 +240,11 @@ def _powershell_binary() -> str | None:
     return shutil.which("powershell") or shutil.which("pwsh")
 
 
-# fmt: off
 def send_windows(title, message, *, app_name):
     powershell = _powershell_binary()
     if not powershell:
-        logger.warning("PowerShell introuvable, notification impossible"); return False
+        logger.warning("PowerShell introuvable, notification impossible")
+        return False
     app_id = _windows_app_id(app_name)
     if _show_toast(powershell, title, message, app_id):
         return True
@@ -211,7 +252,6 @@ def send_windows(title, message, *, app_name):
         return False
     logger.info("AUMID %s refuse, repli sur PowerShell", app_id)
     return _show_toast(powershell, title, message, POWERSHELL_APP_ID)
-# fmt: on
 
 
 def _macos_script(title: str, message: str) -> str:
@@ -221,14 +261,18 @@ def _macos_script(title: str, message: str) -> str:
     )
 
 
-# fmt: off
 def _run_osascript(binary, script):
     try:
-        return subprocess.run([binary, "-e", script], check=False, timeout=15, capture_output=True, text=True)
+        return subprocess.run(
+            [binary, "-e", script],
+            check=False,
+            timeout=15,
+            capture_output=True,
+            text=True,
+        )
     except (OSError, subprocess.SubprocessError) as exc:
         logger.warning("osascript a echoue : %s", exc)
         return None
-# fmt: on
 
 
 def send_macos(title: str, message: str) -> bool:
@@ -257,16 +301,20 @@ def _zenity_command(binary, title, text, timeout, ok_label, cancel_label):
     ]
 
 
-# fmt: off
 def _run_zenity(command, timeout):
     try:
-        return subprocess.run(command, check=False, timeout=timeout + 15, capture_output=True, text=True, env=_clean_env())
+        return subprocess.run(
+            command,
+            check=False,
+            timeout=timeout + 15,
+            capture_output=True,
+            text=True,
+            env=_clean_env(),
+        )
     except (OSError, subprocess.SubprocessError) as exc:
         raise DialogUnavailable(f"zenity a echoue : {exc}") from exc
-# fmt: on
 
 
-# fmt: off
 def _zenity_result(result, timeout):
     if result.returncode == 0:
         return True
@@ -275,9 +323,10 @@ def _zenity_result(result, timeout):
         return None
     stderr = (result.stderr or "").strip()
     if stderr:
-        raise DialogUnavailable(f"zenity n'a pas pu afficher la confirmation : {stderr}")
+        raise DialogUnavailable(
+            f"zenity n'a pas pu afficher la confirmation : {stderr}"
+        )
     return False
-# fmt: on
 
 
 def ask_zenity(text, *, timeout, title, ok_label, cancel_label):
@@ -342,19 +391,19 @@ def _run_tk_dialog(root, timeout, close):
     root.mainloop()
 
 
-# fmt: off
 def ask_tkinter(text, *, timeout, title, ok_label, cancel_label):
     tk = _import_tkinter()
-    if tk is None: return None
+    if tk is None:
+        return None
     root = _open_tk_root(tk)
-    if root is None: return None
+    if root is None:
+        return None
     _configure_tk_root(root, title, tk)
     answer = {"value": None}
     close = _make_close(root, answer)
     _build_tk_dialog(root, text, ok_label, cancel_label, close, tk)
     _run_tk_dialog(root, timeout, close)
     return answer["value"]
-# fmt: on
 
 
 class Notifier:
@@ -386,16 +435,25 @@ class Notifier:
             title, message, app_name=self.app_name, icon=self.icon, urgency=urgency
         )
 
-    # fmt: off
-    def ask(self, text, *, timeout=180, title=None, ok_label="Je suis present", cancel_label="Absent"):
+    def ask(
+        self,
+        text,
+        *,
+        timeout=180,
+        title=None,
+        ok_label="Je suis present",
+        cancel_label="Absent",
+    ):
         window_title = title or self.app_name
-        kwargs = {"timeout": timeout, "title": window_title, "ok_label": ok_label, "cancel_label": cancel_label}
+        kwargs = {
+            "timeout": timeout,
+            "title": window_title,
+            "ok_label": ok_label,
+            "cancel_label": cancel_label,
+        }
         if self.platform.startswith("linux"):
             try:
                 return ask_zenity(text, **kwargs)
             except DialogUnavailable as exc:
                 logger.info("zenity indisponible, repli sur tkinter : %s", exc)
         return ask_tkinter(text, **kwargs)
-
-
-# fmt: on
