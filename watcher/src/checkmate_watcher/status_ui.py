@@ -58,6 +58,7 @@ STATUS_HTML = """<!doctype html>
   }
   .state-dot.outside { background: var(--warn); }
   .state-dot.signed { background: var(--ink); }
+  .state-dot.absent { background: var(--muted); }
   .state-dot.error { background: var(--err); }
   .kicker { margin: 0 0 4px; font-family: ui-monospace, "SFMono-Regular",
   "Cascadia Mono", monospace; font-size: 12px; color: var(--muted); }
@@ -778,7 +779,8 @@ function render(snapshot) {
     if (snapshot.window === window) {
       const state = document.createElement("span");
       state.className = "state";
-      state.textContent = snapshot.mode === "signed" ? "signé" : "en cours";
+      const stateLabels = { signed: "signé", absent: "absent" };
+      state.textContent = stateLabels[snapshot.mode] || "en cours";
       element.appendChild(state);
     }
     slots.appendChild(element);

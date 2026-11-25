@@ -136,7 +136,8 @@ les valeurs locales pour permettre une reprise d'urgence. La variable
 - des compteurs et dates pour le tableau de bord.
 
 Un emargement sans reponse n'est pas marque : il revient apres `prompt_retry`.
-Repondre "Absent" le marque comme traite pour la duree du TTL.
+Repondre "Absent" marque le creneau comme termine avec le motif `absent` :
+la surveillance reprend au creneau suivant, meme apres un redemarrage.
 
 ## Tableau de bord et onboarding
 

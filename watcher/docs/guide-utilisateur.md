@@ -78,6 +78,8 @@ GTK 3 et WebKit2 sont installés. Sinon, il s'ouvre dans le navigateur.
   La detection se fait en HTTP leger, sans garder Chromium ouvert.
 - Dès que l'émargement apparaît, une notification s'affiche.
 - Une fenêtre demande "Je suis présent" ou "Absent".
+- Sur "Absent", CheckMate arrête la surveillance jusqu'au créneau suivant.
+  Ce choix est mémorisé, même après un redémarrage.
 - Sur "Je suis présent", un navigateur visible s'ouvre avec la même session CESAR.
   Un overlay CheckMate animé accompagne le tracé, avec un trou autour du canvas,
   puis disparaît avant la validation. La confirmation s'affiche deux secondes,

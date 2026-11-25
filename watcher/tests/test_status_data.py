@@ -113,6 +113,21 @@ def test_snapshot_creneau_signe(tmp_path):
     assert snapshot["label"] == "Créneau signé"
 
 
+def test_snapshot_creneau_declare_absent(tmp_path):
+    state = make_state(tmp_path)
+    state.mark_window("2026-11-16#0", now=1000, reason="absent")
+
+    snapshot = snapshot_at(
+        tmp_path,
+        state,
+        datetime(2026, 11, 16, 9, 55),
+        datetime(2026, 11, 16, 10, 0),
+    )
+
+    assert snapshot["mode"] == "absent"
+    assert snapshot["label"] == "Créneau déclaré absent"
+
+
 def test_snapshot_hors_creneau(tmp_path):
     state = make_state(tmp_path)
     snapshot = snapshot_at(

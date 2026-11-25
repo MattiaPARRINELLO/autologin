@@ -9,7 +9,11 @@ from checkmate_watcher.http_session import HttpTransportError
 from checkmate_watcher.schedule import Schedule, parse_windows
 from checkmate_watcher.state import StateStore
 from checkmate_watcher.updates import Release, UpdatePolicy, Version
-from checkmate_watcher.watcher import _pause_reason, _record_success
+from checkmate_watcher.watcher import (
+    _mark_absent,
+    _pause_reason,
+    _record_success,
+)
 
 SCHEDULE = Schedule(
     enabled=True,
@@ -127,6 +131,29 @@ def test_pause_sur_creneau_deja_signe(tmp_path):
     assert pause is not None
     assert pause.reason == "creneau deja signe"
     assert pause.window_key == "2026-11-16#0"
+
+
+def test_pause_sur_creneau_declare_absent(tmp_path):
+    state = StateStore(tmp_path / "s.json")
+    state.mark_window(SCHEDULE.window_key(LUNDI_10H), reason="absent")
+
+    pause = _pause_reason(SCHEDULE, state, LUNDI_10H)
+
+    assert pause is not None
+    assert pause.reason == "absence declaree"
+    assert pause.window_key == "2026-11-16#0"
+
+
+def test_absence_termine_le_creneau_courant(tmp_path):
+    state = StateStore(tmp_path / "s.json")
+    key = SCHEDULE.window_key(LUNDI_10H)
+
+    stopped = _mark_absent(state, "signal-1", key)
+
+    assert stopped is True
+    assert state.window_reason(key) == "absent"
+    assert state.get_meta("last_absent_at") is not None
+    assert _pause_reason(SCHEDULE, state, LUNDI_10H) is not None
 
 
 def test_surveillance_active_sur_creneau_libre(tmp_path):

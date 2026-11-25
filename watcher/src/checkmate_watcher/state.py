@@ -36,6 +36,7 @@ class StateStore:
         self.ttl = ttl
         self._signals: dict[str, float] = {}
         self._windows: dict[str, float] = {}
+        self._window_reasons: dict[str, str] = {}
         self._meta: dict[str, str] = {}
         self._load()
 
@@ -55,12 +56,14 @@ class StateStore:
             return
         self._signals = _parse_number_map(payload.get("signals"))
         self._windows = _parse_number_map(payload.get("windows"))
+        self._window_reasons = _parse_meta_map(payload.get("window_reasons"))
         self._meta = _parse_meta_map(payload.get("meta"))
 
     def _build_payload(self) -> dict:
         return {
             "signals": self._signals,
             "windows": self._windows,
+            "window_reasons": self._window_reasons,
             "meta": self._meta,
         }
 
@@ -119,11 +122,25 @@ class StateStore:
     def window_done(self, key: str) -> bool:
         return key in self._windows
 
-    def mark_window(self, key: str, now: float | None = None) -> None:
+    def window_reason(self, key: str) -> str | None:
+        if key not in self._windows:
+            return None
+        return self._window_reasons.get(key, "signed")
+
+    def mark_window(
+        self,
+        key: str,
+        now: float | None = None,
+        reason: str = "signed",
+    ) -> None:
+        if reason not in {"signed", "absent"}:
+            raise ValueError("motif de creneau inconnu")
         current = time.time() if now is None else now
         self._windows[key] = current
-        # Un creneau signe ne sert plus apres une semaine.
+        self._window_reasons[key] = reason
+        # Un creneau termine ne sert plus apres une semaine.
         for old_key, timestamp in list(self._windows.items()):
             if current - timestamp > 7 * 24 * 3600:
                 del self._windows[old_key]
+                self._window_reasons.pop(old_key, None)
         self._save()
