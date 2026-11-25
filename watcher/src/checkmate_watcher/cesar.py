@@ -174,6 +174,247 @@ CANVAS_HITTABLE_JS = """
 }
 """
 
+SIGNATURE_OVERLAY_SHOW_JS = """
+(canvas) => {
+  const styleId = 'checkmate-signature-overlay-style';
+  const overlayId = 'checkmate-signature-overlay';
+  if (!document.getElementById(styleId)) {
+    const style = document.createElement('style');
+    style.id = styleId;
+    style.textContent = `
+      #${overlayId} {
+        position: fixed;
+        inset: 0;
+        z-index: 2147483647;
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity 0.35s ease;
+        background:
+          radial-gradient(1200px 600px at 10% 10%, rgba(124,58,237,.20), transparent 60%),
+          radial-gradient(900px 500px at 90% 90%, rgba(167,139,250,.16), transparent 60%),
+          repeating-linear-gradient(45deg, rgba(139,92,246,.04) 0 18px, transparent 18px 36px);
+        overflow: hidden;
+      }
+      #${overlayId}.cm-visible { opacity: 1; }
+      #${overlayId} .cm-particles { position: absolute; inset: 0; }
+      #${overlayId} .cm-particle {
+        position: absolute;
+        font-size: 22px;
+        color: rgba(167,139,250,.20);
+        animation: cm-float 7s ease-in-out infinite;
+        user-select: none;
+      }
+      @keyframes cm-float {
+        0%, 100% { transform: translate(0,0) rotate(0deg); opacity: .18; }
+        50% { transform: translate(12px,-18px) rotate(18deg); opacity: .34; }
+      }
+      #${overlayId} .cm-badge {
+        position: absolute;
+        right: 22px;
+        bottom: 22px;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 14px 18px;
+        border-radius: 18px;
+        background: linear-gradient(135deg, rgba(30,20,60,.90), rgba(49,46,129,.82));
+        border: 1px solid rgba(167,139,250,.55);
+        color: #f5f3ff;
+        font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+        backdrop-filter: blur(10px);
+        box-shadow: 0 12px 40px rgba(88,28,135,.45);
+        animation: cm-badge-float 2.2s ease-in-out infinite;
+      }
+      @keyframes cm-badge-float {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-7px); }
+      }
+      #${overlayId} .cm-board-wrap {
+        position: relative;
+        width: 46px;
+        height: 46px;
+        border-radius: 12px;
+        background: #4c1d95;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 0 18px rgba(124,58,237,.45);
+      }
+      #${overlayId} .cm-board {
+        position: relative;
+        width: 34px;
+        height: 34px;
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        grid-template-rows: repeat(4, 1fr);
+        border-radius: 6px;
+        overflow: hidden;
+        background: #241443;
+      }
+      #${overlayId} .cm-cell { background: #35205f; }
+      #${overlayId} .cm-cell.light { background: #4b2c83; }
+      #${overlayId} .cm-cell.lit { background: #c4b5fd; }
+      #${overlayId} .cm-piece {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 25%;
+        height: 25%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 11px;
+        line-height: 1;
+        color: #fff;
+        text-shadow: 0 1px 2px rgba(0,0,0,.55);
+        z-index: 2;
+        will-change: transform;
+      }
+      #${overlayId} .cm-piece.done { color: #f5d0fe; }
+      #${overlayId} .cm-text {
+        display: flex;
+        flex-direction: column;
+        line-height: 1.15;
+        gap: 2px;
+      }
+      #${overlayId} .cm-title {
+        font-size: 15px;
+        font-weight: 700;
+        background: linear-gradient(90deg, #f5f3ff, #c4b5fd);
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+      }
+      #${overlayId} .cm-sub { font-size: 11px; color: #c4b5fd; }
+      #${overlayId} .cm-progress {
+        width: 100%;
+        height: 3px;
+        border-radius: 2px;
+        background: rgba(255,255,255,.12);
+        overflow: hidden;
+        margin-top: 6px;
+      }
+      #${overlayId} .cm-progress-bar {
+        height: 100%;
+        width: 0;
+        background: #c4b5fd;
+        transition: width 0.08s linear;
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #${overlayId}, #${overlayId} * { animation: none !important; }
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  let overlay = document.getElementById(overlayId);
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = overlayId;
+    const pieces = ['♟','♞','♝','♜','♛'];
+    let particles = '';
+    for (let index = 0; index < 14; index += 1) {
+      const left = Math.round(Math.random() * 100);
+      const top = Math.round(Math.random() * 100);
+      const delay = (Math.random() * 5).toFixed(2);
+      particles += `<span class="cm-particle" style="left:${left}%;top:${top}%;animation-delay:${delay}s">${pieces[index % pieces.length]}</span>`;
+    }
+    let cells = '';
+    for (let index = 0; index < 16; index += 1) {
+      const row = Math.floor(index / 4);
+      const col = index % 4;
+      cells += `<span class="cm-cell${(row + col) % 2 ? ' light' : ''}"></span>`;
+    }
+    overlay.innerHTML = `
+      <div class="cm-particles">${particles}</div>
+      <div class="cm-badge">
+        <div class="cm-board-wrap">
+          <div class="cm-board">${cells}<span class="cm-piece">♞</span></div>
+        </div>
+        <div class="cm-text">
+          <span class="cm-title">CheckMate</span>
+          <span class="cm-sub">Signature en cours…</span>
+          <div class="cm-progress"><div class="cm-progress-bar"></div></div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    requestAnimationFrame(() => overlay.classList.add('cm-visible'));
+  }
+
+  const cutout = () => {
+    const rect = canvas.getBoundingClientRect();
+    const margin = 24;
+    const x1 = Math.max(0, rect.left - margin);
+    const y1 = Math.max(0, rect.top - margin);
+    const x2 = Math.min(window.innerWidth, rect.right + margin);
+    const y2 = Math.min(window.innerHeight, rect.bottom + margin);
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+    overlay.style.clipPath =
+      `polygon(evenodd, 0 0, ${width}px 0, ${width}px ${height}px, 0 ${height}px, ` +
+      `0 0, ${x1}px ${y1}px, ${x1}px ${y2}px, ${x2}px ${y2}px, ${x2}px ${y1}px, ${x1}px ${y1}px)`;
+  };
+  cutout();
+  window.__checkmateSignatureCutout = cutout;
+
+  let lastIndex = -1;
+  const path = [
+    [0,3],[1,3],[2,3],[3,3],
+    [3,2],[2,2],[1,2],[0,2],
+    [0,1],[1,1],[2,1],[3,1],
+    [3,0],[2,0],[1,0],[0,0],
+  ];
+  window.__checkmateSignatureProgress = (value) => {
+    const progress = Math.max(0, Math.min(1, value));
+    const index = Math.min(15, Math.floor(progress * 16));
+    const piece = overlay.querySelector('.cm-piece');
+    const cells = overlay.querySelectorAll('.cm-cell');
+    const bar = overlay.querySelector('.cm-progress-bar');
+    const sub = overlay.querySelector('.cm-sub');
+    if (bar) bar.style.width = `${progress * 100}%`;
+    if (sub) {
+      sub.textContent = progress >= 1
+        ? 'Signature jouée'
+        : `Signature en cours… ${Math.round(progress * 100)} %`;
+    }
+    if (!piece || !cells.length) return;
+    if (index !== lastIndex) {
+      lastIndex = index;
+      const [col, row] = path[index];
+      piece.style.transform = `translate(${col * 100}%, ${row * 100}%)`;
+      cells.forEach((cell, cellIndex) => {
+        cell.classList.toggle('lit', cellIndex <= index);
+      });
+    }
+    if (progress >= 1) {
+      piece.textContent = '♛';
+      piece.classList.add('done');
+    }
+  };
+  return true;
+}
+"""
+
+SIGNATURE_OVERLAY_PROGRESS_JS = """
+(progress) => {
+  if (window.__checkmateSignatureProgress) {
+    window.__checkmateSignatureProgress(progress);
+  }
+  return true;
+}
+"""
+
+SIGNATURE_OVERLAY_REMOVE_JS = """
+() => {
+  window.__checkmateSignatureProgress = null;
+  window.__checkmateSignatureCutout = null;
+  document.getElementById('checkmate-signature-overlay')?.remove();
+  document.getElementById('checkmate-signature-overlay-style')?.remove();
+  return true;
+}
+"""
+
 EVENT_DRAW_JS = """
 async (canvas, coordinates) => {
   const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -234,14 +475,20 @@ async (canvas, coordinates) => {
   };
 
   const first = coordinates[0];
+  const progress = window.__checkmateSignatureProgress;
+  if (progress) progress(0);
   fire('down', first[0], first[1], 1);
   for (let index = 1; index < coordinates.length; index += 1) {
     await delay(8);
     fire('move', coordinates[index][0], coordinates[index][1], 1);
+    if (progress) {
+      progress(index / Math.max(1, coordinates.length - 1));
+    }
   }
   await delay(8);
   const last = coordinates[coordinates.length - 1];
   fire('up', last[0], last[1], 0);
+  if (progress) progress(1);
   return true;
 }
 """
@@ -610,6 +857,19 @@ class CesarSession:
         points: list[Point],
         diagnostics: SignatureDiagnostics,
     ) -> None:
+        await self._signature_overlay(canvas, True)
+        try:
+            await self._draw_checked_inner(canvas, box, points, diagnostics)
+        finally:
+            await self._signature_overlay(canvas, False)
+
+    async def _draw_checked_inner(
+        self,
+        canvas,
+        box: dict,
+        points: list[Point],
+        diagnostics: SignatureDiagnostics,
+    ) -> None:
         """Rejoue la signature puis verifie qu'elle est vraiment dessinee.
 
         Un canvas mesure pendant une animation, ou un enchainement d'evenements
@@ -705,18 +965,40 @@ class CesarSession:
         extent_y = _ink_ratio(ink, "minY", "maxY", "height")
         return min(extent_x, extent_y) < MIN_INK_RATIO
 
+    async def _signature_overlay(self, canvas, active: bool) -> None:
+        script = SIGNATURE_OVERLAY_SHOW_JS if active else SIGNATURE_OVERLAY_REMOVE_JS
+        try:
+            await canvas.evaluate(script)
+        except Exception:
+            logger.debug("overlay de signature indisponible", exc_info=True)
+
+    async def _signature_overlay_progress(self, progress: float) -> None:
+        if self.page is None:
+            return
+        try:
+            await self.page.evaluate(SIGNATURE_OVERLAY_PROGRESS_JS, progress)
+        except Exception:
+            logger.debug("progression de l'overlay indisponible", exc_info=True)
+
     async def _draw(self, box: dict, points: list[FittedPoint]) -> None:
         if self.page is None:
             raise SignError("navigateur non demarre")
         first = points[0]
         await self.page.mouse.move(box["x"] + first.x, box["y"] + first.y)
         await self.page.mouse.down()
-        for point in points[1:]:
+        total = max(1, len(points) - 1)
+        last_percent = -1
+        for index, point in enumerate(points[1:], start=1):
             await self.page.mouse.move(box["x"] + point.x, box["y"] + point.y, steps=2)
             await asyncio.sleep(0.008)
+            percent = index * 100 // total
+            if percent != last_percent:
+                last_percent = percent
+                await self._signature_overlay_progress(percent / 100)
         last = points[-1]
         await self.page.mouse.move(box["x"] + last.x, box["y"] + last.y)
         await self.page.mouse.up()
+        await self._signature_overlay_progress(1.0)
 
     async def _wait_for_selector(self, selectors: tuple[str, ...], timeout_ms: int):
         if self.page is None:

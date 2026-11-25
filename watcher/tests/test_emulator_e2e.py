@@ -238,6 +238,39 @@ def test_le_watcher_detecte_et_signe_sur_l_emulateur(tmp_path):
         assert state["signature_points"] >= 2
 
 
+def test_overlay_signature_apparait_puis_est_retire(tmp_path):
+    points = [
+        Point(10 + index * 2, 20 if index % 2 == 0 else 80, str(index))
+        for index in range(60)
+    ]
+    with emulator() as (executable, base_url):
+        config = make_config(tmp_path, executable, base_url, points=points)
+
+        async def scenario():
+            async with session_ouverte(config) as session:
+                task = asyncio.create_task(session.sign(points))
+                overlay = session.page.locator("#checkmate-signature-overlay")
+                await overlay.wait_for(state="visible", timeout=10000)
+                pointer_events = await overlay.evaluate(
+                    "element => getComputedStyle(element).pointerEvents"
+                )
+                clip_path = await overlay.evaluate("element => element.style.clipPath")
+                confirmation = await task
+                remaining = await overlay.count()
+                state = wait_for_state(base_url)
+                return confirmation, pointer_events, clip_path, remaining, state
+
+        confirmation, pointer_events, clip_path, remaining, state = asyncio.run(
+            asyncio.wait_for(scenario(), timeout=120)
+        )
+
+    assert "prise en compte" in confirmation.lower()
+    assert pointer_events == "none"
+    assert clip_path.startswith("polygon")
+    assert remaining == 0
+    assert state["signed"] is True
+
+
 def test_une_signature_reduite_a_un_point_ne_signe_pas(tmp_path):
     with emulator() as (executable, base_url):
         points = [Point(20, 20, "start"), Point(20, 20, "end")]
