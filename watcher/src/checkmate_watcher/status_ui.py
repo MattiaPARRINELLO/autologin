@@ -1,5 +1,7 @@
 """Page locale du tableau de bord CheckMate."""
 
+from .ui_shared import API_JS
+
 STATUS_HTML = """<!doctype html>
 <html lang="fr">
 <head>
@@ -264,22 +266,7 @@ const TOKEN = "__TOKEN__";
 let timer = null;
 let stopped = false;
 
-async function api(path, body) {
-  const options = {
-    method: body ? "POST" : "GET",
-    headers: { "X-CheckMate-Token": TOKEN },
-  };
-  if (body) {
-    options.headers["Content-Type"] = "application/json";
-    options.body = JSON.stringify(body);
-  }
-  const response = await fetch(path, options);
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    throw new Error(data.error || ("erreur " + response.status));
-  }
-  return data;
-}
+__API_JS__
 
 function formatDate(value) {
   if (!value) return "-";
@@ -491,4 +478,4 @@ timer = setInterval(refresh, 3000);
 </script>
 </body>
 </html>
-"""
+""".replace("__API_JS__", API_JS)
