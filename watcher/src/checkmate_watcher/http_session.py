@@ -347,13 +347,22 @@ class HttpCesarSession:
         cookies = [_cookie_data(cookie) for cookie in self._session.cookies.jar]
         _write_private_json(self.config.watcher.http_cookies_file, cookies)
 
+    def _require_http_session(self):
+        if self._session is None:
+            raise HttpTransportError("session HTTP non ouverte")
+        return self._session
+
+    def _http_status_error(self, response) -> HttpTransportError:
+        status = response.status_code
+        detail = ""
+        if status == 429 and response.headers.get("Retry-After"):
+            detail = f", Retry-After={response.headers['Retry-After']}"
+        return HttpTransportError(f"CESAR HTTP {status}{detail}")
+
     def _raise_for_status(self, response) -> None:
         status = response.status_code
         if status in (403, 429) or status >= 500:
-            detail = ""
-            if status == 429 and response.headers.get("Retry-After"):
-                detail = f", Retry-After={response.headers['Retry-After']}"
-            raise HttpTransportError(f"CESAR HTTP {status}{detail}")
+            raise self._http_status_error(response)
         if status >= 400:
             raise HttpTransportError(f"CESAR HTTP {status}")
         lowered = response.text.lower()
@@ -366,33 +375,40 @@ class HttpCesarSession:
         login_path = self.config.cesar.login_path.rstrip("/")
         return path == login_path or path.startswith(login_path + "/")
 
-    def _login(self) -> None:
-        if self._session is None:
-            raise HttpTransportError("session HTTP non ouverte")
-        logger.info("connexion HTTP a CESAR")
-        page = self._session.get(
-            self.config.cesar.login_url,
-            timeout=45,
-            allow_redirects=True,
+    def _login_form(self) -> str:
+        session = self._require_http_session()
+        page = session.get(
+            self.config.cesar.login_url, timeout=45, allow_redirects=True
         )
         self._raise_for_status(page)
-        csrf = _first_input(_parse_inputs(page.text), "_csrf_token")
-        response = self._session.post(
+        return _first_input(_parse_inputs(page.text), "_csrf_token")
+
+    def _login_payload(self, csrf: str) -> dict:
+        return {
+            "_username": self.config.cesar.username.strip(),
+            "_password": self.config.cesar.password,
+            "_csrf_token": csrf,
+            "_referer": "",
+        }
+
+    def _login_headers(self) -> dict:
+        return {
+            "Accept-Language": "fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7",
+            "Origin": self.config.cesar.base_url,
+            "Referer": self.config.cesar.login_url,
+        }
+
+    def _post_login(self, csrf: str):
+        session = self._require_http_session()
+        return session.post(
             self.config.cesar.login_url,
-            data={
-                "_username": self.config.cesar.username.strip(),
-                "_password": self.config.cesar.password,
-                "_csrf_token": csrf,
-                "_referer": "",
-            },
-            headers={
-                "Accept-Language": "fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7",
-                "Origin": self.config.cesar.base_url,
-                "Referer": self.config.cesar.login_url,
-            },
+            data=self._login_payload(csrf),
+            headers=self._login_headers(),
             timeout=45,
             allow_redirects=True,
         )
+
+    def _finish_login(self, response) -> None:
         self._raise_for_status(response)
         path = urlsplit(str(response.url)).path
         if self._is_login_path(path):
@@ -402,12 +418,15 @@ class HttpCesarSession:
         self._save_cookies()
         logger.info("connexion HTTP reussie")
 
-    def _skip_cvec(self, response) -> None:
-        token = _first_input(
-            _parse_inputs(response.text),
-            "cvec_file[_token]",
-        )
-        skipped = self._session.post(
+    def _login(self) -> None:
+        logger.info("connexion HTTP a CESAR")
+        csrf = self._login_form()
+        self._finish_login(self._post_login(csrf))
+
+    def _post_cvec_skip(self, response):
+        token = _first_input(_parse_inputs(response.text), "cvec_file[_token]")
+        session = self._require_http_session()
+        return session.post(
             response.url,
             data={
                 "cvec_file[skip]": "skip",
@@ -416,31 +435,33 @@ class HttpCesarSession:
             timeout=45,
             allow_redirects=True,
         )
+
+    def _skip_cvec(self, response) -> None:
+        skipped = self._post_cvec_skip(response)
         self._raise_for_status(skipped)
         path = urlsplit(str(skipped.url)).path
         if self._is_login_path(path) or "/upload/cvec" in path:
             raise HttpTransportError("impossible de terminer l'etape CVEC")
 
-    def _check_http(self) -> AttendanceSignal | None:
-        if self._session is None:
-            raise HttpTransportError("session HTTP non ouverte")
-        response = self._session.get(
-            self.config.cesar.dashboard_url,
-            timeout=45,
-            allow_redirects=True,
+    def _dashboard_response(self):
+        session = self._require_http_session()
+        response = session.get(
+            self.config.cesar.dashboard_url, timeout=45, allow_redirects=True
         )
         self._raise_for_status(response)
-        path = urlsplit(str(response.url)).path
-        if self._is_login_path(path):
-            self._login()
-            response = self._session.get(
-                self.config.cesar.dashboard_url,
-                timeout=45,
-                allow_redirects=True,
-            )
-            self._raise_for_status(response)
-            if self._is_login_path(urlsplit(str(response.url)).path):
-                raise HttpTransportError("session HTTP CESAR expirmee")
+        return response
+
+    def _refresh_http_session(self):
+        self._login()
+        response = self._dashboard_response()
+        if self._is_login_path(urlsplit(str(response.url)).path):
+            raise HttpTransportError("session HTTP CESAR expiree")
+        return response
+
+    def _check_http(self) -> AttendanceSignal | None:
+        response = self._dashboard_response()
+        if self._is_login_path(urlsplit(str(response.url)).path):
+            response = self._refresh_http_session()
         return _calendar_signal(_parse_calendar(response.text))
 
     async def check(self) -> AttendanceSignal | None:
