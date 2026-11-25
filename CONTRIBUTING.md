@@ -408,8 +408,9 @@ reste optionnel et utilise ses propres variables et secrets documentes dans
    sont `0` si la release n'impose ni migration ni version minimale.
 3. Pour une version stable majeure ou mineure, ajouter son resume dans
    `watcher/src/checkmate_watcher/release_notes.json` : titre, resume, gains
-   mesures et explications accessibles. Une version sans resume n'ouvre pas le
-   popup de nouveautes. Les betas n'ouvrent jamais ce popup.
+   mesures et explications accessibles. Le champ `teaser` contient le micro-resume
+   affiche avant l'installation. Une version sans resume n'ouvre pas le popup de
+   nouveautes. Les betas n'ouvrent jamais ce popup.
 4. Verifier localement avec les commandes de la section « Verification locale ».
 5. Pour une beta, pousser `beta`, puis creer et pousser le tag
    `watcher-vX.Y.Z-beta.N` depuis `beta`.

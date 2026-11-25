@@ -151,7 +151,9 @@ systemctl --user restart checkmate-watcher
 ## Mises à jour
 
 CheckMate vérifie les nouvelles versions au démarrage et affiche une
-notification avec le lien de téléchargement, une seule fois par version.
+notification avec le lien de téléchargement, une seule fois par version. Si la
+release stable possède un micro-résumé, la notification explique aussi pourquoi
+la mettre à jour. Le même résumé apparaît dans la CLI et le tableau de bord.
 
 ### Vérifier et installer
 
