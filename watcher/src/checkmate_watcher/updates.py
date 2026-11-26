@@ -66,6 +66,7 @@ class Release:
     migration_reason: str | None = None
     required_reason: str | None = None
     markers_declared: bool = False
+    teaser: str | None = None
 
     @property
     def version_text(self) -> str:
@@ -87,6 +88,10 @@ class Release:
 VERSION_PATTERN = re.compile(r"(\d+)\.(\d+)\.(\d+)(?:-(beta)(?:\.?(\d+))?)?")
 MARKER_PATTERN = re.compile(
     r"^\s*CHECKMATE-(MIGRATION|REQUIRED)\s*:\s*(.+?)\s*$",
+    re.IGNORECASE | re.MULTILINE,
+)
+TEASER_PATTERN = re.compile(
+    r"^\s*CHECKMATE-SUMMARY\s*:\s*(.+?)\s*$",
     re.IGNORECASE | re.MULTILINE,
 )
 
@@ -143,12 +148,21 @@ def _release_downloads(assets):
     )
 
 
+def _release_teaser(body: object) -> str | None:
+    match = TEASER_PATTERN.search(str(body or ""))
+    if match is None:
+        return None
+    value = match.group(1).strip()
+    return None if value == "0" else value
+
+
 def _marker_fields(body) -> dict:
     migration, required, declared = _release_markers(body)
     return {
         "migration_reason": migration,
         "required_reason": required,
         "markers_declared": declared,
+        "teaser": _release_teaser(body),
     }
 
 

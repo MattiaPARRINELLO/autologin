@@ -20,8 +20,8 @@ Le watcher est un processus unique qui :
 
 Aucun service CheckMate n'intervient dans la surveillance : le seul reseau
 sortant va vers CESAR, vers l'API GitHub des releases si les mises a jour sont
-activees, et vers le compteur de statistiques anonymes si `[analytics]` reste
-active.
+activees, vers le compteur de statistiques anonymes si `[analytics]` reste
+active, et vers les messages diffuses si `[broadcast]` reste active.
 
 ## Carte des modules
 
@@ -29,10 +29,11 @@ active.
 |--------|------|
 | `cli.py` | point d'entree `checkmate-watcher` : commandes `run`, `setup`, `status`, `capture`, `self-test`, `update`, `support-bundle`, etc. |
 | `watcher.py` | boucle de surveillance `run_loop`, orchestration des decisions et des signatures |
-| `cesar.py` | `CesarSession` : navigation Playwright, connexion, detection de l'emargement, trace de la signature |
+| `cesar.py` | `CesarSession` : navigation Playwright allégée, connexion, detection de l'emargement, trace de la signature |
 | `http_session.py` | `HttpCesarSession` : login CSRF/CVEC, detection HTTP, cookie partage et signature a la demande |
 | `browser.py` | choix du navigateur : config, Chromium de Playwright, navigateur systeme |
 | `config.py` | chargement et validation du TOML (`[cesar]`, `[watcher]`, `[schedule]`, `[notifications]`, `[updates]`, `[selectors]`) |
+| `remote_selectors.py` | correction des selecteurs CESAR à distance, validation stricte et cache local |
 | `schedule.py` | plages horaires, creneau courant, prochaine ouverture |
 | `signature.py` | lecture, mise a l'echelle et sauvegarde des points de signature |
 | `notifications.py` | notifications bureau et fenetre de confirmation, par plateforme |
@@ -48,7 +49,9 @@ active.
 | `tray.py`, `sni.py` | icone de notification : `pystray` et StatusNotifierItem Linux |
 | `autostart.py` | service systemd utilisateur ou tache planifiee Windows |
 | `updates.py` | lecture des releases GitHub, marqueurs de release, canal, version minimale et migration |
+| `release_notes.py` | resumes versionnes des nouveautés et micro-resumes affiches après les mises a jour stables majeures ou mineures |
 | `analytics.py` | compteurs d'usage anonymes : installation et signature |
+| `broadcast.py` | messages diffuses par le mainteneur, derniers vus retenus dans l'etat |
 | `self_update.py` | installation de la cible de mise a jour par un processus detache |
 | `support.py` | archive de diagnostic sans mot de passe ni signature |
 | `paths.py`, `logging_setup.py` | emplacements portables et journalisation avec rotation |
@@ -64,6 +67,9 @@ run_loop() [watcher.py]
   |-- verification de la politique de mise a jour (si activee)
   |     REQUIRED au-dessus de la version locale -> mode bloque, run --once code 3
   |     sinon -> annoncer la migration eventuelle et poursuivre
+  |     puis -> ouvrir le resume des nouveautés si une release stable importante change
+  |-- messages diffuses : premier contact memorise sans notifier
+  |     puis toutes les 5 min -> notification des identifiants jamais vus
   |
   |-- planning : hors plage ou creneau deja signe ?
   |     oui -> attendre la prochaine ouverture (tranches de 5 s)
@@ -111,7 +117,17 @@ En mode HTTP, la detection lit les attributs JSON du calendrier dans la reponse
 CESAR. La signature reste toujours rejouee dans Chrome avec la meme session :
 le cookie `PHPSESSID` est injecte dans le contexte Playwright juste avant la
 signature. Le transport `browser` reste disponible et sert de repli automatique
-si le HTTP echoue, est bloque ou renvoie une page inattendue.
+si le HTTP echoue, est bloque ou renvoie une page inattendue. Ce chemin demande
+une réponse fraîche à chaque navigation, bloque les images, polices, médias et
+domaines d'analytics, tout en conservant CSS et scripts. Des arguments Chromium
+suppriment aussi le GPU, l'audio et les tâches réseau d'arrière-plan.
+
+Au demarrage, `remote_selectors.py` charge un fichier JSON HTTPS heberge dans le
+depot. Seules des listes de selecteurs non vides sont acceptees, sans URL ni
+JavaScript. Le fichier valide est mis en cache ; en cas de panne reseau, CheckMate
+utilise ce cache puis les selecteurs locaux. Les valeurs distantes passent avant
+les valeurs locales pour permettre une reprise d'urgence. La variable
+`CHECKMATE_REMOTE_SELECTORS=0` desactive ce mecanisme.
 
 ## Etat et deduplication
 
@@ -179,6 +195,20 @@ fonctionner.
 sous Windows, script shell sous Linux. Une migration est donc installee avant la
 cible finale. Apres redemarrage, elle sort de la fenetre de mise a jour et
 l'etape suivante peut etre proposee.
+
+`release_notes.py` compare la version precedente a la version courante. Seule une
+release stable majeure ou mineure, ou le passage d'une beta a sa version stable,
+avec un resume present dans le fichier JSON embarque ouvre la fenetre des
+nouveautes. La version lancee et la version fermee sont conservees dans `state.py`.
+Le tableau de bord recoit le resume dans `/api/status`, puis l'action
+`dismiss-release` memorise sa fermeture. Le popup est rendu dans `status_ui.py`
+avec focus piege, touche Echap et mouvement reduit.
+
+Le champ `teaser` du meme fichier fournit un micro-resume court. Le workflow de
+release l'ajoute aux notes GitHub avec le marqueur `CHECKMATE-SUMMARY`. Les
+versions deja installees lisent donc ce marqueur via l'API GitHub et peuvent
+afficher la raison de mettre a jour avant l'installation, sans attendre d'embarquer
+le nouveau resume complet.
 
 Cote publication, `.github/release-markers.txt` porte les deux valeurs de la
 prochaine release. Le workflow refuse un marqueur absent ou vide. Un marqueur

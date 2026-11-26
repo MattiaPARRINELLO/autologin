@@ -4,11 +4,12 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import threading
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from . import BUILD, __version__, analytics
+from . import BUILD, __version__, analytics, broadcast
 from .cesar import (
     AttendanceSignal,
     CesarError,
@@ -21,6 +22,8 @@ from .errors import describe_error
 from .http_session import HttpCesarSession, HttpTransportError
 from .notifications import Notifier
 from .paths import default_config_path
+from .release_notes import prepare_release_celebration
+from .remote_selectors import with_remote_selectors
 from .signature import load_signature
 from .state import StateStore
 from .status_server import (
@@ -30,6 +33,7 @@ from .status_server import (
 )
 from .tray import TrayController
 from .updates import check_for_update, update_policy
+from .window import open_url
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +41,8 @@ MAX_CONSECUTIVE_ERRORS = 3
 
 MAX_WAIT_CHUNK = 300.0
 HEARTBEAT_SECONDS = 300.0
+BROADCAST_SECONDS = 300.0
+MAX_BROADCAST_NOTICES = 3
 BLOCKED_EXIT_CODE = 3
 BLOCKED_POLL_SECONDS = 2.0
 
@@ -167,6 +173,13 @@ async def _wait_for_new_window(
         await asyncio.sleep(min(max(remaining, 0.5), 5.0))
 
 
+def _update_message(release) -> str:
+    message = f"CheckMate {release.version_text} est disponible."
+    if release.teaser:
+        message += f"\n{release.teaser}"
+    return f"{message}\n{release.url}"
+
+
 async def _check_update(config: Config, state: StateStore) -> None:
     if not config.updates.enabled:
         return
@@ -190,11 +203,69 @@ async def _check_update(config: Config, state: StateStore) -> None:
     await _send(
         config,
         "Mise a jour disponible",
-        f"CheckMate {release.version_text} est disponible.\n{release.url}",
+        _update_message(release),
         icon="dialog-information",
         urgency="normal",
     )
     state.set_meta("update_notified", release.tag)
+
+
+async def _check_broadcast(
+    config: Config, state: StateStore, *, notify: bool = True
+) -> None:
+    """Affiche les messages diffuses jamais vus, sans bloquer la boucle."""
+    if not broadcast.is_enabled(config):
+        return
+    messages = await _fetch_broadcast(config)
+    if messages is None:
+        return
+    if state.get_meta("broadcast.initialized") != "1":
+        _baseline_broadcast(state, messages)
+        return
+    if not notify:
+        return
+    await _notify_broadcast(config, state, messages)
+
+
+async def _fetch_broadcast(config: Config):
+    try:
+        request = asyncio.to_thread(
+            broadcast.fetch_messages, broadcast.endpoint(config)
+        )
+        return await asyncio.wait_for(request, timeout=10)
+    except Exception as exc:
+        logger.debug("messages diffuses indisponibles : %s", exc)
+        return None
+
+
+def _baseline_broadcast(state: StateStore, messages) -> None:
+    """Premier contact : on retient l'existant sans inonder l'utilisateur."""
+    state.set_meta("broadcast.last_id", str(broadcast.newest_id(messages)))
+    state.set_meta("broadcast.initialized", "1")
+
+
+def _last_broadcast_id(state: StateStore) -> int:
+    raw = state.get_meta("broadcast.last_id") or "0"
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        return 0
+
+
+async def _notify_broadcast(
+    config: Config, state: StateStore, messages
+) -> None:
+    last_id = _last_broadcast_id(state)
+    pending = broadcast.unseen(messages, last_id)[:MAX_BROADCAST_NOTICES]
+    for message in pending:
+        await _send(
+            config,
+            message.title,
+            message.text,
+            icon="dialog-information",
+            urgency="normal",
+        )
+        state.set_meta("broadcast.last_id", str(message.id))
 
 
 async def _load_policy(config: Config):
@@ -393,6 +464,16 @@ async def handle_signal(
     return NO_ANSWER
 
 
+def _open_update_celebration(session: StatusSession | None) -> None:
+    if session is None or session.release_note is None or not session.url:
+        return
+    threading.Thread(
+        target=open_url,
+        args=(session.url,),
+        daemon=True,
+    ).start()
+
+
 async def run_loop(
     config: Config,
     *,
@@ -403,6 +484,7 @@ async def run_loop(
 ) -> int:
     auto = config.watcher.auto_sign if auto_override is None else auto_override
     config_path = (config_path or default_config_path()).expanduser()
+    config = with_remote_selectors(config)
 
     try:
         points = load_signature(config.signature.file)
@@ -448,7 +530,13 @@ async def run_loop(
                 once,
             )
         _announce_migration(status_session, policy)
+        if status_session is not None and not dry_run:
+            note = prepare_release_celebration(state, __version__)
+            status_session.set_release_note(note)
+            if note is not None:
+                _open_update_celebration(status_session)
         await _check_update(config, state)
+        await _check_broadcast(config, state, notify=not once)
         poll_headless = (
             True if config.watcher.visible_on_sign else config.watcher.headless
         )
@@ -475,6 +563,7 @@ async def run_loop(
         window_key: str | None = None
         last_window_key: str | None = None
         next_heartbeat = asyncio.get_running_loop().time() + HEARTBEAT_SECONDS
+        next_broadcast = asyncio.get_running_loop().time() + BROADCAST_SECONDS
         try:
             while True:
                 if stop_event is not None and stop_event.is_set():
@@ -496,6 +585,12 @@ async def run_loop(
                     )
                     session = await _open_session(config, poll_headless)
                     continue
+
+                if asyncio.get_running_loop().time() >= next_broadcast:
+                    await _check_broadcast(config, state)
+                    next_broadcast = (
+                        asyncio.get_running_loop().time() + BROADCAST_SECONDS
+                    )
 
                 window_key = schedule.window_key(now)
                 if window_key != last_window_key:

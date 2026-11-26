@@ -190,6 +190,19 @@ def _beta_session(tmp_path) -> StatusSession:
     )
 
 
+def test_le_resume_de_mise_a_jour_peut_etre_ferme(tmp_path):
+    session = _session(tmp_path)
+    note = {"version": "0.7.0", "title": "Mise a jour terminee."}
+    session.set_release_note(note)
+    assert session.snapshot()["release_note"] == note
+
+    result = session.dismiss_release()
+
+    assert result["ok"] is True
+    assert session.snapshot()["release_note"] is None
+    assert session.state.get_meta("release.celebrated_version") == "0.7.0"
+
+
 def test_le_message_stable_sur_beta_explique_le_maintien(monkeypatch):
     monkeypatch.setattr(status_server, "__version__", "0.7.0-beta.2")
     assert "restes" in status_server._channel_message("stable")
@@ -254,6 +267,26 @@ def test_le_canal_beta_se_change_et_se_persiste(tmp_path):
     result = session.action("set-channel", {"channel": "beta"})
     assert result["channel"] == "beta"
     assert load_config(path).updates.channel == "beta"
+
+
+def test_check_update_affiche_le_micro_resume(tmp_path, monkeypatch):
+    release = Release(
+        "watcher-v0.7.0",
+        parse_version("0.7.0"),
+        "https://example.com/release",
+        "stable",
+        False,
+        teaser="Detection 2,3 fois plus rapide.",
+    )
+    monkeypatch.setattr(status_server, "__version__", "0.6.6")
+    monkeypatch.setattr(
+        status_server, "check_for_update", lambda *a, **k: release
+    )
+
+    result = _session(tmp_path).check_update()
+
+    assert result["teaser"] == "Detection 2,3 fois plus rapide."
+    assert result["teaser"] in result["message"]
 
 
 def test_check_update_utilise_le_canal(tmp_path, monkeypatch):

@@ -80,6 +80,31 @@ def test_erreur_reseau_ne_bloque_pas(monkeypatch):
     assert asyncio.run(watcher._startup_policy(_Config())) is None
 
 
+def test_notification_de_mise_a_jour_avec_micro_resume(tmp_path, monkeypatch):
+    release = Release(
+        "watcher-v0.7.0",
+        Version(0, 7, 0),
+        "https://example.com/release",
+        "stable",
+        False,
+        teaser="Detection 2,3 fois plus rapide.",
+    )
+    sent = []
+
+    async def fake_send(config, title, message, **kwargs):
+        sent.append((title, message))
+
+    monkeypatch.setattr(watcher, "check_for_update", lambda *a, **k: release)
+    monkeypatch.setattr(watcher, "_send", fake_send)
+    state = StateStore(tmp_path / "state.json")
+
+    asyncio.run(watcher._check_update(_Config(), state))
+
+    assert len(sent) == 1
+    assert release.teaser in sent[0][1]
+    assert state.get_meta("update_notified") == release.tag
+
+
 def test_pas_de_pause_hors_planning(tmp_path):
     assert (
         _pause_reason(
@@ -157,6 +182,46 @@ def test_succes_repete_ne_reecrit_pas_l_heure(tmp_path):
     state.set_meta("last_ok_at", "2026-11-16T09:05:00")
     _record_success(state)
     assert state.get_meta("last_ok_at") == "2026-11-16T09:05:00"
+
+
+def test_ouvre_la_celebration_apres_mise_a_jour(monkeypatch):
+    started = []
+
+    class FakeThread:
+        def __init__(self, *, target, args, daemon):
+            self.target = target
+            self.args = args
+            self.daemon = daemon
+            started.append(self)
+
+        def start(self):
+            self.started = True
+
+    monkeypatch.setattr(watcher.threading, "Thread", FakeThread)
+    session = SimpleNamespace(
+        release_note={"version": "0.7.0"},
+        url="http://127.0.0.1:1234/?token=test",
+    )
+
+    watcher._open_update_celebration(session)
+
+    assert len(started) == 1
+    assert started[0].target is watcher.open_url
+    assert started[0].args == (session.url,)
+    assert started[0].daemon is True
+    assert started[0].started is True
+
+
+def test_sans_resume_aucune_fenetre_ne_s_ouvre(monkeypatch):
+    class FakeThread:
+        def __init__(self, **kwargs):
+            raise AssertionError("aucun thread attendu")
+
+    monkeypatch.setattr(watcher.threading, "Thread", FakeThread)
+
+    watcher._open_update_celebration(
+        SimpleNamespace(release_note=None, url="http://127.0.0.1:1234")
+    )
 
 
 def test_open_session_choisit_le_transport_http(monkeypatch):

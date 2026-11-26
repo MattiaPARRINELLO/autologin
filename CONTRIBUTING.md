@@ -406,16 +406,21 @@ reste optionnel et utilise ses propres variables et secrets documentes dans
    `chore: passe la version a X.Y.Z`.
 2. Mettre a jour `.github/release-markers.txt` dans ce meme commit. Les valeurs
    sont `0` si la release n'impose ni migration ni version minimale.
-3. Verifier localement avec les commandes de la section « Verification locale ».
-4. Pour une beta, pousser `beta`, puis creer et pousser le tag
+3. Pour une version stable majeure ou mineure, ajouter son resume dans
+   `watcher/src/checkmate_watcher/release_notes.json` : titre, resume, gains
+   mesures et explications accessibles. Le champ `teaser` contient le micro-resume
+   affiche avant l'installation. Une version sans resume n'ouvre pas le popup de
+   nouveautes. Les betas n'ouvrent jamais ce popup.
+4. Verifier localement avec les commandes de la section « Verification locale ».
+5. Pour une beta, pousser `beta`, puis creer et pousser le tag
    `watcher-vX.Y.Z-beta.N` depuis `beta`.
-5. Pour une stable, passer par la procedure de stabilisation ci-dessous, puis
+6. Pour une stable, passer par la procedure de stabilisation ci-dessous, puis
    creer et pousser le tag `watcher-vX.Y.Z` depuis `main`.
-6. Suivre le workflow `Release`. Si un marqueur est non nul, approuver le
+7. Suivre le workflow `Release`. Si un marqueur est non nul, approuver le
    deploiement dans l'environnement `release-manual`.
-7. Verifier la prerelease, les artefacts Windows et Linux, `SHA256SUMS.txt`, et
+8. Verifier la prerelease, les artefacts Windows et Linux, `SHA256SUMS.txt`, et
    tester l'installation de la version publiée.
-8. Pour la release suivante, remettre les marqueurs a `0` s'ils etaient non nuls.
+9. Pour la release suivante, remettre les marqueurs a `0` s'ils etaient non nuls.
 
 Aucun tag ni aucune release ne doit etre cree sans validation humaine.
 

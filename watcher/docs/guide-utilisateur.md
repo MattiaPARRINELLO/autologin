@@ -132,6 +132,15 @@ http_cookies_file = "~/.local/share/checkmate-watcher/http-cookies.json"
 Chromium ouvert pendant la surveillance. Le fichier de cookies HTTP contient la
 session CESAR : ne le partage pas et ne le supprime pas pendant un créneau.
 
+Les sélecteurs CESAR peuvent aussi être corrigés à distance depuis un fichier
+JSON HTTPS du dépôt. CheckMate le valide, le met en cache et l'utilise en priorité
+par rapport aux sélecteurs locaux. En cas de panne réseau, le cache local puis
+les valeurs locales sont utilisés. Pour désactiver ce mécanisme :
+
+```bash
+export CHECKMATE_REMOTE_SELECTORS=0
+```
+
 Pour créer une archive de diagnostic sans secret :
 
 ```bash
@@ -150,10 +159,29 @@ Puis redémarre le service :
 systemctl --user restart checkmate-watcher
 ```
 
+## Messages de l'équipe
+
+Le mainteneur peut diffuser un court message à toutes les installations :
+annonce, panne CESAR, clin d'œil. CheckMate regarde ce canal au démarrage puis
+toutes les 5 minutes, et notifie seulement les messages qu'il n'a pas encore
+montrés. Un message déjà affiché ne revient pas après un redémarrage.
+
+Le canal est public et ne transmet aucune donnée personnelle : l'application ne
+fait que lire la liste des messages. Pour le couper :
+
+```toml
+[broadcast]
+enabled = false
+```
+
+ou avec la variable d'environnement `CHECKMATE_BROADCAST=0`.
+
 ## Mises à jour
 
 CheckMate vérifie les nouvelles versions au démarrage et affiche une
-notification avec le lien de téléchargement, une seule fois par version.
+notification avec le lien de téléchargement, une seule fois par version. Si la
+release stable possède un micro-résumé, la notification explique aussi pourquoi
+la mettre à jour. Le même résumé apparaît dans la CLI et le tableau de bord.
 
 ### Vérifier et installer
 
@@ -167,6 +195,24 @@ checkmate-watcher update --yes
 
 CheckMate télécharge le paquet, vérifie sa somme SHA256 et l'installe en
 arrière-plan. La configuration et la signature sont conservées.
+
+### Nouveautés après une mise à jour importante
+
+Après une release stable majeure ou mineure, ou lors du passage d'une beta à sa
+version stable, CheckMate ouvre le tableau de bord et affiche une fenêtre animée
+avec les nouveautés. Le résumé explique les changements en langage simple et
+présente les gains mesurés avec leur contexte. Les betas n'ouvrent pas cette
+fenêtre.
+
+Le résumé est livré avec l'application, pas téléchargé depuis GitHub. Les simples
+correctifs n'ouvrent pas cette fenêtre. Une fois fermée, elle ne réapparaît pas au
+redémarrage suivant. Le bouton "Voir les notes complètes" ouvre la release GitHub.
+
+Les comparaisons de latence et de mémoire utilisent des valeurs qui évoluent et
+des barres qui se réduisent pour rendre le gain immédiatement lisible.
+
+La fenêtre se ferme avec "C'est parti", la croix ou la touche Échap. Elle est
+utilisable au clavier et respecte le réglage système de réduction des animations.
 
 ### Choisir le canal stable ou beta
 
