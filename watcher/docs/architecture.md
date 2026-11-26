@@ -69,7 +69,8 @@ run_loop() [watcher.py]
   |     sinon -> annoncer la migration eventuelle et poursuivre
   |     puis -> ouvrir le resume des nouveautés si une release stable importante change
   |-- messages diffuses : premier contact memorise sans notifier
-  |     puis toutes les 5 min -> notification des identifiants jamais vus
+  |     puis verification en tache de fond toutes les 5 min, meme en pause
+  |     notification des identifiants jamais vus
   |
   |-- planning : hors plage ou creneau deja signe ?
   |     oui -> attendre la prochaine ouverture (tranches de 5 s)
