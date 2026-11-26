@@ -43,7 +43,20 @@ fichier cite plus haut) :
 - `POST /api/event` : evenement (`install`, `signature`), en-tete
   `X-CheckMate-Key`.
 - `GET /api/stats` : resume JSON (authentification basique).
+- `GET /api/messages` : messages diffuses, public, du plus recent au plus ancien.
+- `POST /api/messages` : publie `{"title": "...", "message": "..."}`
+  (authentification basique, titre 80 caracteres, texte 400).
+- `DELETE /api/messages?id=N` : retire un message (authentification basique).
 - `GET /health` : sonde sans authentification.
+
+## Diffusion
+
+Le tableau de bord contient un bloc « Diffusion a toutes les installations » :
+un titre, un message, puis « Envoyer a tout le monde ». Chaque installation
+affiche le message en notification dans les 5 minutes, une seule fois.
+
+Un message peut etre retire depuis la liste : les installations qui l'ont deja
+affiche ne le reverront pas, les autres ne le verront plus.
 
 ## Tests
 

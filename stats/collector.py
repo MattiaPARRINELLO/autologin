@@ -5,6 +5,10 @@ Recoit deux evenements anonymes envoyes par l'application :
 - ``install`` : premiere installation, une seule fois par identifiant ;
 - ``signature`` : une signature reussie.
 
+Il heberge aussi la diffusion de messages : le mainteneur publie un court
+message depuis le tableau de bord, les installations le lisent via
+``GET /api/messages`` et l'affichent en notification.
+
 La base SQLite ne contient ni adresse IP, ni identifiant CESAR, ni contenu de
 signature. Seul un identifiant d'installation aleatoire distingue les machines.
 
@@ -37,6 +41,7 @@ from collections import defaultdict, deque
 from datetime import UTC, datetime, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from urllib.parse import parse_qs, urlparse
 
 logger = logging.getLogger("checkmate-stats")
 
@@ -44,7 +49,12 @@ EVENTS = {"install", "signature"}
 PLATFORMS = {"windows", "linux", "macos", "other"}
 INSTALL_RE = re.compile(r"^[0-9a-f]{8,64}$")
 VERSION_RE = re.compile(r"^[0-9A-Za-z.+-]{1,32}$")
+EVENT_PATH = "/api/event"
+MESSAGES_PATH = "/api/messages"
 MAX_BODY = 4096
+MAX_MESSAGE_TITLE = 80
+MAX_MESSAGE_TEXT = 400
+MAX_MESSAGES = 50
 RATE_WINDOW = 3600
 RATE_LIMIT = 120
 
@@ -62,6 +72,12 @@ CREATE UNIQUE INDEX IF NOT EXISTS one_install
     ON events(install_id) WHERE name = 'install';
 DROP INDEX IF EXISTS one_daily;
 CREATE INDEX IF NOT EXISTS by_day ON events(day);
+CREATE TABLE IF NOT EXISTS messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    message TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
 """
 
 INSERT_EVENT = (
@@ -69,15 +85,9 @@ INSERT_EVENT = (
     "(install_id, name, version, os, day, created_at) "
     "VALUES (?, ?, ?, ?, ?, ?)"
 )
-SQL_INSTALLS = (
-    "SELECT COUNT(DISTINCT install_id) FROM events "
-    "WHERE name = 'install'"
-)
+SQL_INSTALLS = "SELECT COUNT(DISTINCT install_id) FROM events WHERE name = 'install'"
 SQL_SIGNATURES = "SELECT COUNT(*) FROM events WHERE name = 'signature'"
-SQL_SIGNERS = (
-    "SELECT COUNT(DISTINCT install_id) FROM events "
-    "WHERE name = 'signature'"
-)
+SQL_SIGNERS = "SELECT COUNT(DISTINCT install_id) FROM events WHERE name = 'signature'"
 SQL_SERIES = (
     "SELECT day, COALESCE(SUM(name = 'signature'), 0) AS signatures "
     "FROM events WHERE day >= ? GROUP BY day"
@@ -91,6 +101,11 @@ SQL_PLATFORMS = (
     "SELECT os, COUNT(*) AS installs FROM events "
     "WHERE name = 'install' GROUP BY os ORDER BY installs DESC"
 )
+SQL_MESSAGES = (
+    "SELECT id, title, message, created_at FROM messages ORDER BY id DESC LIMIT ?"
+)
+INSERT_MESSAGE = "INSERT INTO messages (title, message, created_at) VALUES (?, ?, ?)"
+DELETE_MESSAGE = "DELETE FROM messages WHERE id = ?"
 
 
 class Store:
@@ -136,10 +151,7 @@ class Store:
         start_day = datetime.now(UTC).date() - timedelta(days=days - 1)
         rows = self._rows(SQL_SERIES, start_day.isoformat())
         found = {row["day"]: row for row in rows}
-        return [
-            self._series_point(start_day, found, offset)
-            for offset in range(days)
-        ]
+        return [self._series_point(start_day, found, offset) for offset in range(days)]
 
     @staticmethod
     def _series_point(start_day, found: dict, offset: int) -> dict:
@@ -157,10 +169,7 @@ class Store:
 
     def _platforms(self) -> list[dict]:
         rows = self._rows(SQL_PLATFORMS)
-        return [
-            {"os": row["os"], "installs": int(row["installs"])}
-            for row in rows
-        ]
+        return [{"os": row["os"], "installs": int(row["installs"])} for row in rows]
 
     def summary(self, days: int = 30) -> dict:
         return {
@@ -171,11 +180,28 @@ class Store:
             "updated_at": datetime.now(UTC).isoformat(timespec="seconds"),
         }
 
+    def messages(self, limit: int = MAX_MESSAGES) -> list[dict]:
+        return [dict(row) for row in self._rows(SQL_MESSAGES, limit)]
+
+    def add_message(self, title: str, message: str) -> dict:
+        created_at = datetime.now(UTC).isoformat(timespec="seconds")
+        with self._connect() as connection:
+            cursor = connection.execute(INSERT_MESSAGE, (title, message, created_at))
+        return {
+            "id": cursor.lastrowid,
+            "title": title,
+            "message": message,
+            "created_at": created_at,
+        }
+
+    def delete_message(self, message_id: int) -> bool:
+        with self._connect() as connection:
+            cursor = connection.execute(DELETE_MESSAGE, (message_id,))
+        return cursor.rowcount > 0
+
 
 class RateLimiter:
-    def __init__(
-        self, limit: int = RATE_LIMIT, window: int = RATE_WINDOW
-    ) -> None:
+    def __init__(self, limit: int = RATE_LIMIT, window: int = RATE_WINDOW) -> None:
         self.limit = limit
         self.window = window
         self._hits: dict[str, deque[float]] = defaultdict(deque)
@@ -217,6 +243,23 @@ def _platform_error(version: str, platform: str) -> str | None:
     if platform not in PLATFORMS:
         return "bad_os"
     return None
+
+
+def _valid_message(payload: dict) -> tuple[str, str] | None:
+    """Titre et texte nettoyes, ou None si le message est invalide."""
+    title = _text_field(payload, "title")
+    message = _text_field(payload, "message")
+    if not title or not message:
+        return None
+    if len(title) > MAX_MESSAGE_TITLE:
+        return None
+    if len(message) > MAX_MESSAGE_TEXT:
+        return None
+    return title, message
+
+
+def _text_field(payload: dict, key: str) -> str:
+    return str(payload.get(key, "")).strip()
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -293,6 +336,9 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/health":
             self._json(200, {"ok": True})
             return
+        if path == MESSAGES_PATH:
+            self._json(200, {"messages": self.store.messages()})
+            return
         if self._authorized():
             self._route_get(path)
 
@@ -306,25 +352,39 @@ class Handler(BaseHTTPRequestHandler):
         self._json(404, {"error": "not_found"})
 
     def _serve_dashboard(self) -> None:
-        self._send(
-            200, DASHBOARD_HTML.encode("utf-8"), "text/html; charset=utf-8"
-        )
+        self._send(200, DASHBOARD_HTML.encode("utf-8"), "text/html; charset=utf-8")
 
     def do_POST(self) -> None:
-        if not self._post_allowed():
+        path = self.path.split("?", 1)[0]
+        if path == MESSAGES_PATH:
+            self._create_message()
+            return
+        if path == EVENT_PATH:
+            self._create_event()
+            return
+        self._reject(404, "not_found")
+
+    def _create_event(self) -> None:
+        if not self.limiter.allow(self.client_address[0]):
+            self._reject(429, "rate_limited")
+            return
+        if not self._ingest_authorized():
             return
         payload = self._read_payload()
         if payload is not None:
             self._store_event(payload)
 
-    def _post_allowed(self) -> bool:
-        if self.path.split("?", 1)[0] != "/api/event":
-            self._reject(404, "not_found")
-            return False
-        if not self.limiter.allow(self.client_address[0]):
-            self._reject(429, "rate_limited")
-            return False
-        return self._ingest_authorized()
+    def _create_message(self) -> None:
+        if not self._authorized():
+            return
+        payload = self._read_payload()
+        if payload is None:
+            return
+        message = _valid_message(payload)
+        if message is None:
+            self._reject(400, "bad_message")
+            return
+        self._json(201, self.store.add_message(*message))
 
     def _reject(self, status: int, error: str) -> None:
         self._json(status, {"error": error})
@@ -370,6 +430,24 @@ class Handler(BaseHTTPRequestHandler):
             return
         inserted = self.store.record(*fields)
         self._json(202, {"ok": True, "duplicate": not inserted})
+
+    def do_DELETE(self) -> None:
+        if not self._authorized():
+            return
+        message_id = _query_id(self.path)
+        if message_id is None:
+            self._reject(400, "bad_id")
+            return
+        if not self.store.delete_message(message_id):
+            self._reject(404, "not_found")
+            return
+        self._json(200, {"ok": True})
+
+
+def _query_id(path: str) -> int | None:
+    query = parse_qs(urlparse(path).query)
+    raw = query.get("id", [""])[0]
+    return int(raw) if raw.isdigit() else None
 
 
 DASHBOARD_HTML = """<!doctype html>
@@ -420,6 +498,20 @@ DASHBOARD_HTML = """<!doctype html>
   th { font-size: 12px; text-transform: uppercase; letter-spacing: .08em;
   color: var(--muted); font-weight: 500; }
   .empty { color: var(--muted); }
+  .composer { display: grid; gap: 10px; padding: 16px; background: var(--card);
+  border: 1px solid var(--line); border-radius: 14px; }
+  .composer input, .composer textarea { width: 100%; padding: 10px 12px;
+  border: 1px solid var(--line); border-radius: 10px; font: inherit;
+  background: #fff; color: var(--ink); }
+  .composer textarea { resize: vertical; }
+  .composer button { justify-self: start; padding: 10px 16px; border: 0;
+  border-radius: 999px; background: var(--accent); color: #fff; font: inherit;
+  font-weight: 600; cursor: pointer; }
+  .composer button:disabled { opacity: .5; cursor: wait; }
+  .message-text { white-space: pre-wrap; }
+  .row-actions { text-align: right; }
+  .link-button { border: 0; background: none; padding: 0; font: inherit;
+  color: var(--accent); cursor: pointer; }
 </style>
 <main>
   <h1>CheckMate</h1>
@@ -449,6 +541,24 @@ DASHBOARD_HTML = """<!doctype html>
     <h2>Systemes</h2>
     <table><thead><tr><th>Systeme</th><th>Installations</th></tr></thead><tbody
     id="platforms"></tbody></table>
+  </section>
+
+  <section>
+    <h2>Diffusion a toutes les installations</h2>
+    <form class="composer" id="broadcast">
+      <input id="broadcast-title" maxlength="80" placeholder="Titre"
+      required>
+      <textarea id="broadcast-message" maxlength="400" rows="3"
+      placeholder="Message affiche en notification..." required></textarea>
+      <button type="submit" id="broadcast-send">Envoyer a tout le monde</button>
+      <span class="empty" id="broadcast-status"></span>
+    </form>
+  </section>
+
+  <section>
+    <h2>Messages diffuses</h2>
+    <table><thead><tr><th>Titre</th><th>Message</th><th>Envoye</th><th></th>
+    </tr></thead><tbody id="broadcast-list"></tbody></table>
   </section>
 </main>
 <script>
@@ -494,6 +604,79 @@ fetch("/api/stats", {headers: {"Accept": "application/json"}})
     document.getElementById("updated").textContent =
       "Impossible de charger les statistiques.";
   });
+
+const broadcastForm = document.getElementById("broadcast");
+const broadcastStatus = document.getElementById("broadcast-status");
+
+function cell(text, className) {
+  const td = document.createElement("td");
+  td.textContent = text;
+  if (className) td.className = className;
+  return td;
+}
+
+function removeMessage(id) {
+  fetch("api/messages?id=" + id, {method: "DELETE"})
+    .then(r => r.ok ? loadMessages() : Promise.reject(r.status))
+    .catch(() => broadcastStatus.textContent = "Suppression refusee.");
+}
+
+function deleteButton(id) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "link-button";
+  button.textContent = "Retirer";
+  button.addEventListener("click", () => removeMessage(id));
+  return button;
+}
+
+function messageRow(message) {
+  const actions = document.createElement("td");
+  actions.className = "row-actions";
+  actions.append(deleteButton(message.id));
+  const tr = document.createElement("tr");
+  tr.append(cell(message.title), cell(message.message, "message-text"),
+    cell(new Date(message.created_at).toLocaleString("fr-FR")), actions);
+  return tr;
+}
+
+function renderMessages(messages) {
+  const body = document.getElementById("broadcast-list");
+  body.replaceChildren(...messages.map(messageRow));
+  if (messages.length) return;
+  const tr = document.createElement("tr");
+  const td = cell("Aucun message pour le moment", "empty");
+  td.colSpan = 4;
+  tr.append(td);
+  body.append(tr);
+}
+
+function loadMessages() {
+  fetch("api/messages", {headers: {"Accept": "application/json"}})
+    .then(r => r.ok ? r.json() : Promise.reject(r.status))
+    .then(data => renderMessages(data.messages))
+    .catch(() => broadcastStatus.textContent = "Liste indisponible.");
+}
+
+broadcastForm.addEventListener("submit", event => {
+  event.preventDefault();
+  const title = document.getElementById("broadcast-title").value.trim();
+  const message = document.getElementById("broadcast-message").value.trim();
+  fetch("api/messages", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({title, message})
+  })
+    .then(r => r.ok ? r.json() : Promise.reject(r.status))
+    .then(() => {
+      broadcastForm.reset();
+      broadcastStatus.textContent = "Message envoye.";
+      loadMessages();
+    })
+    .catch(() => broadcastStatus.textContent = "Envoi refuse.");
+});
+
+loadMessages();
 </script>
 </html>
 """
@@ -518,9 +701,7 @@ def make_server(
     dashboard_user: str = "checkmate",
     dashboard_password: str | None = None,
 ) -> ThreadingHTTPServer:
-    handler = _handler_class(
-        store, ingest_key, dashboard_user, dashboard_password
-    )
+    handler = _handler_class(store, ingest_key, dashboard_user, dashboard_password)
     return ThreadingHTTPServer(("0.0.0.0", port), handler)
 
 
@@ -534,12 +715,8 @@ def _configure_logging() -> None:
 def _server_options() -> dict:
     return {
         "ingest_key": os.environ.get("CHECKMATE_INGEST_KEY", ""),
-        "dashboard_user": os.environ.get(
-            "CHECKMATE_DASHBOARD_USER", "checkmate"
-        ),
-        "dashboard_password": (
-            os.environ.get("CHECKMATE_DASHBOARD_PASSWORD") or None
-        ),
+        "dashboard_user": os.environ.get("CHECKMATE_DASHBOARD_USER", "checkmate"),
+        "dashboard_password": (os.environ.get("CHECKMATE_DASHBOARD_PASSWORD") or None),
     }
 
 

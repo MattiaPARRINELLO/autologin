@@ -71,6 +71,15 @@ class StoreTests(unittest.TestCase):
         self.assertEqual(totals["installs"], 0)
         self.assertEqual(totals["signatures"], 0)
 
+    def test_messages_are_stored_newest_first(self) -> None:
+        first = self.store.add_message("Titre", "Coucou")
+        self.store.add_message("Autre", "Salut")
+        self.assertEqual(first["title"], "Titre")
+        titles = [message["title"] for message in self.store.messages()]
+        self.assertEqual(titles, ["Autre", "Titre"])
+        self.assertTrue(self.store.delete_message(first["id"]))
+        self.assertFalse(self.store.delete_message(first["id"]))
+
 
 class HttpTests(unittest.TestCase):
     def setUp(self) -> None:
@@ -141,9 +150,11 @@ class HttpTests(unittest.TestCase):
             self.assertEqual(status, 400, payload)
 
     def _authorized_request(self, path: str) -> urllib.request.Request:
+        return urllib.request.Request(self.base + path, headers=self._auth_headers())
+
+    def _auth_headers(self) -> dict[str, str]:
         token = base64.b64encode(b"checkmate:secret").decode("ascii")
-        headers = {"Authorization": f"Basic {token}"}
-        return urllib.request.Request(self.base + path, headers=headers)
+        return {"Authorization": f"Basic {token}"}
 
     def test_dashboard_requires_password(self) -> None:
         with urllib.request.urlopen(self.base + "/health") as response:
@@ -166,6 +177,58 @@ class HttpTests(unittest.TestCase):
         with urllib.request.urlopen(request) as response:
             data = json.loads(response.read())
         self.assertEqual(data["totals"]["installs"], 1)
+
+    def _broadcast_request(self, payload: dict, *, authorized: bool):
+        headers = {"Content-Type": "application/json"}
+        if authorized:
+            headers.update(self._auth_headers())
+        body = json.dumps(payload).encode("utf-8")
+        return urllib.request.Request(
+            self.base + "/api/messages", data=body, headers=headers, method="POST"
+        )
+
+    def broadcast(self, payload: dict, *, authorized: bool = True):
+        request = self._broadcast_request(payload, authorized=authorized)
+        try:
+            with urllib.request.urlopen(request) as response:
+                return response.status, json.loads(response.read())
+        except urllib.error.HTTPError as error:
+            return error.code, json.loads(error.read() or b"{}")
+
+    def test_messages_endpoint_is_public(self) -> None:
+        self.store.add_message("Titre", "Coucou")
+        with urllib.request.urlopen(self.base + "/api/messages") as response:
+            data = json.loads(response.read())
+        self.assertEqual(data["messages"][0]["message"], "Coucou")
+
+    def test_sending_message_requires_password(self) -> None:
+        status, _ = self.broadcast(
+            {"title": "Titre", "message": "Coucou"}, authorized=False
+        )
+        self.assertEqual(status, 401)
+
+    def test_message_is_created_and_deleted(self) -> None:
+        status, body = self.broadcast({"title": "Titre", "message": "Coucou"})
+        self.assertEqual(status, 201)
+        delete = urllib.request.Request(
+            self.base + f"/api/messages?id={body['id']}",
+            headers=self._auth_headers(),
+            method="DELETE",
+        )
+        with urllib.request.urlopen(delete) as response:
+            self.assertEqual(response.status, 200)
+        self.assertEqual(self.store.messages(), [])
+
+    def test_bad_message_is_rejected(self) -> None:
+        payloads = (
+            {"title": "", "message": "Coucou"},
+            {"title": "Titre", "message": ""},
+            {"title": "x" * 81, "message": "Coucou"},
+            {"title": "Titre", "message": "x" * 401},
+        )
+        for payload in payloads:
+            status, _ = self.broadcast(payload)
+            self.assertEqual(status, 400, payload)
 
 
 if __name__ == "__main__":
