@@ -1,6 +1,6 @@
 [project]
 name = "checkmate-watcher"
-version = "0.7.0"
+version = "0.7.1"
 description = "Surveille CESAR Emineo et propose de signer l'emargement des qu'il s'ouvre"
 readme = "README.md"
 license = "MIT"
