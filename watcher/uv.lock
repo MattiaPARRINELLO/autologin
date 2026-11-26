@@ -138,7 +138,7 @@ wheels = [
 
 [[package]]
 name = "checkmate-watcher"
-version = "0.7.0-beta.5"
+version = "0.7.0-beta.6"
 source = { editable = "." }
 dependencies = [
     { name = "curl-cffi" },
