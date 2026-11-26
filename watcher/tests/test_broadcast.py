@@ -152,3 +152,20 @@ def test_mode_once_retient_sans_notifier(monkeypatch):
 
     assert sent == []
     assert state.meta["broadcast.last_id"] == "2"
+
+
+def test_la_boucle_diffuse_meme_hors_cycle(monkeypatch):
+    calls: list[str] = []
+
+    async def check(config, state):
+        calls.append("check")
+        if len(calls) == 2:
+            raise asyncio.CancelledError
+
+    monkeypatch.setattr(watcher, "_check_broadcast", check)
+    monkeypatch.setattr(watcher, "BROADCAST_SECONDS", 0)
+
+    with pytest.raises(asyncio.CancelledError):
+        asyncio.run(watcher._broadcast_loop(_config(), _State()))
+
+    assert len(calls) == 2

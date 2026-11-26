@@ -579,7 +579,7 @@ function table(id, rows, key) {
     tr.append(a, b); body.append(tr);
   }
 }
-fetch("/api/stats", {headers: {"Accept": "application/json"}})
+fetch("api/stats", {headers: {"Accept": "application/json"}})
   .then(r => r.ok ? r.json() : Promise.reject(r.status))
   .then(data => {
     fill("installs", data.totals.installs);

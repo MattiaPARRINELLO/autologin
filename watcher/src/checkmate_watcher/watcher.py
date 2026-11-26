@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 import threading
 from dataclasses import dataclass
@@ -225,6 +226,13 @@ async def _check_broadcast(
     if not notify:
         return
     await _notify_broadcast(config, state, messages)
+
+
+async def _broadcast_loop(config: Config, state: StateStore) -> None:
+    """Verifie les messages en continu, meme hors creneau ou en pause."""
+    while True:
+        await _check_broadcast(config, state)
+        await asyncio.sleep(BROADCAST_SECONDS)
 
 
 async def _fetch_broadcast(config: Config):
@@ -516,6 +524,11 @@ async def run_loop(
         tray = TrayController(status_session)
         tray.start()
     stop_event = status_session.stop_event if status_session else None
+    broadcast_task: asyncio.Task | None = None
+    if once:
+        await _check_broadcast(config, state, notify=False)
+    elif not dry_run:
+        broadcast_task = asyncio.create_task(_broadcast_loop(config, state))
 
     try:
         policy = await _startup_policy(config)
@@ -536,7 +549,6 @@ async def run_loop(
             if note is not None:
                 _open_update_celebration(status_session)
         await _check_update(config, state)
-        await _check_broadcast(config, state, notify=not once)
         poll_headless = (
             True if config.watcher.visible_on_sign else config.watcher.headless
         )
@@ -563,7 +575,6 @@ async def run_loop(
         window_key: str | None = None
         last_window_key: str | None = None
         next_heartbeat = asyncio.get_running_loop().time() + HEARTBEAT_SECONDS
-        next_broadcast = asyncio.get_running_loop().time() + BROADCAST_SECONDS
         try:
             while True:
                 if stop_event is not None and stop_event.is_set():
@@ -585,12 +596,6 @@ async def run_loop(
                     )
                     session = await _open_session(config, poll_headless)
                     continue
-
-                if asyncio.get_running_loop().time() >= next_broadcast:
-                    await _check_broadcast(config, state)
-                    next_broadcast = (
-                        asyncio.get_running_loop().time() + BROADCAST_SECONDS
-                    )
 
                 window_key = schedule.window_key(now)
                 if window_key != last_window_key:
@@ -733,6 +738,10 @@ async def run_loop(
     except StopRequested:
         return 0
     finally:
+        if broadcast_task is not None:
+            broadcast_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await broadcast_task
         if tray is not None:
             tray.stop()
         if status_server is not None:
