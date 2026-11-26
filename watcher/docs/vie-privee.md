@@ -31,12 +31,23 @@ ou avec la variable d'environnement `CHECKMATE_ANALYTICS=0`. L'identifiant
 d'installation reste sur ton ordinateur ; supprimer le dossier de données le
 supprime aussi.
 
+Les messages diffuses sont un canal public en lecture seule : l'application
+recupere la liste pour afficher les annonces de l'equipe, sans rien envoyer.
+Seul le dernier identifiant vu reste dans `state.json`. Pour couper ce canal :
+
+```toml
+[broadcast]
+enabled = false
+```
+
 ## Services contactés
 
 - l'instance CESAR Emineo configurée dans l'assistant ;
 - l'API GitHub des releases, si les mises à jour sont activées ;
 - le compteur de statistiques (`main.mprnl.fr/cm-stats`), si les statistiques
-  sont activées.
+  sont activées ;
+- le canal de messages (`main.mprnl.fr/cm-stats/api/messages`), si les messages
+  sont activés.
 
 ## Ce qui est stocké
 

@@ -15,6 +15,7 @@ import tomli_w
 
 from . import __version__
 from .analytics import DEFAULT_ENDPOINT as DEFAULT_ANALYTICS_ENDPOINT
+from .broadcast import DEFAULT_ENDPOINT as DEFAULT_BROADCAST_ENDPOINT
 from .credentials import DEFAULT_SERVICE
 from .credentials import get_password as get_keyring_password
 from .paths import (
@@ -156,6 +157,12 @@ class AnalyticsConfig:
     endpoint: str = DEFAULT_ANALYTICS_ENDPOINT
 
 
+@dataclass(frozen=True)
+class BroadcastConfig:
+    enabled: bool = True
+    endpoint: str = DEFAULT_BROADCAST_ENDPOINT
+
+
 def _legacy_channel(table: dict) -> str | None:
     if "include_prerelease" not in table:
         return None
@@ -201,6 +208,7 @@ class Config:
     schedule: Schedule = field(default_factory=Schedule)
     updates: UpdatesConfig = field(default_factory=UpdatesConfig)
     analytics: AnalyticsConfig = field(default_factory=AnalyticsConfig)
+    broadcast: BroadcastConfig = field(default_factory=BroadcastConfig)
 
 
 def _require(table: dict, key: str, table_name: str) -> str:
@@ -378,6 +386,7 @@ def _remaining_sections(config: Config) -> dict:
         "schedule": _schedule_to_dict(config.schedule),
         "updates": _attr_dict(config.updates, ("enabled", "channel")),
         "analytics": _attr_dict(config.analytics, ("enabled", "endpoint")),
+        "broadcast": _attr_dict(config.broadcast, ("enabled", "endpoint")),
         "selectors": _selectors_to_dict(config.selectors),
     }
 
@@ -650,6 +659,16 @@ def _load_analytics(data: dict) -> AnalyticsConfig:
     return AnalyticsConfig(enabled=enabled, endpoint=endpoint)
 
 
+def _load_broadcast(data: dict) -> BroadcastConfig:
+    table = _table(data, "broadcast")
+    defaults = BroadcastConfig()
+    enabled = _bool(table, "enabled", defaults.enabled)
+    endpoint = str(table.get("endpoint", defaults.endpoint))
+    if enabled:
+        _http(endpoint, "broadcast", "endpoint")
+    return BroadcastConfig(enabled=enabled, endpoint=endpoint)
+
+
 def _load_schedule(data: dict) -> Schedule:
     table = data.get("schedule", {})
     try:
@@ -700,6 +719,7 @@ def _load_parts(data: dict, require_password: bool) -> dict:
         "selectors": _load_selectors(data),
         "updates": _load_updates(data),
         "analytics": _load_analytics(data),
+        "broadcast": _load_broadcast(data),
     }
 
 

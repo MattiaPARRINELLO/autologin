@@ -20,8 +20,8 @@ Le watcher est un processus unique qui :
 
 Aucun service CheckMate n'intervient dans la surveillance : le seul reseau
 sortant va vers CESAR, vers l'API GitHub des releases si les mises a jour sont
-activees, et vers le compteur de statistiques anonymes si `[analytics]` reste
-active.
+activees, vers le compteur de statistiques anonymes si `[analytics]` reste
+active, et vers les messages diffuses si `[broadcast]` reste active.
 
 ## Carte des modules
 
@@ -51,6 +51,7 @@ active.
 | `updates.py` | lecture des releases GitHub, marqueurs de release, canal, version minimale et migration |
 | `release_notes.py` | resumes versionnes des nouveautés et micro-resumes affiches après les mises a jour stables majeures ou mineures |
 | `analytics.py` | compteurs d'usage anonymes : installation et signature |
+| `broadcast.py` | messages diffuses par le mainteneur, derniers vus retenus dans l'etat |
 | `self_update.py` | installation de la cible de mise a jour par un processus detache |
 | `support.py` | archive de diagnostic sans mot de passe ni signature |
 | `paths.py`, `logging_setup.py` | emplacements portables et journalisation avec rotation |
@@ -67,6 +68,8 @@ run_loop() [watcher.py]
   |     REQUIRED au-dessus de la version locale -> mode bloque, run --once code 3
   |     sinon -> annoncer la migration eventuelle et poursuivre
   |     puis -> ouvrir le resume des nouveautés si une release stable importante change
+  |-- messages diffuses : premier contact memorise sans notifier
+  |     puis toutes les 5 min -> notification des identifiants jamais vus
   |
   |-- planning : hors plage ou creneau deja signe ?
   |     oui -> attendre la prochaine ouverture (tranches de 5 s)

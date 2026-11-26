@@ -120,6 +120,21 @@ def test_refuse_un_transport_inconnu(tmp_path):
         )
 
 
+def test_lit_la_diffusion(tmp_path):
+    config = load_config(
+        write_config(tmp_path, "[broadcast]\nenabled = false")
+    )
+    assert config.broadcast.enabled is False
+    assert config.broadcast.endpoint.endswith("/api/messages")
+
+
+def test_refuse_un_endpoint_de_diffusion_invalide(tmp_path):
+    with pytest.raises(ConfigError):
+        load_config(
+            write_config(tmp_path, '[broadcast]\nendpoint = "ftp://exemple"')
+        )
+
+
 def _fail_once(monkeypatch, method: str, error: Exception):
     original = getattr(Path, method)
     calls = {"count": 0}

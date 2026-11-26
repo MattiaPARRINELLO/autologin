@@ -159,6 +159,23 @@ Puis redémarre le service :
 systemctl --user restart checkmate-watcher
 ```
 
+## Messages de l'équipe
+
+Le mainteneur peut diffuser un court message à toutes les installations :
+annonce, panne CESAR, clin d'œil. CheckMate regarde ce canal au démarrage puis
+toutes les 5 minutes, et notifie seulement les messages qu'il n'a pas encore
+montrés. Un message déjà affiché ne revient pas après un redémarrage.
+
+Le canal est public et ne transmet aucune donnée personnelle : l'application ne
+fait que lire la liste des messages. Pour le couper :
+
+```toml
+[broadcast]
+enabled = false
+```
+
+ou avec la variable d'environnement `CHECKMATE_BROADCAST=0`.
+
 ## Mises à jour
 
 CheckMate vérifie les nouvelles versions au démarrage et affiche une
