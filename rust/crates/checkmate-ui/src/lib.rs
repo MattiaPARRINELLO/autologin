@@ -5,6 +5,7 @@
 
 pub mod client;
 pub mod components;
+pub mod state;
 pub mod theme;
 
 /// Titre de la fenetre principale.
