@@ -10,6 +10,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from . import native_integrations
+
 logger = logging.getLogger(__name__)
 
 ZENITY_TIMEOUT_CODE = 5
@@ -21,7 +23,7 @@ class DialogUnavailable(Exception):
     """L'outil de dialogue manque, un autre peut le remplacer."""
 
 
-CHECKMATE_APP_ID = "CheckMate.Watcher"
+CHECKMATE_APP_ID = "fr.checkmate.CheckMate"
 
 POWERSHELL_APP_ID = (
     "{1AC14E77-02E7-4E5D-B744-2EB1AE5198B7}"
@@ -489,6 +491,9 @@ class Notifier:
         )
 
     def send(self, title, message, *, urgency="critical"):
+        native = native_integrations.notify(title, message, urgency=urgency)
+        if native is not None:
+            return native
         if self.platform.startswith("win"):
             return send_windows(title, message, app_name=self.app_name)
         if self.platform == "darwin":
