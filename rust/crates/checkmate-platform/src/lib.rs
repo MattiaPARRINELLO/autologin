@@ -214,9 +214,11 @@ mod tests {
         assert_eq!(
             dirs,
             PlatformDirs {
-                data: PathBuf::from("/data/checkmate-watcher"),
-                config: PathBuf::from("/config/checkmate-watcher"),
-                log: PathBuf::from("/state/checkmate-watcher/log"),
+                data: PathBuf::from("/data").join("checkmate-watcher"),
+                config: PathBuf::from("/config").join("checkmate-watcher"),
+                log: PathBuf::from("/state")
+                    .join("checkmate-watcher")
+                    .join("log"),
             }
         );
     }

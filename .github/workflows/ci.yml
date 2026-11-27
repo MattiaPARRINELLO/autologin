@@ -124,6 +124,14 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      - name: Installer les dependances GPUI
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libx11-dev libxcb1-dev libxkbcommon-dev \
+            libxkbcommon-x11-dev libwayland-dev libfontconfig1-dev
+
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: rust -> target
