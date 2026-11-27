@@ -409,7 +409,9 @@ impl CheckmateApp {
                          coupe le mode silencieux.",
                     )
                     .with_urgency(NoticeUrgency::Normal);
-                    checkmate_platform::notify::send(&notice)
+                    #[cfg(target_os = "windows")]
+                    let notice = notice.with_action("open", "Ouvrir le tableau de bord");
+                    checkmate_platform::notify::send_and_wait(&notice)
                 })
                 .await;
             let _ = this.update(cx, |app, cx| {
