@@ -19,3 +19,12 @@ def test_l_archive_linux_copie_le_binaire_dans_le_venv():
 
     assert "rust/target/release/checkmate-ui" in script
     assert ".venv/bin/checkmate-ui" in script
+
+
+def test_l_installateur_copie_le_binaire_dans_le_venv():
+    script = (
+        Path(__file__).resolve().parents[1] / "scripts" / "install-service.sh"
+    ).read_text(encoding="utf-8")
+
+    assert 'install -m 755 "$APP_DIR/checkmate-ui"' in script
+    assert '"$APP_DIR/.venv/bin/checkmate-ui"' in script

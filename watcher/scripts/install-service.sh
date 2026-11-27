@@ -44,9 +44,15 @@ if command -v rsync >/dev/null 2>&1; then
 else
     find "$APP_DIR" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
     cp -a "$ROOT/pyproject.toml" "$ROOT/uv.lock" "$ROOT/src" "$APP_DIR/"
+    if [ -f "$ROOT/checkmate-ui" ]; then
+        cp -a "$ROOT/checkmate-ui" "$APP_DIR/"
+    fi
 fi
 
 "$ROOT/scripts/create-venv.sh" "$APP_DIR"
+if [ -f "$APP_DIR/checkmate-ui" ]; then
+    install -m 755 "$APP_DIR/checkmate-ui" "$APP_DIR/.venv/bin/checkmate-ui"
+fi
 echo "Application installee dans $APP_DIR"
 
 rm -f "$BIN"
