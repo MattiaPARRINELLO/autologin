@@ -144,6 +144,26 @@ jobs:
         if: runner.os == 'Linux'
         run: python3 scripts/check-boundaries.py
 
+  rust-audit:
+    name: Audit Rust
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: rust
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-deny,cargo-audit
+
+      - name: Licences, bans et sources
+        run: cargo deny check
+
+      - name: Vulnerabilites
+        run: cargo audit
+
   e2e:
     name: E2E emulateur
     runs-on: ubuntu-latest
