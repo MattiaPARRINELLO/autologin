@@ -300,3 +300,16 @@ un ordre de tabulation explicite, des raccourcis, la fermeture par Echap et des
 libelles internes verifiables par test. L'exposition aux lecteurs d'ecran est
 bloquee en amont et suivie dans
 [#163](https://github.com/MattiaPARRINELLO/autologin/issues/163).
+
+### Mode sans fenetre
+
+`checkmate-ui --headless` ou `CHECKMATE_HEADLESS=1` ne cree aucune fenetre : le
+binaire lit `runtime.json`, affiche un resume et sort. `--check` ajoute un code
+de sortie non nul si le service local est absent. Sans ces drapeaux, la fenetre
+est creee a la demande, detruite a la fermeture, et le processus rend le GPU en
+sortant ; le moteur Python continue de tourner, donc une nouvelle ouverture ne
+redemarre rien.
+
+GPUI 0.2.2 n'expose pas d'icone de fenetre. L'icone partagee reste
+`watcher/assets/checkmate.png`, referencee par l'installeur, et son integration
+systeme suit en T2 avec l'icone de barre d'etat.

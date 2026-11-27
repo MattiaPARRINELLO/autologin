@@ -102,7 +102,23 @@ impl CheckmateApp {
             }
             Err(error) => Loadable::Failed(error),
         };
+        self.show_release_note();
         self.state.ensure_focus();
+    }
+
+    /// Ouvre les nouveautes une seule fois, au premier instantane qui les porte.
+    fn show_release_note(&mut self) {
+        if self.state.screen != Screen::Dashboard || self.state.overlay.is_some() {
+            return;
+        }
+        let note = match self.state.status.ready() {
+            Some(status) => status.release_note.clone(),
+            None => None,
+        };
+        if let Some(note) = note {
+            self.state.overlay = Some(Overlay::ReleaseNotes(note));
+            self.state.focus = FocusId::DialogCancel;
+        }
     }
 
     fn apply_key(&mut self, event: &KeyDownEvent, window: &mut Window, cx: &mut Context<Self>) {

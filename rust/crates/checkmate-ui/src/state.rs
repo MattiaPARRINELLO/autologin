@@ -397,7 +397,14 @@ impl AppState {
                 self.form.signature.clear();
                 Effect::None
             }
-            FocusId::SignatureConfirm => Effect::ShowSignatureConfirmation,
+            FocusId::SignatureConfirm => {
+                if self.form.has_signature() && crate::signature::is_usable(&self.form.signature) {
+                    Effect::ShowSignatureConfirmation
+                } else {
+                    self.error = Some("Dessine ou importe d'abord une signature.".to_owned());
+                    Effect::None
+                }
+            }
             FocusId::ImportSignature => Effect::ImportSignature,
             FocusId::Step(_)
             | FocusId::Field(_)
@@ -611,6 +618,17 @@ mod tests {
         assert!(state.form.days.contains(&"sat".to_owned()));
         state.handle_key(Key::Enter);
         assert!(!state.form.days.contains(&"sat".to_owned()));
+    }
+
+    #[test]
+    fn une_signature_vide_n_ouvre_pas_la_confirmation() {
+        let mut state = AppState::default();
+        state.screen = super::Screen::Onboarding;
+        state.step = SetupStep::Signature;
+        state.focus = FocusId::SignatureConfirm;
+        assert_eq!(state.handle_key(Key::Enter), Effect::None);
+        assert!(state.overlay.is_none());
+        assert!(state.error.is_some());
     }
 
     #[test]
