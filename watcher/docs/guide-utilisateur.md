@@ -84,6 +84,9 @@ GTK 3 et WebKit2 sont installés. Sinon, il s'ouvre dans le navigateur.
   Un overlay CheckMate animé accompagne le tracé, avec un trou autour du canvas,
   puis disparaît avant la validation. La confirmation s'affiche deux secondes,
   puis la fenêtre se referme.
+- Le tracé est envoyé en une seule passe, instantanée. Si tu reprends la main et
+  signes toi-même, tu peux fermer la fenêtre : CheckMate vérifie l'émargement et
+  enregistre la présence au lieu de signaler une erreur.
 - Si la detection HTTP échoue ou rencontre un blocage, CheckMate prévient et
   repasse automatiquement sur le navigateur pour le reste du créneau.
 - Une fois signé sur un créneau, CheckMate ne vérifie plus rien jusqu'au créneau
