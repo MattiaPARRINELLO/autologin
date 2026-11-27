@@ -47,10 +47,21 @@ release_notes_data = [
     (str(SRC / "checkmate_watcher" / "release_notes.json"), "checkmate_watcher")
 ]
 
+RUST = PROJECT.parent / "rust" / "target" / "release"
+native_name = "checkmate-ui.exe" if sys.platform.startswith("win") else "checkmate-ui"
+native_binary = RUST / native_name
+if not native_binary.is_file():
+    raise SystemExit(
+        f"{native_name} absent : {native_binary}."
+        " Compile le workspace Rust avant l'installeur"
+        " (cargo build --release -p checkmate-cli --bin checkmate-ui)."
+    )
+native_binaries = [(str(native_binary), ".")]
+
 a = Analysis(
     [str(PROJECT / "packaging" / "entrypoint.py")],
     pathex=[str(SRC)],
-    binaries=playwright_binaries + webview_binaries + curl_binaries,
+    binaries=playwright_binaries + webview_binaries + curl_binaries + native_binaries,
     datas=playwright_datas + webview_datas + curl_datas + release_notes_data,
     hiddenimports=hiddenimports,
     hookspath=[],
