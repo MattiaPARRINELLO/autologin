@@ -1,0 +1,15 @@
+[package]
+name = "checkmate-ui"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+description = "Interface native GPUI de CheckMate"
+
+[dependencies]
+checkmate-core.workspace = true
+
+[lints]
+workspace = true
