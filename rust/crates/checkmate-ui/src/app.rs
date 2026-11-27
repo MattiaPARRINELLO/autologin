@@ -652,6 +652,7 @@ fn translate_key(event: &KeyDownEvent) -> Key {
         "space" => Key::Space,
         "escape" => Key::Escape,
         "backspace" => Key::Backspace,
+        _ if keystroke.modifiers.control || keystroke.modifiers.alt => Key::Char(String::new()),
         _ => match &keystroke.key_char {
             Some(text) if !text.is_empty() => Key::Char(text.clone()),
             _ => Key::Char(keystroke.key.clone()),

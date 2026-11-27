@@ -305,7 +305,15 @@ impl AppState {
                 Effect::None
             }
             Key::Escape => self.escape(),
-            Key::Enter | Key::Space => self.activate(),
+            Key::Enter => self.activate(),
+            Key::Space => {
+                if self.edits_text() {
+                    self.edit_text(|text| text.push(' '));
+                    Effect::None
+                } else {
+                    self.activate()
+                }
+            }
             Key::Backspace => {
                 self.edit_text(|text| {
                     text.pop();
@@ -332,17 +340,28 @@ impl AppState {
         Effect::None
     }
 
+    fn edits_text(&self) -> bool {
+        matches!(&self.focus, FocusId::Field(_) | FocusId::Window(_))
+    }
+
     fn edit_text(&mut self, edit: impl FnOnce(&mut String)) {
-        let FocusId::Field(field) = &self.focus else {
-            return;
-        };
-        let target = match field {
-            Field::BaseUrl => &mut self.form.base_url,
-            Field::Username => &mut self.form.username,
-            Field::Password => &mut self.form.password,
-            Field::ImportPath => &mut self.form.import_path,
-        };
-        edit(target);
+        match &self.focus {
+            FocusId::Field(field) => {
+                let target = match field {
+                    Field::BaseUrl => &mut self.form.base_url,
+                    Field::Username => &mut self.form.username,
+                    Field::Password => &mut self.form.password,
+                    Field::ImportPath => &mut self.form.import_path,
+                };
+                edit(target);
+            }
+            FocusId::Window(index) => {
+                if let Some(window) = self.form.windows.get_mut(*index) {
+                    edit(window);
+                }
+            }
+            _ => {}
+        }
     }
 
     fn activate(&mut self) -> Effect {
@@ -618,6 +637,30 @@ mod tests {
         assert!(state.form.days.contains(&"sat".to_owned()));
         state.handle_key(Key::Enter);
         assert!(!state.form.days.contains(&"sat".to_owned()));
+    }
+
+    #[test]
+    fn l_espace_s_ecrit_dans_un_champ() {
+        let mut state = AppState::default();
+        state.screen = super::Screen::Onboarding;
+        state.step = SetupStep::Credentials;
+        state.focus = FocusId::Field(Field::Username);
+        state.handle_key(Key::Char("a".to_owned()));
+        state.handle_key(Key::Space);
+        assert_eq!(state.form.username, "a ");
+    }
+
+    #[test]
+    fn un_creneau_se_modifie_au_clavier() {
+        let mut state = AppState::default();
+        state.screen = super::Screen::Onboarding;
+        state.step = SetupStep::Schedule;
+        state.focus = FocusId::Window(0);
+        state.form.windows[0].clear();
+        for character in "09:00-10:00".chars() {
+            state.handle_key(Key::Char(character.to_string()));
+        }
+        assert_eq!(state.form.windows[0], "09:00-10:00");
     }
 
     #[test]
