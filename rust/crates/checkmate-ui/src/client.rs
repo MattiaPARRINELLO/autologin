@@ -353,6 +353,40 @@ mod tests {
     use std::net::TcpListener;
     use std::path::PathBuf;
 
+    /// Lit la requete complete, corps compris. Sans cela, Windows
+    /// interrompt la connexion (10053) quand le client a encore un corps
+    /// a envoyer.
+    fn read_request(stream: &mut std::net::TcpStream) -> String {
+        let mut data = Vec::new();
+        let mut buffer = [0_u8; 1024];
+        loop {
+            let read = stream.read(&mut buffer).unwrap();
+            if read == 0 {
+                break;
+            }
+            data.extend_from_slice(&buffer[..read]);
+            if let Some(position) = headers_end(&data) {
+                let headers = String::from_utf8_lossy(&data[..position]);
+                let length = headers
+                    .lines()
+                    .find_map(|line| {
+                        line.to_lowercase()
+                            .strip_prefix("content-length:")
+                            .and_then(|value| value.trim().parse::<usize>().ok())
+                    })
+                    .unwrap_or(0);
+                if data.len() >= position + 4 + length {
+                    break;
+                }
+            }
+        }
+        String::from_utf8_lossy(&data).into_owned()
+    }
+
+    fn headers_end(data: &[u8]) -> Option<usize> {
+        data.windows(4).position(|window| window == b"\r\n\r\n")
+    }
+
     fn write_runtime(dir: &std::path::Path, name: &str, port: u16) -> PathBuf {
         let path = dir.join(name);
         let payload = format!(
@@ -381,6 +415,7 @@ mod tests {
         assert!(!error.is_stale());
     }
 
+    #[cfg(unix)]
     #[test]
     fn signale_un_processus_disparu() {
         let dir = std::env::temp_dir().join("checkmate-runtime-test");
@@ -400,9 +435,7 @@ mod tests {
         let runtime = write_runtime(&dir, "runtime.json", port);
         let worker = std::thread::spawn(move || {
             let (mut stream, _) = listener.accept().unwrap();
-            let mut buffer = [0_u8; 2048];
-            let read = stream.read(&mut buffer).unwrap();
-            let request = String::from_utf8_lossy(&buffer[..read]).into_owned();
+            let request = read_request(&mut stream);
             assert!(
                 request
                     .to_lowercase()
@@ -432,8 +465,7 @@ mod tests {
         let runtime = write_runtime(&dir, "runtime.json", port);
         let worker = std::thread::spawn(move || {
             let (mut stream, _) = listener.accept().unwrap();
-            let mut buffer = [0_u8; 2048];
-            let _ = stream.read(&mut buffer).unwrap();
+            let _ = read_request(&mut stream);
             let body = r#"{"error":"notification impossible sur ce systeme"}"#;
             let response = format!(
                 "HTTP/1.1 409 Conflict\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{body}",
@@ -467,10 +499,11 @@ mod tests {
         let runtime = write_runtime(&dir, "runtime.json", port);
         let worker = std::thread::spawn(move || {
             let (mut stream, _) = listener.accept().unwrap();
-            let mut buffer = [0_u8; 2048];
-            let _ = stream.read(&mut buffer).unwrap();
+            let _ = read_request(&mut stream);
             stream
-                .write_all(b"HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\n\r\n")
+                .write_all(
+                    b"HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
+                )
                 .unwrap();
         });
 
