@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
+import signal
 import threading
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -506,6 +507,37 @@ def _open_update_celebration(session: StatusSession | None) -> None:
     ).start()
 
 
+def _install_stop_handlers(stop_event: threading.Event) -> None:
+    """Transforme SIGTERM et SIGINT en demande d'arret propre."""
+
+    def request_stop(signum, _frame):
+        logger.info("arret demande (signal %s)", signum)
+        stop_event.set()
+
+    for name in ("SIGTERM", "SIGINT"):
+        candidate = getattr(signal, name, None)
+        if candidate is None:
+            continue
+        try:
+            signal.signal(candidate, request_stop)
+        except (OSError, ValueError):
+            logger.debug("signal %s non installable", name)
+
+
+async def _cancel_on_stop(
+    stop_event: threading.Event, task: asyncio.Task | None
+) -> None:
+    """Annule la tache principale des que l'arret est demande.
+
+    Une signature en cours peut durer plusieurs minutes. Sans annulation, un
+    SIGTERM laisserait le navigateur ouvert jusqu'au delai de systemd.
+    """
+    while not stop_event.is_set():
+        await asyncio.sleep(0.2)
+    if task is not None and not task.done():
+        task.cancel()
+
+
 async def run_loop(
     config: Config,
     *,
@@ -563,6 +595,13 @@ async def run_loop(
             tray = TrayController(status_session)
             tray.start()
     stop_event = status_session.stop_event if status_session else None
+    if stop_event is not None:
+        _install_stop_handlers(stop_event)
+    stop_watcher: asyncio.Task | None = None
+    if stop_event is not None:
+        stop_watcher = asyncio.create_task(
+            _cancel_on_stop(stop_event, asyncio.current_task())
+        )
     broadcast_task: asyncio.Task | None = None
     if once:
         await _check_broadcast(config, state, notify=False)
@@ -798,10 +837,18 @@ async def run_loop(
 
                 await asyncio.sleep(config.watcher.poll_interval)
         finally:
+            logger.info("fermeture du navigateur")
             await session.close()
     except StopRequested:
         return 0
+    except asyncio.CancelledError:
+        logger.info("arret demande, fermeture en cours")
+        return 0
     finally:
+        if stop_watcher is not None:
+            stop_watcher.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await stop_watcher
         if broadcast_task is not None:
             broadcast_task.cancel()
             with contextlib.suppress(asyncio.CancelledError):
