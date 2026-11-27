@@ -20,6 +20,10 @@ allow = [
   "CC0-1.0",
   "MPL-2.0",
   "Unlicense",
+  # libfuzzer-sys, build-dep transitive de rav1e via image (gpui).
+  "NCSA",
+  # webpki-roots, donnees de racines TLS utilisees par le client HTTP de gpui.
+  "CDLA-Permissive-2.0",
 ]
 confidence-threshold = 0.8
 
