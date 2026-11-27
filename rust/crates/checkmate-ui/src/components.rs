@@ -5,7 +5,7 @@
 //! dans les vues.
 
 use gpui::prelude::*;
-use gpui::{div, px, Div, Pixels, SharedString};
+use gpui::{Div, Pixels, SharedString, div, px};
 
 use checkmate_core::status::Tone;
 
@@ -244,8 +244,14 @@ pub fn empty_state(
 }
 
 /// Puce selectionnable (jour, canal, option).
-pub fn chip(theme: &Theme, label: impl Into<SharedString>, selected: bool) -> Div {
+pub fn chip(
+    theme: &Theme,
+    id: impl Into<SharedString>,
+    label: impl Into<SharedString>,
+    selected: bool,
+) -> gpui::Stateful<Div> {
     div()
+        .id(id.into())
         .flex()
         .items_center()
         .justify_center()
@@ -318,7 +324,7 @@ pub fn radii(theme: &Theme) -> [Pixels; 3] {
 
 #[cfg(test)]
 mod tests {
-    use super::{button_colors, ButtonKind};
+    use super::{ButtonKind, button_colors};
     use crate::theme::{Motion, Theme};
 
     #[test]

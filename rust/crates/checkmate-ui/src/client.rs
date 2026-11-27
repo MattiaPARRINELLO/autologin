@@ -15,8 +15,8 @@ use checkmate_core::setup::{
     Credentials, FinishPayload, SchedulePayload, SetupResult, SetupState, SignaturePayload,
 };
 use checkmate_core::status::{ActionResult, StatusSnapshot};
-use serde::de::DeserializeOwned;
 use serde::Deserialize;
+use serde::de::DeserializeOwned;
 
 /// En-tete d'authentification des deux serveurs locaux.
 pub const TOKEN_HEADER: &str = "X-CheckMate-Token";
@@ -112,9 +112,7 @@ impl ApiError {
             Self::RuntimeMissing(_) | Self::RuntimeStale(_) | Self::Unreachable(_) => {
                 "Relance CheckMate depuis le menu Demarrer."
             }
-            Self::RuntimeInvalid(_) => {
-                "Le fichier d'etat local est illisible. Relance CheckMate."
-            }
+            Self::RuntimeInvalid(_) => "Le fichier d'etat local est illisible. Relance CheckMate.",
             Self::Unauthorized => "Le jeton local a ete refuse. Relance CheckMate.",
             Self::Rejected { .. } | Self::Decode(_) => "",
         }
@@ -252,7 +250,9 @@ fn transport(error: ureq::Error) -> ApiError {
     }
 }
 
-fn decode<T: DeserializeOwned>(mut response: ureq::http::Response<ureq::Body>) -> Result<T, ApiError> {
+fn decode<T: DeserializeOwned>(
+    mut response: ureq::http::Response<ureq::Body>,
+) -> Result<T, ApiError> {
     let status = response.status().as_u16();
     if status == 403 {
         return Err(ApiError::Unauthorized);
@@ -355,7 +355,10 @@ mod tests {
 
     fn write_runtime(dir: &std::path::Path, name: &str, port: u16) -> PathBuf {
         let path = dir.join(name);
-        let payload = format!(r#"{{"pid":{},"port":{port},"token":"jeton-test"}}"#, std::process::id());
+        let payload = format!(
+            r#"{{"pid":{},"port":{port},"token":"jeton-test"}}"#,
+            std::process::id()
+        );
         std::fs::write(&path, payload).unwrap();
         path
     }

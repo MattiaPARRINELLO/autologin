@@ -6,7 +6,7 @@
 use std::time::Duration;
 
 use gpui::SharedString;
-use gpui::{px, rgb, FontWeight, Pixels, Rgba, WindowAppearance};
+use gpui::{FontWeight, Pixels, Rgba, WindowAppearance, px, rgb};
 
 /// Palette complete d'une apparence.
 #[derive(Debug, Clone, PartialEq)]
@@ -86,11 +86,7 @@ impl Motion {
 
     /// Duree a appliquer, nulle en mouvement reduit.
     pub fn duration(&self, normal: Duration) -> Duration {
-        if self.reduced {
-            Duration::ZERO
-        } else {
-            normal
-        }
+        if self.reduced { Duration::ZERO } else { normal }
     }
 }
 
