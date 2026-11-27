@@ -38,6 +38,7 @@ pub fn header(state: &AppState, theme: &Theme, cx: &mut Context<CheckmateApp>) -
         .ready()
         .map_or_else(String::new, |status| status.channel.clone());
     div()
+        .debug_selector(|| "header".to_owned())
         .flex()
         .items_center()
         .justify_between()
@@ -146,6 +147,7 @@ pub fn dashboard(
     div()
         .flex()
         .flex_col()
+        .debug_selector(|| "dashboard".to_owned())
         .items_center()
         .w_full()
         .flex_1()
@@ -406,6 +408,7 @@ fn actions_row(state: &AppState, theme: &Theme, cx: &mut Context<CheckmateApp>) 
                 style,
                 !busy,
             )
+            .debug_selector(move || format!("action-{}", kind.name()))
             .when(focused, |button| {
                 button.border_2().border_color(theme.focus_ring)
             })
@@ -466,6 +469,7 @@ where
     U: Fn(&MouseUpEvent, &mut gpui::Window, &mut App) + 'static,
 {
     let mut column = components::content_column(theme)
+        .debug_selector(move || format!("step-{}", state.step.index()))
         .py(theme.spacing.xl)
         .child(stepper(state, theme))
         .when_some(state.error.clone(), |column, error| {
@@ -698,6 +702,7 @@ where
     let pad_focused = state.focus == FocusId::SignatureConfirm;
     div()
         .id("signature-pad")
+        .debug_selector(|| "signature-pad".to_owned())
         .flex()
         .items_center()
         .justify_center()
@@ -1041,6 +1046,7 @@ pub fn modal(
         } => confirm_card(state, theme, *action, title.clone(), body.clone(), cx),
     };
     div()
+        .debug_selector(|| "modal".to_owned())
         .absolute()
         .top_0()
         .left_0()
@@ -1054,10 +1060,11 @@ pub fn modal(
 
 fn modal_card(theme: &Theme) -> gpui::Stateful<Div> {
     components::card(theme)
-        .id("modal-card")
-        .overflow_y_scroll()
         .w(px(560.0))
         .max_h(px(600.0))
+        .id("modal-card")
+        .overflow_y_scroll()
+        .debug_selector(|| "modal-card".to_owned())
 }
 
 fn release_card(

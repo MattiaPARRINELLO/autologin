@@ -423,6 +423,12 @@ impl CheckmateApp {
         .detach();
     }
 
+    /// Ouvre l'assistant au demarrage, sans fenetre deja affichee.
+    pub fn open_onboarding_initial(&mut self, cx: &mut Context<Self>) {
+        self.state.open_onboarding();
+        self.load_setup(cx);
+    }
+
     /// Ouvre l'assistant et charge son etat.
     pub fn open_onboarding(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.run_effect(Effect::OpenOnboarding, window, cx);
@@ -540,6 +546,11 @@ impl CheckmateApp {
         self.run_effect(effect, window, cx);
     }
 
+    /// Poignee de focus racine, pour les tests de rendu.
+    pub fn focus_handle(&self) -> FocusHandle {
+        self.focus.clone()
+    }
+
     fn focus(&mut self, target: FocusId, window: &mut Window, cx: &mut Context<Self>) {
         self.state.focus = target;
         window.focus(&self.focus);
@@ -641,6 +652,8 @@ impl Render for CheckmateApp {
         }
         let theme = &self.theme;
         let mut root = components::page(theme)
+            .relative()
+            .debug_selector(|| "app-root".to_owned())
             .track_focus(&self.focus)
             .on_key_down(cx.listener(|this, event: &KeyDownEvent, window, cx| {
                 this.apply_key(event, window, cx);
@@ -673,9 +686,18 @@ impl Render for CheckmateApp {
     }
 }
 
-/// Lance l'application en fenetre.
+/// Lance l'application en fenetre sur le tableau de bord.
 pub fn run() {
-    Application::new().run(|cx: &mut App| {
+    run_screen(false);
+}
+
+/// Lance l'application directement sur l'assistant.
+pub fn run_setup() {
+    run_screen(true);
+}
+
+fn run_screen(setup: bool) {
+    Application::new().run(move |cx: &mut App| {
         let spec = checkmate_platform::DASHBOARD_WINDOW;
         let options = WindowOptions {
             app_id: Some(checkmate_platform::APP_ID.to_owned()),
@@ -687,7 +709,11 @@ pub fn run() {
         };
         let window = cx.open_window(options, |window, cx| {
             let app = cx.new(CheckmateApp::new);
-            app.update(cx, CheckmateApp::start);
+            if setup {
+                app.update(cx, CheckmateApp::open_onboarding_initial);
+            } else {
+                app.update(cx, CheckmateApp::start);
+            }
             let focus = app.read(cx).focus.clone();
             window.focus(&focus);
             app

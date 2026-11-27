@@ -21,6 +21,9 @@ image = { version = "0.25.9", default-features = false, features = ["png", "jpeg
 [dev-dependencies]
 serde_json.workspace = true
 
+[target.'cfg(any(target_os = "linux", target_os = "freebsd"))'.dev-dependencies]
+gpui = { workspace = true, features = ["test-support"] }
+
 [target.'cfg(any(target_os = "linux", target_os = "freebsd"))'.dependencies]
 gpui = { workspace = true, features = ["x11", "wayland"] }
 

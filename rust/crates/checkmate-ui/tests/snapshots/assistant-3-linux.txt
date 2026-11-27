@@ -1,0 +1,10 @@
+ecran: assistant
+focus: focus : Signature
+titre: Creneau signe
+version: 0.7.1-beta.1 (beta)
+creneaux: 08:00-12:30, 13:30-17:30
+jours: mon,tue,wed,thu,fri
+compteurs: Demarrages=42 Detections=37 Signatures=12 Erreurs=1
+etape: Signature (3)
+compte: etudiant.exemple
+signature: 0 points
