@@ -1,4 +1,8 @@
 {
+  "0.7.1-beta.1": {
+    "version": "0.7.1-beta.1",
+    "teaser": "Signature plus rapide et plus fiable : tracé en une passe et reprise en main si le navigateur se ferme."
+  },
   "0.7.0": {
     "version": "0.7.0",
     "importance": "important",
