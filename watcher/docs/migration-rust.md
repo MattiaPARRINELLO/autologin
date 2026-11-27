@@ -28,11 +28,12 @@ tranche T0.
 | `config.toml` | Python E | Python E | Python E | Rust E | Rust E | Rust E | Rust E |
 | `state.json` | Python E | Python E | Python E | Python E | Rust E | Rust E | Rust E |
 | `runtime.json`, `setup-runtime.json` et API locale | Python E | Python E, Rust L | Python E, Rust L | transition | Rust E | Rust E | supprime |
-| Logs | Python E | Python E | Rust E | Rust E | Rust E | Rust E | Rust E |
+| Logs | Python E | Python E | Python E, Rust E | Rust E | Rust E | Rust E | Rust E |
 | Trousseau | Python E | Python E | Python E | Rust E | Rust E | Rust E | Rust E |
 | Signature et session CESAR | Python E | Python E | Python E | Python E | Python E | Rust E | Rust E |
 | Mises a jour et notes | Python E | Python E | Python E | Rust E | Rust E | Rust E | Rust E |
 | Icone et notifications | Python E | Python E | Rust E | Rust E | Rust E | Rust E | Rust E |
+| Autostart | Python E | Python E | Rust E | Rust E | Rust E | Rust E | Rust E |
 | Interface | HTML | GPUI | GPUI | GPUI | GPUI | GPUI | GPUI |
 | Binaire publie | Python | Python | Python | Python | beta Rust | beta Rust | Rust |
 
@@ -45,7 +46,11 @@ tranche T0.
   il est present ; s'il manque, Python journalise l'erreur et retombe sur
   pywebview puis le navigateur pour ne pas bloquer l'utilisateur.
 - **T2** : l'icone, les notifications et l'autostart passent au Rust. Python
-  n'affiche plus d'icone et ne cree plus de service. Le moteur continue.
+  n'affiche plus d'icone et ne cree plus de service. Le moteur continue et
+  demande les notifications au binaire natif. Les journaux du moteur restent
+  dans le fichier Python ; les integrations natives ecrivent leur propre
+  `checkmate-native.log`. Aucun drapeau de bascule ne survit a la tranche : le
+  repli Python ne s'active que si `checkmate-ui` manque ou echoue.
 - **T3** : la config, l'etat, les logs, le trousseau, les mises a jour et les
   notes passent au Rust. Python lit `config.toml` et `state.json` sans les
   ecrire. La boucle et la signature restent Python.

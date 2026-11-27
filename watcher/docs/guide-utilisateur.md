@@ -32,12 +32,14 @@ moment de signer, puis se referme.
 3. Windows SmartScreen peut afficher un avertissement tant que l'exécutable
    n'est pas signé. Clique sur "Informations complémentaires" puis
    "Exécuter quand même".
-4. À la fin, l'onboarding s'ouvre dans une fenêtre CheckMate native. Si
-   WebView2 est absent, il s'ouvre dans ton navigateur.
+4. À la fin, l'onboarding s'ouvre dans une fenêtre CheckMate native. Si le
+   binaire natif manque, il s'ouvre dans ton navigateur.
 
 L'installeur crée un raccourci "CheckMate" dans le menu Démarrer. Le raccourci
 ouvre le tableau de bord. L'assistant installe le démarrage automatique à
-l'ouverture de session.
+l'ouverture de session : une entrée `CheckMate` dans la clé `Run` de
+l'utilisateur. Le désactiver retire cette entrée, sans toucher au reste de la
+configuration.
 
 ## Installation sur Linux
 
@@ -53,8 +55,10 @@ L'installateur installe l'application dans `~/.local/share/checkmate-watcher`,
 crée le service utilisateur systemd, ajoute une entrée **CheckMate** dans le menu
 des applications et lance l'onboarding si aucune configuration n'existe.
 
-L'entrée du menu ouvre le tableau de bord dans une fenêtre native, si PyGObject,
-GTK 3 et WebKit2 sont installés. Sinon, il s'ouvre dans le navigateur.
+L'entrée du menu ouvre le tableau de bord dans une fenêtre native CheckMate. Si
+le binaire natif manque, le tableau de bord s'ouvre dans le navigateur.
+L'assistant installe un service utilisateur systemd
+(`checkmate-watcher.service`) ; le désactiver le retire proprement.
 
 ## Onboarding
 
@@ -102,8 +106,16 @@ créneau en cours, prochaine ouverture, compteurs, dernière signature. Il perme
 de reconfigurer, tester la notification, vérifier les mises à jour, ouvrir les
 logs ou quitter.
 
-Une icône apparaît dans la zone de notification Windows. Elle change de couleur
-selon l'état : active, hors créneau, créneau signé ou erreur.
+Une icône apparaît dans la zone de notification Linux et Windows. Elle change
+de couleur selon l'état : active, hors créneau, créneau signé, attente ou
+erreur. Son menu propose d'ouvrir le tableau de bord, de reconfigurer, de tester
+la notification, de vérifier les mises à jour et de quitter. Sous Windows, un
+double-clic sur l'icône ouvre le tableau de bord.
+
+Les notifications sont affichées par le composant natif. Une notification
+identique remplace la précédente au lieu de s'empiler. Si le service de
+notification du bureau est absent, CheckMate affiche une fenêtre de confirmation
+et l'indique dans `checkmate-native.log`, sans bloquer la surveillance.
 
 ## Modifier la configuration
 

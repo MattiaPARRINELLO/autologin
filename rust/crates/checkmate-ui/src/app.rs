@@ -14,6 +14,7 @@ use checkmate_core::setup::{
     Credentials, FinishPayload, SchedulePayload, SetupResult, SignaturePayload, SignaturePoint,
 };
 use checkmate_core::status::StatusSnapshot;
+use checkmate_platform::notify::{Notice, NoticeUrgency, NotifyOutcome};
 
 use crate::client::{ApiError, Backend, LiveBackend};
 use crate::components;
@@ -395,17 +396,44 @@ impl CheckmateApp {
     }
 
     fn test_notification(&mut self, cx: &mut Context<Self>) {
-        let backend = self.backend.clone();
         self.state.error = None;
+        self.state.message = Some("Test de notification en cours...".to_owned());
+        cx.notify();
         cx.spawn(async move |this, cx| {
-            let result = cx
+            let outcome = cx
                 .background_executor()
-                .spawn(async move { backend.test_notification() })
+                .spawn(async {
+                    let notice = Notice::new(
+                        "CheckMate",
+                        "Test de notification. Si tu ne la vois pas, \
+                         coupe le mode silencieux.",
+                    )
+                    .with_urgency(NoticeUrgency::Normal);
+                    #[cfg(target_os = "windows")]
+                    let notice = notice.with_action("open", "Ouvrir le tableau de bord");
+                    checkmate_platform::notify::send_and_wait(&notice)
+                })
                 .await;
             let _ = this.update(cx, |app, cx| {
-                match result {
-                    Ok(response) => app.state.message = Some(response.message),
-                    Err(error) => app.state.error = Some(error.to_string()),
+                match outcome {
+                    NotifyOutcome::Shown => {
+                        app.state.message = Some(
+                            "Notification envoyée. Si tu ne la vois pas, \
+                             coupe le mode silencieux."
+                                .to_owned(),
+                        );
+                    }
+                    NotifyOutcome::FallbackShown => {
+                        app.state.message = Some(
+                            "Service de notification indisponible : une fenêtre de \
+                             confirmation s'est affichée."
+                                .to_owned(),
+                        );
+                    }
+                    NotifyOutcome::Unavailable(reason) => {
+                        app.state.error =
+                            Some(format!("Notification impossible sur ce système : {reason}"));
+                    }
                 }
                 cx.notify();
             });

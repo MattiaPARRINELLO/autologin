@@ -1,14 +1,21 @@
 //! Integrations systeme de CheckMate.
 //!
-//! Tranche T1 : identite de l'application, emplacements des fichiers Python et
-//! description de la fenetre. Aucune ecriture, aucun secret, aucune API
-//! reservee a une seule plateforme.
+//! Tranche T2 : identite de l'application, emplacements des fichiers Python,
+//! description de la fenetre, icone de zone de notification, notifications
+//! bureau et demarrage automatique. Aucune API reservee a une seule plateforme
+//! dans l'interface publique.
 //!
 //! Les emplacements reproduisent `watcher/src/checkmate_watcher/paths.py`
 //! (platformdirs) pour que la coquille Rust lise le `runtime.json` ecrit par
 //! Python au meme endroit.
 
 use std::path::PathBuf;
+
+pub mod autostart;
+pub mod icon;
+pub mod log;
+pub mod notify;
+pub mod tray;
 
 /// Plateforme de compilation, pour les journaux et le diagnostic.
 #[must_use]
@@ -168,6 +175,40 @@ pub fn process_alive(pid: u32) -> bool {
         return std::path::Path::new("/proc").join(pid.to_string()).exists();
     }
     true
+}
+
+/// Ouvre le tableau de bord dans un nouveau processus `checkmate-ui`.
+///
+/// Utilise par l'icone et par les notifications pour reactiver l'interface
+/// sans lier la crate a GPUI.
+pub fn spawn_dashboard() -> bool {
+    let Ok(executable) = std::env::current_exe() else {
+        return false;
+    };
+    let mut command = std::process::Command::new(executable);
+    command
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null());
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        command.creation_flags(0x0800_0000);
+    }
+    match command.spawn() {
+        Ok(mut child) => {
+            std::thread::spawn(move || {
+                let _ = child.wait();
+            });
+            true
+        }
+        Err(error) => {
+            log::warn(&format!(
+                "ouverture du tableau de bord impossible : {error}"
+            ));
+            false
+        }
+    }
 }
 
 /// Vrai si l'environnement interdit d'ouvrir une fenetre.

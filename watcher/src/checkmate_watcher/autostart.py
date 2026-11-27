@@ -8,6 +8,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+from . import native_integrations
 from .paths import default_env_path
 
 logger = logging.getLogger(__name__)
@@ -133,6 +134,13 @@ def _enable_windows(executable: Path, config_path: Path) -> bool:
 
 
 def enable_autostart(executable: Path, config_path: Path) -> bool:
+    native = native_integrations.autostart("enable", executable, config_path)
+    if native is not None:
+        return native
+    return _enable_autostart_legacy(executable, config_path)
+
+
+def _enable_autostart_legacy(executable: Path, config_path: Path) -> bool:
     if sys.platform.startswith("win"):
         return _enable_windows(executable, config_path)
     if sys.platform == "linux":
@@ -180,6 +188,13 @@ def _disable_windows() -> bool:
 
 
 def disable_autostart() -> bool:
+    native = native_integrations.autostart("disable")
+    if native is not None:
+        return native
+    return _disable_autostart_legacy()
+
+
+def _disable_autostart_legacy() -> bool:
     if sys.platform.startswith("win"):
         return _disable_windows()
     if sys.platform == "linux":
@@ -214,6 +229,13 @@ def _status_windows() -> bool:
 
 
 def autostart_enabled() -> bool:
+    native = native_integrations.autostart_enabled()
+    if native is not None:
+        return native
+    return _autostart_enabled_legacy()
+
+
+def _autostart_enabled_legacy() -> bool:
     if sys.platform.startswith("win"):
         return _status_windows()
     if sys.platform == "linux":
@@ -234,6 +256,13 @@ def restart_autostart() -> bool:
 
     Sur Windows, l'entree du registre prend effet a la prochaine session.
     """
+    native = native_integrations.autostart("restart")
+    if native is not None:
+        return native
+    return _restart_autostart_legacy()
+
+
+def _restart_autostart_legacy() -> bool:
     if sys.platform.startswith("win"):
         return True
     if sys.platform == "linux":

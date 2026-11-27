@@ -312,4 +312,37 @@ redemarre rien.
 
 GPUI 0.2.2 n'expose pas d'icone de fenetre. L'icone partagee reste
 `watcher/assets/checkmate.png`, referencee par l'installeur, et son integration
-systeme suit en T2 avec l'icone de barre d'etat.
+systeme est livree en T2 avec l'icone de barre d'etat.
+
+### Integrations systeme (T2)
+
+L'icone, les notifications et le demarrage automatique vivent dans
+`checkmate-platform`, jamais dans la boucle GPUI.
+
+| Besoin | Linux | Windows |
+|---|---|---|
+| Icone | `ksni` (StatusNotifierItem) | `tray-icon` avec une boucle `winit` |
+| Notifications | `notify-rust` sur D-Bus | `notify-rust` sur WinRT |
+| Autostart | unite systemd utilisateur | valeur `Run` du registre |
+
+`checkmate-ui --tray` est un processus separe, lance par Python. Il interroge
+`/api/status` toutes les dix secondes et met a jour l'icone sans recreer l'item.
+Ses clics ouvrent le tableau de bord dans un nouveau processus ou appellent
+`/api/action`. Le processus s'arrete quand le moteur Python disparait, quand
+l'utilisateur choisit « Quitter » ou quand Python le termine.
+
+Les notifications passent par `checkmate-ui notify`, appele par le moteur Python
+et par l'assistant. Le titre, le corps et l'urgence sont identiques a
+`notifications.py`. Sous Linux, l'identifiant de remplacement est deduit du
+titre, donc deux alertes successives ne s'empilent pas. Si le service manque,
+une fenetre de confirmation s'affiche, l'absence est ecrite dans
+`checkmate-native.log` et aucune nouvelle tentative n'est faite en boucle.
+
+L'autostart passe par `checkmate-ui autostart enable|disable|status|restart`.
+Python fournit le chemin du binaire et de `config.toml` ; Rust ecrit l'unite ou
+l'entree de registre et l'active. L'ancienne tache planifiee Windows est retiree
+au passage.
+
+Si le binaire `checkmate-ui` manque, Python reprend l'icone `pystray`, les
+notifications et l'autostart historiques. Ce repli protege d'un paquet
+incomplet ; aucun drapeau ne permet de revenir en arriere une fois T2 livree.

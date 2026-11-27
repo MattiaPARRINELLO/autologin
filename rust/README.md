@@ -8,7 +8,7 @@ reference fonctionnelle jusqu'a la release `1.0.0`.
 | Crate | Role | Dependances autorisees |
 |---|---|---|
 | `checkmate-core` | Regles metier pures, sans entree/sortie, sans horloge, sans reseau | aucune crate du workspace |
-| `checkmate-platform` | Fenetre native, icone, notifications, autostart, trousseau, chemins | `checkmate-core` |
+| `checkmate-platform` | Fenetre native, icone, notifications, autostart, trousseau, chemins | `checkmate-core` et crates externes epinglees |
 | `checkmate-ui` | Vues GPUI, composants, navigation | `checkmate-core`, `checkmate-platform` |
 | `checkmate-cli` | Binaire `checkmate` et commandes | les trois autres |
 
@@ -26,6 +26,13 @@ dans [`watcher/docs/architecture.md`](../watcher/docs/architecture.md#interface-
 
 Le binaire `checkmate-ui` lit `runtime.json` ecrit par Python et n'ecrit aucun
 fichier de donnees. `CHECKMATE_HEADLESS=1` interdit toute fenetre.
+
+### Integrations systeme
+
+`checkmate-ui --tray` porte l'icone native, `checkmate-ui notify` envoie une
+notification et `checkmate-ui autostart` gere le demarrage automatique. Python
+les appelle ; les details de plateforme sont dans
+[`watcher/docs/architecture.md`](../watcher/docs/architecture.md#integrations-systeme-t2).
 
 ## Fixtures de parite
 

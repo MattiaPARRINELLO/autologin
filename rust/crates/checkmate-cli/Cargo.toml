@@ -21,5 +21,8 @@ checkmate-core.workspace = true
 checkmate-platform.workspace = true
 checkmate-ui.workspace = true
 
+[dev-dependencies]
+serde_json.workspace = true
+
 [lints]
 workspace = true

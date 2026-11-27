@@ -9,6 +9,24 @@ publish.workspace = true
 description = "Integrations systeme de CheckMate : fenetre, icone, notifications, autostart, trousseau"
 
 [dependencies]
+checkmate-core.workspace = true
+# Notifications bureau : zbus sous Linux, WinRT sous Windows. Version exacte,
+# jamais une branche. La crate reste optionnelle par cible via ses features
+# internes, elle ne tire ni GTK ni bibliotheque systeme supplementaire.
+notify-rust = { version = "=4.19.0" }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+# StatusNotifierItem en Rust pur, sans pystray ni XEmbed. La feature tokio est
+# celle de ksni ; la version exacte de tokio correspond a celle resolue par ksni.
+ksni = { version = "=0.3.8", default-features = false, features = ["tokio"] }
+tokio = { version = "=1.54.1", features = ["rt-multi-thread"] }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+# Icone de zone de notification native. Les features par defaut (GTK et
+# libappindicator) sont coupees : sous Windows elles ne servent a rien.
+tray-icon = { version = "=0.27.0", default-features = false }
+# Winit fournit la boucle de messages Win32 sans unsafe dans notre crate.
+winit = { version = "=0.30.12", default-features = false }
 
 [lints]
 workspace = true
