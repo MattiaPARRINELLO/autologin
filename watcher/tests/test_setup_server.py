@@ -320,7 +320,8 @@ def test_publie_et_retire_le_runtime_de_l_assistant(tmp_path, monkeypatch):
     assert payload["port"] == 4321
     assert payload["token"] == "jeton-assistant"
     assert payload["pid"] == os.getpid()
-    assert path.stat().st_mode & 0o777 == 0o600
+    if os.name == "posix":
+        assert path.stat().st_mode & 0o777 == 0o600
     setup_server.remove_setup_runtime()
     assert not path.exists()
 
