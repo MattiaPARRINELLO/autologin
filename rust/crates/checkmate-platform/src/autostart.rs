@@ -305,11 +305,14 @@ mod windows {
 
     pub(super) fn disable() -> Result<(), AutostartError> {
         remove_legacy_task();
+        if !is_enabled() {
+            return Ok(());
+        }
         let key = format!("HKCU\\{RUN_KEY}");
         let Some(output) = run("reg", &["delete", &key, "/v", RUN_VALUE, "/f"]) else {
             return Err(AutostartError::new("reg.exe introuvable"));
         };
-        if output.status.success() || is_missing(&output) {
+        if output.status.success() {
             Ok(())
         } else {
             Err(failure("suppression du demarrage automatique", &output))
@@ -319,15 +322,6 @@ mod windows {
     pub(super) fn is_enabled() -> bool {
         let key = format!("HKCU\\{RUN_KEY}");
         run("reg", &["query", &key, "/v", RUN_VALUE]).is_some_and(|output| output.status.success())
-    }
-
-    fn is_missing(output: &std::process::Output) -> bool {
-        let text = format!(
-            "{} {}",
-            String::from_utf8_lossy(&output.stdout).to_lowercase(),
-            String::from_utf8_lossy(&output.stderr).to_lowercase()
-        );
-        text.contains("introuvable") || text.contains("unable to find")
     }
 
     #[cfg(test)]
