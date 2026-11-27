@@ -117,6 +117,11 @@ identique remplace la précédente au lieu de s'empiler. Si le service de
 notification du bureau est absent, CheckMate affiche une fenêtre de confirmation
 et l'indique dans `checkmate-native.log`, sans bloquer la surveillance.
 
+Un seul CheckMate tourne à la fois. Relancer le raccourci ne démarre pas un
+second moteur : la fenêtre déjà ouverte revient au premier plan. Quitter ou
+arrêter le service ferme le navigateur, retire le tableau de bord local et
+l'icône, sans laisser de processus en arrière-plan.
+
 ## Modifier la configuration
 
 Depuis le tableau de bord, clique sur "Reconfigurer". L'assistant s'ouvre dans

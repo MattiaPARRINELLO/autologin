@@ -14,8 +14,9 @@ pub const UNIT_NAME: &str = "checkmate-watcher.service";
 /// Valeur historique du registre et ancienne tache planifiee.
 pub const RUN_VALUE: &str = "CheckMate";
 
-#[cfg(target_os = "windows")]
-const RUN_KEY: &str = r"Software\Microsoft\Windows\CurrentVersion\Run";
+/// Cle du registre Windows, identique a `autostart.RUN_KEY`.
+#[cfg_attr(not(target_os = "windows"), allow(dead_code))]
+pub const RUN_KEY: &str = r"Software\Microsoft\Windows\CurrentVersion\Run";
 
 /// Commande a relancer au demarrage.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -350,6 +351,15 @@ mod windows {
 #[cfg(test)]
 mod tests {
     use super::AutostartSpec;
+
+    #[test]
+    fn la_cle_et_la_valeur_repreinent_le_registre_python() {
+        assert_eq!(
+            super::RUN_KEY,
+            r"Software\Microsoft\Windows\CurrentVersion\Run"
+        );
+        assert_eq!(super::RUN_VALUE, "CheckMate");
+    }
 
     #[test]
     fn la_commande_reprend_les_chemins_entre_guillemets() {

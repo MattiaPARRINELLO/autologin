@@ -58,6 +58,14 @@ jobs:
       - name: Dependances
         run: uv sync
 
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust -> target
+
+      - name: Compiler la coquille GPUI
+        working-directory: rust
+        run: cargo build --release -p checkmate-cli --bin checkmate-ui
+
       - name: Bundle PyInstaller
         run: uv run pyinstaller packaging/checkmate.spec --noconfirm --clean
 
@@ -115,6 +123,21 @@ jobs:
 
       - name: Dependances
         run: uv sync
+
+      - name: Installer les dependances GPUI
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libx11-dev libxcb1-dev libxkbcommon-dev \
+            libxkbcommon-x11-dev libwayland-dev libfontconfig1-dev
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust -> target
+
+      - name: Compiler la coquille GPUI
+        working-directory: rust
+        run: cargo build --release -p checkmate-cli --bin checkmate-ui
 
       - name: Archive Linux
         run: bash packaging/build-linux.sh "${{ needs.channel.outputs.version }}"

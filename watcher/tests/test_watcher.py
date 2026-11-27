@@ -4,6 +4,8 @@ import asyncio
 from datetime import datetime
 from types import SimpleNamespace
 
+import pytest
+
 from checkmate_watcher import watcher
 from checkmate_watcher.http_session import HttpTransportError
 from checkmate_watcher.schedule import Schedule, parse_windows
@@ -320,3 +322,44 @@ def test_verification_apres_fermeture_du_navigateur_echoue_proprement():
     session = _CheckSession(error=RuntimeError("Target closed"))
 
     assert asyncio.run(watcher._signature_landed(session)) is False
+
+
+def test_un_signal_annule_la_tache_en_cours():
+    import threading
+
+    async def scenario():
+        stop = threading.Event()
+        started = asyncio.Event()
+
+        async def longue_operation():
+            started.set()
+            await asyncio.sleep(30)
+
+        task = asyncio.create_task(longue_operation())
+        await started.wait()
+        watchdog = asyncio.create_task(watcher._cancel_on_stop(stop, task))
+        stop.set()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+        stop.set()
+        await watchdog
+
+    asyncio.run(scenario())
+
+
+def test_l_arret_installe_les_gestionnaires_de_signal():
+    import signal
+    import threading
+
+    stop = threading.Event()
+    previous = {
+        name: signal.getsignal(getattr(signal, name))
+        for name in ("SIGTERM", "SIGINT")
+    }
+    try:
+        watcher._install_stop_handlers(stop)
+        signal.raise_signal(signal.SIGTERM)
+        assert stop.is_set()
+    finally:
+        for name, handler in previous.items():
+            signal.signal(getattr(signal, name), handler)

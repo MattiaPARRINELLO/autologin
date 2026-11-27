@@ -13,6 +13,7 @@ use std::path::PathBuf;
 
 pub mod autostart;
 pub mod icon;
+pub mod instance;
 pub mod log;
 pub mod notify;
 pub mod tray;

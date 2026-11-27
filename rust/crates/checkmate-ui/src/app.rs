@@ -742,6 +742,14 @@ pub fn run_setup() {
 }
 
 fn run_screen(setup: bool) {
+    let instance = checkmate_platform::instance::acquire();
+    if matches!(
+        instance,
+        checkmate_platform::instance::Acquisition::Existing
+    ) {
+        let _ = checkmate_platform::instance::request_focus();
+        return;
+    }
     Application::new().run(move |cx: &mut App| {
         let spec = checkmate_platform::DASHBOARD_WINDOW;
         let options = WindowOptions {
@@ -767,9 +775,37 @@ fn run_screen(setup: bool) {
             eprintln!("fenetre indisponible : {error}");
             cx.quit();
         }
+        if let checkmate_platform::instance::Acquisition::Primary(guard) = instance {
+            watch_instance(guard, cx);
+        }
         cx.on_window_closed(|cx| cx.quit()).detach();
         cx.activate(true);
     });
+}
+
+/// Ramene la fenetre au premier plan quand un second lancement le demande.
+fn watch_instance(guard: checkmate_platform::instance::InstanceGuard, cx: &mut App) {
+    cx.spawn(async move |cx| {
+        loop {
+            cx.background_executor()
+                .timer(Duration::from_millis(250))
+                .await;
+            let requested = guard.take_focus_request();
+            if !requested {
+                continue;
+            }
+            let updated = cx.update(|cx| {
+                cx.activate(true);
+                if let Some(window) = cx.active_window() {
+                    let _ = window.update(cx, |_, window, _| window.activate_window());
+                }
+            });
+            if updated.is_err() {
+                break;
+            }
+        }
+    })
+    .detach();
 }
 
 /// Resume sans fenetre, pour le mode headless et les diagnostics.
