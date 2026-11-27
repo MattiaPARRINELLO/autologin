@@ -18,6 +18,21 @@ Les frontieres sont verifiees mecaniquement :
 python3 scripts/check-boundaries.py
 ```
 
+## Fixtures de parite
+
+`fixtures/parity/` contient les cas partages entre Python et Rust : `config`,
+`schedule`, `release_notes`, `updates`. Chaque fichier liste des cas nommes avec
+une entree et une attente, y compris les cas d'erreur.
+
+- `watcher/tests/test_parity_fixtures.py` rejoue chaque cas avec les
+  implementations Python et garantit que les fixtures decrivent le comportement
+  reel.
+- `crates/checkmate-core/tests/parity_fixtures.rs` verifie que le cote Rust lit
+  les memes fichiers et que leur structure reste stable.
+
+Quand un comportement change, la fixture et son test Python evoluent ensemble,
+puis l'implementation Rust doit satisfaire la meme attente.
+
 ## Version
 
 La version du workspace reste `0.0.0` tant que le binaire n'est pas publie. La
