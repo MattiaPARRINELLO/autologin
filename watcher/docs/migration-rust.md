@@ -28,7 +28,7 @@ tranche T0.
 | `config.toml` | Python E | Python E | Python E | Rust E | Rust E | Rust E | Rust E |
 | `state.json` | Python E | Python E | Python E | Python E | Rust E | Rust E | Rust E |
 | `runtime.json`, `setup-runtime.json` et API locale | Python E | Python E, Rust L | Python E, Rust L | transition | Rust E | Rust E | supprime |
-| Logs | Python E | Python E | Rust E | Rust E | Rust E | Rust E | Rust E |
+| Logs | Python E | Python E | Python E, Rust E | Rust E | Rust E | Rust E | Rust E |
 | Trousseau | Python E | Python E | Python E | Rust E | Rust E | Rust E | Rust E |
 | Signature et session CESAR | Python E | Python E | Python E | Python E | Python E | Rust E | Rust E |
 | Mises a jour et notes | Python E | Python E | Python E | Rust E | Rust E | Rust E | Rust E |
