@@ -1,0 +1,36 @@
+{
+  "version": "0.7.1-beta.1",
+  "channel": "beta",
+  "build": "2026.11.27",
+  "started_at": "2026-11-27T08:00:00",
+  "now": "2026-11-27T09:12:30",
+  "uptime_seconds": 4350,
+  "mode": "signed",
+  "label": "Creneau signe",
+  "window": "08:00-12:30",
+  "next_window": "2026-11-27T13:30:00",
+  "schedule": {
+    "enabled": true,
+    "days": ["mon", "tue", "wed", "thu", "fri"],
+    "windows": ["08:00-12:30", "13:30-17:30"]
+  },
+  "counters": {
+    "starts": 42,
+    "detections": 37,
+    "signed": 12,
+    "errors": 1
+  },
+  "last_signed_at": "2026-11-27T08:04:17",
+  "last_detection_at": "2026-11-27T08:04:09",
+  "last_error_at": null,
+  "last_error_kind": null,
+  "last_error_message": null,
+  "restart_required": false,
+  "blocked": null,
+  "migration": null,
+  "release_note": {
+    "version": "0.7.1-beta.1",
+    "teaser": "Signature plus rapide et plus fiable."
+  },
+  "log_file": "/home/exemple/.local/state/checkmate-watcher/checkmate-watcher.log"
+}
