@@ -106,3 +106,20 @@ def test_la_commande_status_replie_sur_le_navigateur(monkeypatch):
     monkeypatch.setattr(cli, "open_url", ouverts.append)
     assert cli._ouvrir_si_pret() is True
     assert ouverts == ["http://127.0.0.1:1/"]
+
+
+def test_locate_trouve_le_binaire_dans_internal_pyinstaller(
+    tmp_path, monkeypatch
+):
+    monkeypatch.delenv(native_ui.BINARY_ENV, raising=False)
+    internal = tmp_path / "_internal"
+    internal.mkdir()
+    binary = _fake_binary(internal)
+    monkeypatch.setattr(native_ui.shutil, "which", lambda name: None)
+    monkeypatch.setattr(
+        native_ui, "_repository_root", lambda: tmp_path / "repo"
+    )
+    monkeypatch.setattr(
+        native_ui.sys, "executable", str(tmp_path / "CheckMate")
+    )
+    assert native_ui.locate() == binary

@@ -42,6 +42,10 @@ def candidates() -> list[Path]:
     if override:
         found.append(Path(override).expanduser())
     found.append(Path(sys.executable).resolve().parent / binary_name())
+    # PyInstaller 6 range les binaires dans `_internal` pour un bundle onedir.
+    found.append(
+        Path(sys.executable).resolve().parent / "_internal" / binary_name()
+    )
     bundle = getattr(sys, "_MEIPASS", None)
     if bundle:
         found.append(Path(bundle) / binary_name())
