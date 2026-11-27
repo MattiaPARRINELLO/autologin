@@ -1,0 +1,13 @@
+{
+  "schema": 1,
+  "description": "Budgets de performance de la 1.0. Les metriques non mesurables avant les tranches T1 et T4 restent en required false et sont signalees comme en attente.",
+  "budgets": [
+    {"metric": "cli_startup_ms", "aggregate": "p95", "max": 250, "required": true},
+    {"metric": "rss_peak_mib", "aggregate": "max", "max": 30, "required": true},
+    {"metric": "binary_mib", "aggregate": "max", "max": 30, "required": true},
+    {"metric": "ui_startup_ms", "aggregate": "p95", "max": 250, "required": false},
+    {"metric": "rss_ui_mib", "aggregate": "max", "max": 120, "required": false},
+    {"metric": "cpu_idle_percent", "aggregate": "max", "max": 0.2, "required": false},
+    {"metric": "detection_p95_ms", "aggregate": "p95", "max": 400, "required": false}
+  ]
+}
