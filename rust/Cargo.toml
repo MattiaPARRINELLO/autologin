@@ -15,6 +15,12 @@ license = "MIT"
 repository = "https://github.com/MattiaPARRINELLO/autologin"
 publish = false
 
+[profile.release]
+codegen-units = 1
+lto = "thin"
+strip = "symbols"
+panic = "abort"
+
 [workspace.dependencies]
 checkmate-core = { path = "crates/checkmate-core" }
 checkmate-platform = { path = "crates/checkmate-platform" }
