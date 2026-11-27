@@ -12,6 +12,10 @@ description = "Point d'entree du binaire CheckMate"
 name = "checkmate"
 path = "src/main.rs"
 
+[[bin]]
+name = "checkmate-ui"
+path = "src/bin/checkmate_ui.rs"
+
 [dependencies]
 checkmate-core.workspace = true
 checkmate-platform.workspace = true
