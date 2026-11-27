@@ -894,7 +894,7 @@ dependencies = [
 
 [[package]]
 name = "checkmate-cli"
-version = "0.7.1-beta.4"
+version = "1.0.0-beta.4"
 dependencies = [
  "checkmate-core",
  "checkmate-platform",
@@ -904,7 +904,7 @@ dependencies = [
 
 [[package]]
 name = "checkmate-core"
-version = "0.7.1-beta.4"
+version = "1.0.0-beta.4"
 dependencies = [
  "serde",
  "serde_json",
@@ -912,7 +912,7 @@ dependencies = [
 
 [[package]]
 name = "checkmate-platform"
-version = "0.7.1-beta.4"
+version = "1.0.0-beta.4"
 dependencies = [
  "checkmate-core",
  "ksni",
@@ -924,7 +924,7 @@ dependencies = [
 
 [[package]]
 name = "checkmate-ui"
-version = "0.7.1-beta.4"
+version = "1.0.0-beta.4"
 dependencies = [
  "checkmate-core",
  "checkmate-platform",
