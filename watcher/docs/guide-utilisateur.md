@@ -32,8 +32,8 @@ moment de signer, puis se referme.
 3. Windows SmartScreen peut afficher un avertissement tant que l'exécutable
    n'est pas signé. Clique sur "Informations complémentaires" puis
    "Exécuter quand même".
-4. À la fin, l'onboarding s'ouvre dans une fenêtre CheckMate native. Si
-   WebView2 est absent, il s'ouvre dans ton navigateur.
+4. À la fin, l'onboarding s'ouvre dans une fenêtre CheckMate native. Si le
+   binaire natif manque, il s'ouvre dans ton navigateur.
 
 L'installeur crée un raccourci "CheckMate" dans le menu Démarrer. Le raccourci
 ouvre le tableau de bord. L'assistant installe le démarrage automatique à
