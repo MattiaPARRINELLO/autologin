@@ -1,0 +1,111 @@
+{
+  "domain": "config",
+  "description": "Cas de chargement de config.toml, valeurs attendues et erreurs. Le validateur Python rejoue chaque cas avec checkmate_watcher.config.",
+  "cases": [
+    {
+      "name": "valeurs_par_defaut",
+      "toml": "[cesar]\nbase_url = \"https://cesar.example.fr/\"\nusername = \"eleve\"\npassword = \"secret\"\n",
+      "expect": {
+        "values": {
+          "cesar.base_url": "https://cesar.example.fr",
+          "cesar.login_url": "https://cesar.example.fr/connexion",
+          "watcher.poll_interval": 60,
+          "watcher.transport": "http",
+          "watcher.auto_sign": false,
+          "selectors.attendance_button.0": "button.buttonPresent"
+        }
+      }
+    },
+    {
+      "name": "surcharges_watcher_et_signature",
+      "toml": "[cesar]\nbase_url = \"https://cesar.example.fr/\"\nusername = \"eleve\"\npassword = \"secret\"\n\n[watcher]\npoll_interval = 30\nauto_sign = true\nheadless = true\n\n[signature]\npadding_ratio = 0.5\n",
+      "expect": {
+        "values": {
+          "watcher.poll_interval": 30,
+          "watcher.auto_sign": true,
+          "watcher.headless": true,
+          "signature.padding_ratio": 0.5
+        }
+      }
+    },
+    {
+      "name": "planning_valide",
+      "toml": "[cesar]\nbase_url = \"https://cesar.example.fr/\"\nusername = \"eleve\"\npassword = \"secret\"\n\n[schedule]\nenabled = true\ndays = [\"mon\", \"tue\"]\nwindows = [\"09:00-12:00\", \"13:30-16:30\"]\n",
+      "expect": {
+        "values": {
+          "schedule.enabled": true,
+          "schedule.days": [
+            0,
+            1
+          ],
+          "schedule.windows": [
+            "09:00-12:00",
+            "13:30-16:30"
+          ]
+        }
+      }
+    },
+    {
+      "name": "refuse_intervalle_court",
+      "toml": "[cesar]\nbase_url = \"https://cesar.example.fr/\"\nusername = \"eleve\"\npassword = \"secret\"\n\n[watcher]\npoll_interval = 5\n",
+      "expect": {
+        "error": "ConfigError"
+      }
+    },
+    {
+      "name": "refuse_transport_inconnu",
+      "toml": "[cesar]\nbase_url = \"https://cesar.example.fr/\"\nusername = \"eleve\"\npassword = \"secret\"\n\n[watcher]\ntransport = \"websocket\"\n",
+      "expect": {
+        "error": "ConfigError",
+        "match": "transport doit valoir"
+      }
+    },
+    {
+      "name": "refuse_endpoint_diffusion_invalide",
+      "toml": "[cesar]\nbase_url = \"https://cesar.example.fr/\"\nusername = \"eleve\"\npassword = \"secret\"\n\n[broadcast]\nendpoint = \"ftp://exemple\"\n",
+      "expect": {
+        "error": "ConfigError"
+      }
+    },
+    {
+      "name": "refuse_canal_inconnu",
+      "toml": "[cesar]\nbase_url = \"https://cesar.example.fr/\"\nusername = \"eleve\"\npassword = \"secret\"\n\n[updates]\nchannel = \"nightly\"\n",
+      "expect": {
+        "error": "ConfigError",
+        "match": "channel doit valoir"
+      }
+    },
+    {
+      "name": "alias_include_prerelease",
+      "toml": "[cesar]\nbase_url = \"https://cesar.example.fr/\"\nusername = \"eleve\"\npassword = \"secret\"\n\n[updates]\ninclude_prerelease = true\n",
+      "expect": {
+        "values": {
+          "updates.channel": "beta"
+        }
+      }
+    },
+    {
+      "name": "canal_prime_sur_alias",
+      "toml": "[cesar]\nbase_url = \"https://cesar.example.fr/\"\nusername = \"eleve\"\npassword = \"secret\"\n\n[updates]\nchannel = \"stable\"\ninclude_prerelease = true\n",
+      "expect": {
+        "values": {
+          "updates.channel": "stable"
+        }
+      }
+    },
+    {
+      "name": "refuse_fenetres_chevauchantes",
+      "toml": "[cesar]\nbase_url = \"https://cesar.example.fr/\"\nusername = \"eleve\"\npassword = \"secret\"\n\n[schedule]\nenabled = true\nwindows = [\"09:00-12:00\", \"11:00-13:00\"]\n",
+      "expect": {
+        "error": "ConfigError"
+      }
+    },
+    {
+      "name": "refuse_fichier_absent",
+      "file": false,
+      "expect": {
+        "error": "ConfigError"
+      }
+    }
+  ]
+}
