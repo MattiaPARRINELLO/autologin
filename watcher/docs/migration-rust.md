@@ -27,7 +27,7 @@ tranche T0.
 |---|---|---|---|---|---|---|---|
 | `config.toml` | Python E | Python E | Python E | Rust E | Rust E | Rust E | Rust E |
 | `state.json` | Python E | Python E | Python E | Python E | Rust E | Rust E | Rust E |
-| `runtime.json` et API locale | Python E | Python E, Rust L | Python E, Rust L | transition | Rust E | Rust E | supprime |
+| `runtime.json`, `setup-runtime.json` et API locale | Python E | Python E, Rust L | Python E, Rust L | transition | Rust E | Rust E | supprime |
 | Logs | Python E | Python E | Rust E | Rust E | Rust E | Rust E | Rust E |
 | Trousseau | Python E | Python E | Python E | Rust E | Rust E | Rust E | Rust E |
 | Signature et session CESAR | Python E | Python E | Python E | Python E | Python E | Rust E | Rust E |
@@ -38,9 +38,12 @@ tranche T0.
 
 ## Points de bascule
 
-- **T1** : `runtime.json` et l'API locale restent ecrits par Python. La coquille
-  Rust lit, affiche et declenche des actions. Aucune ecriture de fichier cote
-  Rust. La beta publiee remplace pywebview par GPUI, Python reste le moteur.
+- **T1** : `runtime.json`, `setup-runtime.json` et l'API locale restent ecrits
+  par Python. La coquille Rust lit, affiche et declenche des actions. Aucune
+  ecriture de fichier cote Rust. La beta publiee remplace pywebview par GPUI,
+  Python reste le moteur. Le binaire `checkmate-ui` est lance par Python quand
+  il est present ; s'il manque, Python journalise l'erreur et retombe sur
+  pywebview puis le navigateur pour ne pas bloquer l'utilisateur.
 - **T2** : l'icone, les notifications et l'autostart passent au Rust. Python
   n'affiche plus d'icone et ne cree plus de service. Le moteur continue.
 - **T3** : la config, l'etat, les logs, le trousseau, les mises a jour et les

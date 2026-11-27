@@ -274,6 +274,14 @@ qui ne depend plus de cette combinaison.
    checkmate-cli --bin checkmate-ui` ne doit creer aucune fenetre ni paniquer.
 7. Consigner la version et les ecarts dans cette section.
 
+### Lancement
+
+`window.open_url` et `checkmate status` essaient d'abord la coquille native
+(`native_ui.open_dashboard`). L'assistant lance `checkmate-ui --setup` apres
+avoir publie `setup-runtime.json`. La recherche du binaire suit cet ordre :
+`CHECKMATE_UI_BINARY`, dossier de l'executable Python, ressources PyInstaller,
+`rust/target/release` puis `debug`, et enfin `PATH`.
+
 ### Empaquetage
 
 Le binaire s'appelle `checkmate-ui`. Il lit `runtime.json` sans argument et
