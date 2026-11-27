@@ -123,3 +123,20 @@ def test_locate_trouve_le_binaire_dans_internal_pyinstaller(
         native_ui.sys, "executable", str(tmp_path / "CheckMate")
     )
     assert native_ui.locate() == binary
+
+
+def test_locate_suit_le_venv_sans_resoudre_le_lien(tmp_path, monkeypatch):
+    import sys
+
+    venv_bin = tmp_path / "venv" / "bin"
+    venv_bin.mkdir(parents=True)
+    interpreter = venv_bin / "python"
+    interpreter.symlink_to(sys.executable)
+    binary = _fake_binary(venv_bin)
+    monkeypatch.delenv(native_ui.BINARY_ENV, raising=False)
+    monkeypatch.setattr(native_ui.shutil, "which", lambda name: None)
+    monkeypatch.setattr(
+        native_ui, "_repository_root", lambda: tmp_path / "repo"
+    )
+    monkeypatch.setattr(native_ui.sys, "executable", str(interpreter))
+    assert native_ui.locate() == binary

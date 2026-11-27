@@ -41,11 +41,12 @@ def candidates() -> list[Path]:
     override = os.environ.get(BINARY_ENV)
     if override:
         found.append(Path(override).expanduser())
-    found.append(Path(sys.executable).resolve().parent / binary_name())
+    # `sys.executable` peut etre un lien vers l'interpreteur systeme dans un
+    # venv : on garde le chemin du venv, sans le resoudre.
+    executable = Path(sys.executable)
+    found.append(executable.parent / binary_name())
     # PyInstaller 6 range les binaires dans `_internal` pour un bundle onedir.
-    found.append(
-        Path(sys.executable).resolve().parent / "_internal" / binary_name()
-    )
+    found.append(executable.parent / "_internal" / binary_name())
     bundle = getattr(sys, "_MEIPASS", None)
     if bundle:
         found.append(Path(bundle) / binary_name())
