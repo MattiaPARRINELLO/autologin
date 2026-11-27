@@ -1,5 +1,5 @@
 """Surveillance automatique de l'emargement CESAR Emineo."""
 
-__version__ = "0.7.0-beta.6"
+__version__ = "0.7.1-beta.1"
 
-BUILD = "2026-11-23.15"
+BUILD = "2026-11-27.1"

@@ -136,6 +136,19 @@ CALENDAR_IDENTITY_JS = """
 MIN_INK_RATIO = 0.05
 
 
+CLOSED_MARKERS = (
+    "Target page, context or browser has been closed",
+    "Target closed",
+    "Browser has been closed",
+)
+
+
+def _is_browser_closed(exc: BaseException) -> bool:
+    """Detecte une fenetre Chromium fermee pendant une action Playwright."""
+    text = str(exc)
+    return any(marker in text for marker in CLOSED_MARKERS)
+
+
 def draw_coordinates(fitted: list[FittedPoint]) -> list[list[float]]:
     return [[round(point.x, 2), round(point.y, 2)] for point in fitted]
 
@@ -848,6 +861,18 @@ class CesarSession:
 
         Renvoie le texte de confirmation affiche par le site.
         """
+        try:
+            return await self._sign(points)
+        except SignError:
+            raise
+        except Exception as exc:
+            if _is_browser_closed(exc):
+                raise SignError(
+                    "navigateur ferme pendant la signature"
+                ) from exc
+            raise
+
+    async def _sign(self, points: list[Point]) -> str:
         if self.page is None:
             raise SignError("navigateur non demarre")
 
@@ -968,6 +993,10 @@ class CesarSession:
         await self._signature_overlay(canvas, True)
         try:
             await self._draw_checked_inner(canvas, box, points, diagnostics)
+        except Exception:
+            # Une interruption en plein trace doit laisser une trace exploitable.
+            await diagnostics.save(canvas)
+            raise
         finally:
             await self._signature_overlay(canvas, False)
 
@@ -980,11 +1009,27 @@ class CesarSession:
     ) -> None:
         """Rejoue la signature puis verifie qu'elle est vraiment dessinee.
 
-        Un canvas mesure pendant une animation, ou un enchainement d'evenements
-        ignore par la librairie du site, produit un simple point au lieu du
-        trace. On retente alors en envoyant les evenements DOM directement.
+        Le trace est d'abord envoye en une seule passe JavaScript, instantanee,
+        pour ne pas laisser le temps a l'utilisateur de reprendre la main. Si la
+        librairie du site ignore ces evenements, on retombe sur un vrai curseur
+        souris, plus lent mais accepte partout.
         """
         await canvas.evaluate(INK_SNAPSHOT_JS)
+        await canvas.evaluate(
+            EVENT_DRAW_JS, draw_coordinates(self._fit_points(points, box))
+        )
+        await self.page.wait_for_timeout(200)
+        ink = await canvas.evaluate(INK_DIFF_JS)
+        logger.info("encre detectee apres trace direct : %s", ink)
+        await diagnostics.add_step("trace direct", canvas, ink)
+        if not self._ink_is_incomplete(ink):
+            return
+
+        logger.warning(
+            "trace direct ignore ou incomplet sur le canvas CESAR (%s), "
+            "rejeu a la souris",
+            ink,
+        )
         if await self._wait_until_hittable(canvas):
             box = await self._stable_box(canvas) or box
             await self._draw(box, self._fit_points(points, box))
@@ -999,30 +1044,8 @@ class CesarSession:
         await self.page.wait_for_timeout(200)
         ink = await canvas.evaluate(INK_DIFF_JS)
         logger.info("encre detectee sur le canvas : %s", ink)
-        await diagnostics.add_step("premier essai", canvas, ink)
-        if not self._ink_is_incomplete(ink):
-            return
-
-        logger.warning(
-            "trace incomplet sur le canvas CESAR (%s), nouvelle tentative", ink
-        )
-        retry_box = await self._stable_box(canvas)
-        if (
-            retry_box is None
-            or retry_box["width"] <= 0
-            or retry_box["height"] <= 0
-        ):
-            raise SignError("canvas de signature sans dimensions")
-        await canvas.evaluate(
-            EVENT_DRAW_JS,
-            draw_coordinates(self._fit_points(points, retry_box)),
-        )
-        await self.page.wait_for_timeout(200)
-        ink = await canvas.evaluate(INK_DIFF_JS)
-        logger.info("encre detectee apres rejeu : %s", ink)
-        await diagnostics.add_step("rejeu", canvas, ink)
+        await diagnostics.add_step("rejeu souris", canvas, ink)
         if self._ink_is_incomplete(ink):
-            await diagnostics.save(canvas)
             raise SignError(
                 "la signature n'a pas ete prise par le canvas CESAR "
                 "(trace reduit a un point ou a une ligne)"
@@ -1111,15 +1134,16 @@ class CesarSession:
         await self.page.mouse.move(box["x"] + first.x, box["y"] + first.y)
         await self.page.mouse.down()
         total = max(1, len(points) - 1)
-        last_percent = -1
+        last_decile = -1
         for index, point in enumerate(points[1:], start=1):
             await self.page.mouse.move(
                 box["x"] + point.x, box["y"] + point.y, steps=2
             )
             await asyncio.sleep(0.008)
             percent = index * 100 // total
-            if percent != last_percent:
-                last_percent = percent
+            decile = percent // 10
+            if decile != last_decile:
+                last_decile = decile
                 await self._signature_overlay_progress(percent / 100)
         last = points[-1]
         await self.page.mouse.move(box["x"] + last.x, box["y"] + last.y)

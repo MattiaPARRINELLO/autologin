@@ -7,8 +7,11 @@ import pytest
 from checkmate_watcher.cesar import (
     CALENDAR_IDENTITY_JS,
     CANVAS_HITTABLE_JS,
+    EVENT_DRAW_JS,
+    INK_DIFF_JS,
     PERFORMANCE_BROWSER_ARGS,
     CesarSession,
+    SignError,
     _block_nonessential_request,
     _should_block_request,
     draw_coordinates,
@@ -372,3 +375,155 @@ def test_abandonne_si_le_canvas_reste_recouvert():
         is False
     )
     assert len(page.waits) >= 1
+
+
+INK_COMPLETE = {
+    "count": 1200,
+    "minX": 10,
+    "minY": 5,
+    "maxX": 290,
+    "maxY": 140,
+    "width": 300,
+    "height": 150,
+}
+INK_INCOMPLETE = {
+    "count": 2,
+    "minX": 50,
+    "minY": 50,
+    "maxX": 51,
+    "maxY": 51,
+    "width": 300,
+    "height": 150,
+}
+
+
+class FakeDiagnostics:
+    def __init__(self) -> None:
+        self.steps: list[tuple[str, dict | None]] = []
+        self.saved = False
+
+    async def add_step(self, label: str, canvas, ink) -> None:
+        self.steps.append((label, ink))
+
+    async def save(self, canvas) -> None:
+        self.saved = True
+
+
+class FakeMouse:
+    def __init__(self) -> None:
+        self.moves = 0
+
+    async def move(self, *args, **kwargs) -> None:
+        self.moves += 1
+
+    async def down(self) -> None:
+        return None
+
+    async def up(self) -> None:
+        return None
+
+
+class FakeSignatureCanvas:
+    def __init__(self, inks: list[dict], *, broken: bool = False) -> None:
+        self.inks = list(inks)
+        self.broken = broken
+        self.scripts: list[dict | str] = []
+
+    async def evaluate(self, script, arg=None):
+        if self.broken and script is EVENT_DRAW_JS:
+            raise RuntimeError(
+                "Target page, context or browser has been closed"
+            )
+        self.scripts.append(script)
+        if script is INK_DIFF_JS:
+            return self.inks.pop(0)
+        return True
+
+    async def bounding_box(self):
+        return {"x": 0, "y": 0, "width": 300, "height": 150}
+
+
+class FakeSignaturePage(FakePage):
+    def __init__(self) -> None:
+        super().__init__(wait_seconds=0)
+        self.mouse = FakeMouse()
+
+    async def evaluate(self, script, arg=None):
+        return True
+
+
+def _signature_session(page=None) -> CesarSession:
+    return make_session(page or FakeSignaturePage())
+
+
+def test_trace_direct_suffit_quand_l_encre_est_complete():
+    session = _signature_session()
+    canvas = FakeSignatureCanvas([INK_COMPLETE])
+    diagnostics = FakeDiagnostics()
+
+    asyncio.run(
+        session._draw_checked_inner(
+            canvas,
+            {"x": 0, "y": 0, "width": 300, "height": 150},
+            [FittedPoint(x=10, y=10), FittedPoint(x=290, y=140)],
+            diagnostics,
+        )
+    )
+
+    assert diagnostics.steps == [("trace direct", INK_COMPLETE)]
+    assert session.page.mouse.moves == 0
+
+
+def test_trace_direct_incomplet_rejoue_a_la_souris():
+    session = _signature_session()
+    canvas = FakeSignatureCanvas([INK_INCOMPLETE, INK_COMPLETE])
+    diagnostics = FakeDiagnostics()
+
+    asyncio.run(
+        session._draw_checked_inner(
+            canvas,
+            {"x": 0, "y": 0, "width": 300, "height": 150},
+            [FittedPoint(x=10, y=10), FittedPoint(x=290, y=140)],
+            diagnostics,
+        )
+    )
+
+    assert [label for label, _ in diagnostics.steps] == [
+        "trace direct",
+        "rejeu souris",
+    ]
+    assert session.page.mouse.moves > 0
+
+
+def test_diagnostic_enregistre_si_le_trace_est_interrompu():
+    session = _signature_session()
+    canvas = FakeSignatureCanvas([], broken=True)
+    diagnostics = FakeDiagnostics()
+
+    with pytest.raises(RuntimeError):
+        asyncio.run(
+            session._draw_checked(
+                canvas,
+                {"x": 0, "y": 0, "width": 300, "height": 150},
+                [FittedPoint(x=10, y=10), FittedPoint(x=290, y=140)],
+                diagnostics,
+            )
+        )
+
+    assert diagnostics.saved is True
+
+
+def test_navigateur_ferme_pendant_la_signature(monkeypatch):
+    session = _signature_session()
+
+    async def closed(points):
+        raise RuntimeError(
+            "Locator.evaluate: Target page, context or browser has been closed"
+        )
+
+    monkeypatch.setattr(session, "_sign", closed)
+
+    with pytest.raises(SignError) as error:
+        asyncio.run(session.sign([]))
+
+    assert "navigateur ferme" in str(error.value)

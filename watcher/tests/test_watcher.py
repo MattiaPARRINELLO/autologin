@@ -290,3 +290,33 @@ def test_open_session_bascule_sur_navigateur_si_http_echoue(monkeypatch):
 
     assert isinstance(session, FakeBrowser)
     assert session.opened is True
+
+
+class _CheckSession:
+    def __init__(self, result=None, error: Exception | None = None) -> None:
+        self.result = result
+        self.error = error
+
+    async def check(self):
+        if self.error is not None:
+            raise self.error
+        return self.result
+
+
+def test_presence_deja_enregistree_quand_l_emargement_a_disparu():
+    session = _CheckSession(result=None)
+
+    assert asyncio.run(watcher._signature_landed(session)) is True
+
+
+def test_signature_pas_encore_enregistree_si_l_emargement_est_ouvert():
+    signal = SimpleNamespace(key="E13", label="Emargement ouvert")
+    session = _CheckSession(result=signal)
+
+    assert asyncio.run(watcher._signature_landed(session)) is False
+
+
+def test_verification_apres_fermeture_du_navigateur_echoue_proprement():
+    session = _CheckSession(error=RuntimeError("Target closed"))
+
+    assert asyncio.run(watcher._signature_landed(session)) is False
