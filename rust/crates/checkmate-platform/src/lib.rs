@@ -10,6 +10,12 @@
 
 use std::path::PathBuf;
 
+/// Plateforme de compilation, pour les journaux et le diagnostic.
+#[must_use]
+pub fn target() -> &'static str {
+    std::env::consts::OS
+}
+
 /// Nom du dossier de donnees, comme `paths.APP_NAME`.
 pub const APP_NAME: &str = "checkmate-watcher";
 
@@ -153,8 +159,18 @@ fn absolute(value: Option<std::ffi::OsString>) -> Option<PathBuf> {
     value.map(PathBuf::from).filter(|path| path.is_absolute())
 }
 
-/// Vrai si l'environnement interdit d'ouvrir une fenetre.
+/// Vrai si le processus existe encore.
 ///
+/// Sous Linux, `/proc/<pid>` est la source fiable sans appel systeme. Ailleurs,
+/// l'absence de reponse HTTP reste le signal d'expiration.
+pub fn process_alive(pid: u32) -> bool {
+    if cfg!(target_os = "linux") {
+        return std::path::Path::new("/proc").join(pid.to_string()).exists();
+    }
+    true
+}
+
+/// Vrai si l'environnement interdit d'ouvrir une fenetre.
 /// `CHECKMATE_HEADLESS=1` force le mode sans fenetre. Sous Linux sans
 /// `DISPLAY` ni `WAYLAND_DISPLAY`, une fenetre ne peut pas s'ouvrir.
 pub fn headless_by_environment() -> bool {
