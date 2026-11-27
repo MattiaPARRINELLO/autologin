@@ -202,6 +202,7 @@ mod tests {
         move |key| map.get(key).cloned()
     }
 
+    #[cfg(unix)]
     #[test]
     fn linux_suit_le_xdg() {
         let dirs = dirs_for_os(
@@ -223,6 +224,7 @@ mod tests {
         );
     }
 
+    #[cfg(unix)]
     #[test]
     fn linux_replie_sur_le_dossier_personnel() {
         let dirs =
