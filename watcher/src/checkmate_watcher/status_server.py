@@ -10,6 +10,7 @@ import subprocess
 import sys
 import threading
 import urllib.request
+from contextlib import suppress
 from dataclasses import dataclass
 from datetime import datetime
 from http.server import ThreadingHTTPServer
@@ -41,6 +42,7 @@ from .updates import (
 logger = logging.getLogger(__name__)
 
 RUNTIME_NAME = "runtime.json"
+ENGINE_LOCK_NAME = "watcher.lock"
 BETA_MESSAGE = (
     "Canal beta active. Les mises a jour arrivent souvent et la "
     "stabilite du projet n'est pas garantie."
@@ -173,6 +175,52 @@ def remove_runtime() -> None:
             path.unlink()
         except FileNotFoundError:
             pass
+
+
+class EngineGuard:
+    """Verrou du moteur, supprime a l'arret propre."""
+
+    def __init__(self, path: Path) -> None:
+        self.path = path
+
+    def release(self) -> None:
+        with suppress(FileNotFoundError):
+            self.path.unlink()
+
+
+def engine_lock_path() -> Path:
+    return data_dir() / ENGINE_LOCK_NAME
+
+
+def _engine_running() -> bool:
+    runtime = read_runtime()
+    return runtime is not None and status_alive(runtime)
+
+
+def acquire_engine() -> EngineGuard | None:
+    """Reserve le moteur, ou rend None quand une autre instance tourne.
+
+    Le fichier verrou protege la fenetre entre le test de vivacite et le
+    demarrage du serveur. Un verrou orphelin, laisse par un processus tue
+    brutalement, est remplace des que le runtime ne repond plus.
+    """
+    path = engine_lock_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    for _ in range(2):
+        try:
+            descriptor = os.open(
+                path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600
+            )
+        except FileExistsError:
+            if _engine_running():
+                return None
+            with suppress(FileNotFoundError):
+                path.unlink()
+            continue
+        with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
+            stream.write(str(os.getpid()))
+        return EngineGuard(path)
+    return None
 
 
 def status_alive(runtime: dict, timeout: float = 1.5) -> bool:

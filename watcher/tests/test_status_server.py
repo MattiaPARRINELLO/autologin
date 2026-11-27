@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import threading
 import urllib.error
 import urllib.request
@@ -297,3 +298,39 @@ def test_check_update_utilise_le_canal(tmp_path, monkeypatch):
     assert result["available"] is True
     assert result["channel"] == "beta"
     assert result["version"] == "0.6.0-beta.1"
+
+
+def test_le_verrou_refuse_un_second_moteur(tmp_path, monkeypatch):
+    monkeypatch.setattr(status_server, "data_dir", lambda: tmp_path)
+    monkeypatch.setattr(status_server, "_engine_running", lambda: True)
+    status_server.engine_lock_path().parent.mkdir(parents=True, exist_ok=True)
+    status_server.engine_lock_path().write_text("999999")
+
+    assert status_server.acquire_engine() is None
+
+
+def test_le_verrou_ecrit_le_pid_et_se_libere(tmp_path, monkeypatch):
+    monkeypatch.setattr(status_server, "data_dir", lambda: tmp_path)
+    monkeypatch.setattr(status_server, "_engine_running", lambda: False)
+
+    guard = status_server.acquire_engine()
+
+    assert guard is not None
+    assert status_server.engine_lock_path().read_text() == str(os.getpid())
+    monkeypatch.setattr(status_server, "_engine_running", lambda: True)
+    assert status_server.acquire_engine() is None
+    guard.release()
+    assert not status_server.engine_lock_path().exists()
+
+
+def test_un_verrou_orphelin_est_remplace(tmp_path, monkeypatch):
+    monkeypatch.setattr(status_server, "data_dir", lambda: tmp_path)
+    monkeypatch.setattr(status_server, "_engine_running", lambda: False)
+    status_server.engine_lock_path().parent.mkdir(parents=True, exist_ok=True)
+    status_server.engine_lock_path().write_text("999999")
+
+    guard = status_server.acquire_engine()
+
+    assert guard is not None
+    assert status_server.engine_lock_path().read_text() == str(os.getpid())
+    guard.release()

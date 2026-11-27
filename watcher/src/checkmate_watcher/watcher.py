@@ -10,7 +10,14 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from . import BUILD, __version__, analytics, broadcast, native_integrations
+from . import (
+    BUILD,
+    __version__,
+    analytics,
+    broadcast,
+    native_integrations,
+    native_ui,
+)
 from .cesar import (
     AttendanceSignal,
     CesarError,
@@ -29,6 +36,7 @@ from .signature import load_signature
 from .state import StateStore
 from .status_server import (
     StatusSession,
+    acquire_engine,
     start_status_server,
     stop_status_server,
 )
@@ -510,12 +518,24 @@ async def run_loop(
     config_path = (config_path or default_config_path()).expanduser()
     config = with_remote_selectors(config)
 
+    engine = None
+    if not once:
+        engine = acquire_engine()
+        if engine is None:
+            logger.info(
+                "une instance surveille deja, ouverture du tableau de bord"
+            )
+            native_ui.open_dashboard()
+            return 0
+
     try:
         points = load_signature(config.signature.file)
     except Exception as exc:
         if not dry_run:
             logger.error("signature indisponible : %s", exc)
             logger.error("lance 'checkmate-watcher capture' pour en creer une")
+            if engine is not None:
+                engine.release()
             return 2
         logger.warning(
             "signature indisponible (%s), dry-run sans signature", exc
@@ -791,3 +811,5 @@ async def run_loop(
         native_integrations.stop_tray(native_tray)
         if status_server is not None:
             stop_status_server(status_server)
+        if engine is not None:
+            engine.release()
