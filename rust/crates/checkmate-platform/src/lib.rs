@@ -189,7 +189,9 @@ fn headless_from(os: &str, env: impl Fn(&str) -> Option<std::ffi::OsString>) -> 
 
 #[cfg(test)]
 mod tests {
-    use super::{PlatformDirs, dirs_for_os, headless_from};
+    #[cfg(unix)]
+    use super::PlatformDirs;
+    use super::{dirs_for_os, headless_from};
     use std::collections::HashMap;
     use std::ffi::OsString;
     use std::path::PathBuf;
