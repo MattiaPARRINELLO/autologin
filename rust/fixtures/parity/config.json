@@ -96,7 +96,12 @@
     },
     {
       "name": "refuse_mot_de_passe_absent",
-      "toml": "[cesar]\nbase_url = \"https://cesar.example.fr\"\nusername = \"eleve\"\npassword_env = \"CHECKMATE_PARITY_ABSENT\"\n",
+      "toml_lines": [
+        "[cesar]",
+        "base_url = \"https://cesar.example.fr\"",
+        "username = \"eleve\"",
+        "password_env = \"CHECKMATE_PARITY_ABSENT\""
+      ],
       "unset_env": ["CHECKMATE_PARITY_ABSENT"],
       "expect": {
         "error": "ConfigError"

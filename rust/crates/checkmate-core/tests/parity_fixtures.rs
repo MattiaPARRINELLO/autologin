@@ -113,7 +113,7 @@ fn les_cas_de_config_ont_une_entree() {
         let has_error = case["expect"]["error"].is_string();
         let has_values = case["expect"]["values"].is_object();
         assert!(has_error ^ has_values, "config : attente ambigue");
-        let has_toml = case["toml"].is_string();
+        let has_toml = case["toml"].is_string() || case["toml_lines"].is_array();
         let missing_file = case["file"].as_bool() == Some(false);
         assert!(has_toml || missing_file, "config : entree absente");
     }

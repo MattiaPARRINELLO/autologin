@@ -85,7 +85,10 @@ def _config(case, monkeypatch, tmp_path):
         monkeypatch.setenv(name, value)
     path = tmp_path / "config.toml"
     if case.get("file", True):
-        path.write_text(case["toml"], encoding="utf-8")
+        text = case.get("toml")
+        if text is None:
+            text = "\n".join(case["toml_lines"]) + "\n"
+        path.write_text(text, encoding="utf-8")
     config = load_config(path)
     expected = case["expect"].get("values", {})
     return {
