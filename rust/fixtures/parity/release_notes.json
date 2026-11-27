@@ -1,0 +1,121 @@
+{
+  "domain": "release_notes",
+  "description": "Cas de nouveautes : seuil de popup, contenu du resume 0.7.0 et transitions d'etat.",
+  "cases": [
+    {
+      "name": "mineure_stable_ouvre_popup",
+      "op": "significant",
+      "input": {"previous": "0.6.9", "current": "0.7.0"},
+      "expect": {"significant": true}
+    },
+    {
+      "name": "mineure_suivante_ouvre_popup",
+      "op": "significant",
+      "input": {"previous": "0.7.0", "current": "0.8.0"},
+      "expect": {"significant": true}
+    },
+    {
+      "name": "majeure_ouvre_popup",
+      "op": "significant",
+      "input": {"previous": "0.9.0", "current": "1.0.0"},
+      "expect": {"significant": true}
+    },
+    {
+      "name": "correctif_sans_popup",
+      "op": "significant",
+      "input": {"previous": "0.7.0", "current": "0.7.1"},
+      "expect": {"significant": false}
+    },
+    {
+      "name": "arrivee_sur_beta_sans_popup",
+      "op": "significant",
+      "input": {"previous": "0.6.9", "current": "0.7.0-beta.1"},
+      "expect": {"significant": false}
+    },
+    {
+      "name": "beta_a_beta_sans_popup",
+      "op": "significant",
+      "input": {"previous": "0.7.0-beta.4", "current": "0.7.0-beta.5"},
+      "expect": {"significant": false}
+    },
+    {
+      "name": "beta_vers_stable_ouvre_popup",
+      "op": "significant",
+      "input": {"previous": "0.7.0-beta.4", "current": "0.7.0"},
+      "expect": {"significant": true}
+    },
+    {
+      "name": "retour_arriere_sans_popup",
+      "op": "significant",
+      "input": {"previous": "0.7.0", "current": "0.6.9"},
+      "expect": {"significant": false}
+    },
+    {
+      "name": "version_inconnue_sans_popup",
+      "op": "significant",
+      "input": {"previous": "inconnue", "current": "0.7.0"},
+      "expect": {"significant": false}
+    },
+    {
+      "name": "resume_0_7_0",
+      "op": "note",
+      "input": {"version": "0.7.0"},
+      "expect": {
+        "version": "0.7.0",
+        "metrics": ["2,3×", "15×", "0"],
+        "features": 6,
+        "last_feature": "Des messages de l'équipe",
+        "performance_before": 657,
+        "performance_after": 284
+      }
+    },
+    {
+      "name": "version_sans_resume",
+      "op": "note",
+      "input": {"version": "1.0.0"},
+      "expect": {"note": null}
+    },
+    {
+      "name": "premiere_execution_sans_popup",
+      "op": "celebration",
+      "input": {"current": "0.7.0"},
+      "expect": {"note_version": null, "last_version": "0.7.0"}
+    },
+    {
+      "name": "mise_a_jour_importante_avec_resume",
+      "op": "celebration",
+      "input": {"last_version": "0.6.9", "current": "0.7.0"},
+      "expect": {"note_version": "0.7.0", "last_version": "0.7.0"}
+    },
+    {
+      "name": "beta_sans_popup",
+      "op": "celebration",
+      "input": {"last_version": "0.6.9", "current": "0.7.0-beta.1"},
+      "expect": {"note_version": null, "last_version": "0.7.0-beta.1"}
+    },
+    {
+      "name": "beta_vers_stable_avec_resume",
+      "op": "celebration",
+      "input": {"last_version": "0.7.0-beta.4", "current": "0.7.0"},
+      "expect": {"note_version": "0.7.0", "last_version": "0.7.0"}
+    },
+    {
+      "name": "correctif_sans_celebration",
+      "op": "celebration",
+      "input": {"last_version": "0.7.0", "current": "0.7.1"},
+      "expect": {"note_version": null, "last_version": "0.7.1"}
+    },
+    {
+      "name": "popup_deja_ferme",
+      "op": "celebration",
+      "input": {"last_version": "0.6.9", "celebrated_version": "0.7.0", "current": "0.7.0"},
+      "expect": {"note_version": null, "last_version": "0.7.0"}
+    },
+    {
+      "name": "version_sans_resume_pas_de_popup",
+      "op": "celebration",
+      "input": {"last_version": "0.6.9", "current": "1.0.0"},
+      "expect": {"note_version": null, "last_version": "1.0.0"}
+    }
+  ]
+}

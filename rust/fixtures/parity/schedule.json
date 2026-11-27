@@ -1,0 +1,155 @@
+{
+  "domain": "schedule",
+  "description": "Cas de planning, fenetres, jours et prochaines ouvertures. Le validateur Python rejoue chaque cas avec checkmate_watcher.schedule.",
+  "defaults": {
+    "enabled": true,
+    "days": ["mon", "tue", "wed", "thu", "fri"],
+    "windows": ["09:00-12:00", "13:30-16:30"]
+  },
+  "cases": [
+    {
+      "name": "parse_window_valide",
+      "op": "parse_window",
+      "input": {"value": "09:00-12:00"},
+      "expect": {"start": "09:00:00", "end": "12:00:00", "text": "09:00-12:00"}
+    },
+    {
+      "name": "parse_window_refuse_9h",
+      "op": "parse_window",
+      "input": {"value": "9h-12h"},
+      "expect": {"error": "ScheduleError"}
+    },
+    {
+      "name": "parse_window_refuse_fin_avant_debut",
+      "op": "parse_window",
+      "input": {"value": "12:00-09:00"},
+      "expect": {"error": "ScheduleError"}
+    },
+    {
+      "name": "parse_window_refuse_sans_fin",
+      "op": "parse_window",
+      "input": {"value": "09:00"},
+      "expect": {"error": "ScheduleError"}
+    },
+    {
+      "name": "parse_window_refuse_vide",
+      "op": "parse_window",
+      "input": {"value": ""},
+      "expect": {"error": "ScheduleError"}
+    },
+    {
+      "name": "parse_windows_refuse_chevauchement",
+      "op": "parse_windows",
+      "input": {"values": ["09:00-12:00", "11:00-13:00"]},
+      "expect": {"error": "ScheduleError"}
+    },
+    {
+      "name": "parse_days_accepte_abreviations",
+      "op": "parse_days",
+      "input": {"values": ["Mon", "tue", "WED"]},
+      "expect": {"days": [0, 1, 2]}
+    },
+    {
+      "name": "parse_days_refuse_nom_complet",
+      "op": "parse_days",
+      "input": {"values": ["lundi"]},
+      "expect": {"error": "ScheduleError"}
+    },
+    {
+      "name": "active_window_matin",
+      "op": "active_window",
+      "input": {"now": "2026-11-16T10:00:00"},
+      "expect": {"window": "09:00-12:00"}
+    },
+    {
+      "name": "active_window_apres_midi",
+      "op": "active_window",
+      "input": {"now": "2026-11-16T14:00:00"},
+      "expect": {"window": "13:30-16:30"}
+    },
+    {
+      "name": "active_window_pause",
+      "op": "active_window",
+      "input": {"now": "2026-11-16T12:30:00"},
+      "expect": {"window": null}
+    },
+    {
+      "name": "active_window_samedi",
+      "op": "active_window",
+      "input": {"now": "2026-11-21T10:00:00"},
+      "expect": {"window": null}
+    },
+    {
+      "name": "active_window_debut_inclus",
+      "op": "active_window",
+      "input": {"now": "2026-11-16T09:00:00"},
+      "expect": {"window": "09:00-12:00"}
+    },
+    {
+      "name": "active_window_fin_exclue",
+      "op": "active_window",
+      "input": {"now": "2026-11-16T12:00:00"},
+      "expect": {"window": null}
+    },
+    {
+      "name": "window_key_matin",
+      "op": "window_key",
+      "input": {"now": "2026-11-16T10:00:00"},
+      "expect": {"key": "2026-11-16#0"}
+    },
+    {
+      "name": "window_key_apres_midi",
+      "op": "window_key",
+      "input": {"now": "2026-11-16T14:00:00"},
+      "expect": {"key": "2026-11-16#1"}
+    },
+    {
+      "name": "window_key_hors_plage",
+      "op": "window_key",
+      "input": {"now": "2026-11-16T20:00:00"},
+      "expect": {"key": null}
+    },
+    {
+      "name": "next_start_avant_ouverture",
+      "op": "next_start",
+      "input": {"now": "2026-11-16T08:00:00"},
+      "expect": {"at": "2026-11-16T09:00:00"}
+    },
+    {
+      "name": "next_start_apres_pause",
+      "op": "next_start",
+      "input": {"now": "2026-11-16T12:30:00"},
+      "expect": {"at": "2026-11-16T13:30:00"}
+    },
+    {
+      "name": "next_start_lendemain",
+      "op": "next_start",
+      "input": {"now": "2026-11-16T17:00:00"},
+      "expect": {"at": "2026-11-17T09:00:00"}
+    },
+    {
+      "name": "next_start_vendredi_vers_lundi",
+      "op": "next_start",
+      "input": {"now": "2026-11-20T18:00:00"},
+      "expect": {"at": "2026-11-23T09:00:00"}
+    },
+    {
+      "name": "seconds_until_next",
+      "op": "seconds_until_next",
+      "input": {"now": "2026-11-16T08:00:00"},
+      "expect": {"seconds": 3600}
+    },
+    {
+      "name": "planning_desactive_ne_bloque_rien",
+      "op": "active_window",
+      "input": {"now": "2026-11-16T10:00:00", "enabled": false},
+      "expect": {"window": null}
+    },
+    {
+      "name": "window_key_desactive",
+      "op": "window_key",
+      "input": {"now": "2026-11-16T10:00:00", "enabled": false},
+      "expect": {"key": null}
+    }
+  ]
+}

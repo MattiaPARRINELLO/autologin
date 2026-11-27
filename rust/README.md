@@ -18,6 +18,44 @@ Les frontieres sont verifiees mecaniquement :
 python3 scripts/check-boundaries.py
 ```
 
+## Fixtures de parite
+
+`fixtures/parity/` contient les cas partages entre Python et Rust : `config`,
+`schedule`, `release_notes`, `updates`. Chaque fichier liste des cas nommes avec
+une entree et une attente, y compris les cas d'erreur.
+
+- `watcher/tests/test_parity_fixtures.py` rejoue chaque cas avec les
+  implementations Python et garantit que les fixtures decrivent le comportement
+  reel.
+- `crates/checkmate-core/tests/parity_fixtures.rs` verifie que le cote Rust lit
+  les memes fichiers et que leur structure reste stable.
+
+Quand un comportement change, la fixture et son test Python evoluent ensemble,
+puis l'implementation Rust doit satisfaire la meme attente.
+
+## Benchmark
+
+`scripts/benchmark.py` mesure le demarrage du binaire, son pic de memoire, son
+temps CPU et sa taille, puis compare aux budgets de
+`benchmarks/budgets.json`.
+
+```bash
+cargo build --release -p checkmate-cli
+python3 scripts/benchmark.py --no-build
+```
+
+Le rapport JSON est ecrit dans `benchmarks/report.json`, ignore par git. Le
+script sort en code 1 des qu'un budget obligatoire est depasse.
+
+Les metriques qui dependent de l'interface GPUI ou du moteur de detection
+(`ui_startup_ms`, `rss_ui_mib`, `cpu_idle_percent`, `detection_p95_ms`) sont
+declarees `required: false` et signalees comme en attente. Elles deviennent
+obligatoires aux tranches T1 et T4.
+
+La memoire est lue dans `/proc/<pid>/status` (`VmHWM`) sous Linux et via
+`GetProcessMemoryInfo` sous Windows, pendant une execution retenue par
+`--bench-hold-ms`.
+
 ## Version
 
 La version du workspace reste `0.0.0` tant que le binaire n'est pas publie. La

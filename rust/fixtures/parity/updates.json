@@ -1,0 +1,258 @@
+{
+  "domain": "updates",
+  "description": "Cas de versions, releases GitHub, canaux, marqueurs, assets, sommes et politique de mise a jour.",
+  "cases": [
+    {
+      "name": "parse_version_simple",
+      "op": "parse_version",
+      "input": {"tag": "watcher-v1.2.3"},
+      "expect": {"version": "1.2.3"}
+    },
+    {
+      "name": "parse_version_beta_sans_point",
+      "op": "parse_version",
+      "input": {"tag": "watcher-v0.6.0-beta1"},
+      "expect": {"version": "0.6.0-beta.1"}
+    },
+    {
+      "name": "parse_version_invalide",
+      "op": "parse_version",
+      "input": {"tag": "pas une version"},
+      "expect": {"version": null}
+    },
+    {
+      "name": "parse_version_prefixe_court",
+      "op": "parse_version",
+      "input": {"tag": "v1.6.0"},
+      "expect": {"version": "1.6.0"}
+    },
+    {
+      "name": "parse_release_marqueurs_zero",
+      "op": "parse_release",
+      "input": {
+        "payload": {
+          "tag_name": "watcher-v0.7.0",
+          "body": "CHECKMATE-MIGRATION: 0\nCHECKMATE-REQUIRED: 0"
+        }
+      },
+      "expect": {
+        "markers_declared": true,
+        "migration_reason": null,
+        "required_reason": null
+      }
+    },
+    {
+      "name": "parse_release_conserve_les_raisons",
+      "op": "parse_release",
+      "input": {
+        "payload": {
+          "tag_name": "watcher-v0.7.0",
+          "body": "CHECKMATE-MIGRATION: format v2\nCHECKMATE-REQUIRED: securite"
+        }
+      },
+      "expect": {
+        "migration_reason": "format v2",
+        "required_reason": "securite"
+      }
+    },
+    {
+      "name": "parse_release_lit_le_teaser",
+      "op": "parse_release",
+      "input": {
+        "payload": {
+          "tag_name": "watcher-v0.7.0",
+          "body": "CHECKMATE-MIGRATION: 0\nCHECKMATE-REQUIRED: 0\nCHECKMATE-SUMMARY: Chrome reste ferme pendant la surveillance."
+        }
+      },
+      "expect": {
+        "teaser": "Chrome reste ferme pendant la surveillance."
+      }
+    },
+    {
+      "name": "parse_release_ignore_teaser_zero",
+      "op": "parse_release",
+      "input": {
+        "payload": {
+          "tag_name": "watcher-v0.7.1",
+          "body": "CHECKMATE-MIGRATION: 0\nCHECKMATE-REQUIRED: 0\nCHECKMATE-SUMMARY: 0"
+        }
+      },
+      "expect": {"teaser": null}
+    },
+    {
+      "name": "parse_release_ignore_tag_legacy",
+      "op": "parse_release",
+      "input": {"payload": {"tag_name": "v1.6.0"}},
+      "expect": {"release": null}
+    },
+    {
+      "name": "parse_release_compte_les_telechargements",
+      "op": "parse_release",
+      "input": {
+        "payload": {
+          "tag_name": "watcher-v0.2.0",
+          "html_url": "https://example.com/release",
+          "name": "CheckMate 0.2.0",
+          "assets": [{"download_count": 5}, {"download_count": 7}]
+        }
+      },
+      "expect": {"downloads": 12}
+    },
+    {
+      "name": "parse_release_collecte_les_assets",
+      "op": "parse_release",
+      "input": {
+        "payload": {
+          "tag_name": "watcher-v0.4.2",
+          "assets": [
+            {"name": "CheckMate-Setup-0.4.2.exe", "browser_download_url": "u", "size": 42},
+            {"name": "SHA256SUMS.txt", "browser_download_url": "v"}
+          ]
+        }
+      },
+      "expect": {"assets": 2, "setup_size": 42}
+    },
+    {
+      "name": "select_latest_beta_et_stable",
+      "op": "select_latest",
+      "input": {
+        "channel": "beta",
+        "releases": [
+          {"tag": "watcher-v0.6.0"},
+          {"tag": "watcher-v0.7.0-beta.1", "prerelease": true},
+          {"tag": "watcher-v0.7.0-beta.2", "prerelease": true}
+        ]
+      },
+      "expect": {"tag": "watcher-v0.7.0-beta.2"}
+    },
+    {
+      "name": "select_latest_stable_ignore_beta",
+      "op": "select_latest",
+      "input": {
+        "channel": "stable",
+        "releases": [
+          {"tag": "watcher-v0.6.0"},
+          {"tag": "watcher-v0.7.0-beta.1", "prerelease": true}
+        ]
+      },
+      "expect": {"tag": "watcher-v0.6.0"}
+    },
+    {
+      "name": "check_for_update_disponible",
+      "op": "check_for_update",
+      "input": {
+        "current": "0.1.0",
+        "releases": [{"tag": "watcher-v0.1.0"}, {"tag": "watcher-v0.2.0"}]
+      },
+      "expect": {"tag": "watcher-v0.2.0"}
+    },
+    {
+      "name": "check_for_update_deja_a_jour",
+      "op": "check_for_update",
+      "input": {
+        "current": "0.2.0",
+        "releases": [{"tag": "watcher-v0.1.0"}]
+      },
+      "expect": {"tag": null}
+    },
+    {
+      "name": "check_for_update_refuse_beta_sur_stable",
+      "op": "check_for_update",
+      "input": {
+        "current": "0.1.0",
+        "channel": "stable",
+        "releases": [
+          {"tag": "watcher-v0.1.0"},
+          {"tag": "watcher-v0.2.0-beta.1", "prerelease": true}
+        ]
+      },
+      "expect": {"tag": null}
+    },
+    {
+      "name": "check_for_update_accepte_beta_sur_beta",
+      "op": "check_for_update",
+      "input": {
+        "current": "0.1.0",
+        "channel": "beta",
+        "releases": [
+          {"tag": "watcher-v0.1.0"},
+          {"tag": "watcher-v0.2.0-beta.1", "prerelease": true}
+        ]
+      },
+      "expect": {"tag": "watcher-v0.2.0-beta.1"}
+    },
+    {
+      "name": "platform_asset_windows",
+      "op": "platform_asset",
+      "input": {
+        "tag": "watcher-v0.4.2",
+        "platform": "win32",
+        "assets": [
+          {"name": "CheckMate-Setup-0.4.2.exe", "browser_download_url": "u"},
+          {"name": "CheckMate-linux-0.4.2.tar.gz", "browser_download_url": "v"},
+          {"name": "SHA256SUMS.txt", "browser_download_url": "w"}
+        ]
+      },
+      "expect": {"name": "CheckMate-Setup-0.4.2.exe"}
+    },
+    {
+      "name": "platform_asset_linux",
+      "op": "platform_asset",
+      "input": {
+        "tag": "watcher-v0.4.2",
+        "platform": "linux",
+        "assets": [
+          {"name": "CheckMate-Setup-0.4.2.exe", "browser_download_url": "u"},
+          {"name": "CheckMate-linux-0.4.2.tar.gz", "browser_download_url": "v"},
+          {"name": "SHA256SUMS.txt", "browser_download_url": "w"}
+        ]
+      },
+      "expect": {"name": "CheckMate-linux-0.4.2.tar.gz"}
+    },
+    {
+      "name": "platform_asset_macos_absent",
+      "op": "platform_asset",
+      "input": {
+        "tag": "watcher-v0.4.2",
+        "platform": "darwin",
+        "assets": [
+          {"name": "CheckMate-Setup-0.4.2.exe", "browser_download_url": "u"},
+          {"name": "CheckMate-linux-0.4.2.tar.gz", "browser_download_url": "v"},
+          {"name": "SHA256SUMS.txt", "browser_download_url": "w"}
+        ]
+      },
+      "expect": {"name": null}
+    },
+    {
+      "name": "parse_checksums_deux_formats",
+      "op": "parse_checksums",
+      "input": {
+        "text": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa  CheckMate-linux-0.4.2.tar.gz\nbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb *autre.zip\nignore\n"
+      },
+      "expect": {
+        "map": {
+          "CheckMate-linux-0.4.2.tar.gz": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "autre.zip": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        }
+      }
+    },
+    {
+      "name": "update_policy_migration_prioritaire",
+      "op": "update_policy",
+      "input": {
+        "current": "0.6.6",
+        "channel": "beta",
+        "releases": [
+          {"tag": "watcher-v0.7.0-beta.1", "migration": "format v2"},
+          {"tag": "watcher-v0.7.0", "required": "securite"}
+        ]
+      },
+      "expect": {
+        "available": true,
+        "migration_tag": "watcher-v0.7.0-beta.1",
+        "required_tag": "watcher-v0.7.0",
+        "install_target_tag": "watcher-v0.7.0-beta.1"
+      }
+    }
+  ]
+}
