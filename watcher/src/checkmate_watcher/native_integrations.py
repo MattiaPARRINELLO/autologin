@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import logging
 import subprocess
+import threading
 import time
 import zlib
 
@@ -37,7 +38,7 @@ def start_tray() -> subprocess.Popen | None:
     process = native_ui.spawn("--tray")
     if process is None:
         return None
-    time.sleep(0.4)
+    time.sleep(1.0)
     code = process.poll()
     if code is None:
         logger.info("icone native demarree (pid %s)", process.pid)
@@ -93,7 +94,12 @@ def notify(
     # il reste vivant pour capter le clic sur le toast.
     time.sleep(0.2)
     code = process.poll()
-    if code is None or code == 0:
+    if code is None:
+        # Le helper Windows attend un clic ; un thread le moissonne des qu'il
+        # se termine pour ne pas laisser de zombie.
+        threading.Thread(target=process.wait, daemon=True).start()
+        return True
+    if code == 0:
         return True
     logger.warning("notification native indisponible (code %s)", code)
     return None
