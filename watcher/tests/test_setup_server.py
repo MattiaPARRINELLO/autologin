@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
 import threading
 import urllib.error
@@ -305,3 +306,31 @@ def test_autostart_outcome(monkeypatch):
     message, state = setup_server._autostart_outcome(True, True)
     assert state == "installed"
     assert "prochaine ouverture de session" in message
+
+
+def test_publie_et_retire_le_runtime_de_l_assistant(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+
+    monkeypatch.setattr(setup_server, "data_dir", lambda: tmp_path)
+    session = SimpleNamespace(token="jeton-assistant")
+    server = SimpleNamespace(server_address=("127.0.0.1", 4321))
+    setup_server.write_setup_runtime(session, server)
+    path = setup_server.setup_runtime_path()
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    assert payload["port"] == 4321
+    assert payload["token"] == "jeton-assistant"
+    assert payload["pid"] == os.getpid()
+    if os.name == "posix":
+        assert path.stat().st_mode & 0o777 == 0o600
+    setup_server.remove_setup_runtime()
+    assert not path.exists()
+
+
+def test_ne_retire_pas_le_runtime_d_un_autre_processus(tmp_path, monkeypatch):
+    monkeypatch.setattr(setup_server, "data_dir", lambda: tmp_path)
+    path = setup_server.setup_runtime_path()
+    path.write_text(
+        json.dumps({"pid": 1, "port": 1, "token": "x"}), encoding="utf-8"
+    )
+    setup_server.remove_setup_runtime()
+    assert path.exists()

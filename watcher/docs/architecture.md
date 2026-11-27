@@ -234,3 +234,82 @@ tranche, est fixee dans [migration-rust.md](migration-rust.md).
 - Les serveurs locaux n'ecoutent que sur `127.0.0.1` et exigent un jeton.
 - La signature est stockee en points, pas en image.
 - Aucun secret n'est ecrit dans la configuration par defaut.
+
+## Interface native GPUI
+
+La coquille Rust de la tranche T1 lit l'API locale Python et n'ecrit aucun
+fichier de donnees.
+
+### Version epinglee
+
+`gpui` est declare dans `rust/Cargo.toml` avec une version exacte,
+`=0.2.2`, et jamais une branche ni `main`. Les features dependent de la cible :
+
+| Cible | Features | Raison |
+|---|---|---|
+| Linux, FreeBSD | `font-kit`, `x11`, `wayland` | les deux serveurs d'affichage |
+| Windows | `font-kit`, `windows-manifest` | manifeste DPI et execution |
+| macOS | `font-kit` | backend natif |
+
+`libc` est verrouille a `0.2.189` et `mio` a `1.2.4` dans
+`rust/Cargo.lock`. La raison est une incompatibilite transitive :
+`gpui 0.2.2` tire `xattr 0.2.3`, qui utilise `libc::ENOATTR`, retire des
+definitions Linux dans `libc 0.2.190` ; et `mio 1.2.5` exige justement
+`libc >= 0.2.190`. Les deux verrous disparaitront avec une version de GPUI
+qui ne depend plus de cette combinaison.
+
+### Procedure de montee
+
+1. Changer la version dans `rust/Cargo.toml`, jamais la source git.
+2. `cargo update -p gpui` puis verifier `cargo tree -p checkmate-ui`.
+3. `cargo test` : les tests `gpui::test` couvrent le tableau de bord, les cinq
+   etapes de l'assistant et les fenetres modales.
+4. Comparer les captures textuelles de `rust/crates/checkmate-ui/tests/` avec
+   le rendu courant. Une difference inattendue est un echec, pas une mise a
+   jour automatique.
+5. Verifier la matrice : Linux X11, Linux Wayland, Windows, puis macOS
+   manuellement. La CI couvre Linux et Windows, macOS reste manuel jusqu'a la
+   tranche T7.
+6. Verifier le mode sans fenetre : `CHECKMATE_HEADLESS=1 cargo run -p
+   checkmate-cli --bin checkmate-ui` ne doit creer aucune fenetre ni paniquer.
+7. Consigner la version et les ecarts dans cette section.
+
+### Lancement
+
+`window.open_url` et `checkmate status` essaient d'abord la coquille native
+(`native_ui.open_dashboard`). L'assistant lance `checkmate-ui --setup` apres
+avoir publie `setup-runtime.json`. La recherche du binaire suit cet ordre :
+`CHECKMATE_UI_BINARY`, dossier de l'executable Python, ressources PyInstaller,
+`rust/target/release` puis `debug`, et enfin `PATH`.
+
+### Empaquetage
+
+Le binaire s'appelle `checkmate-ui`. Il lit `runtime.json` sans argument et
+Python le lance quand il est present (`native_ui.py`). Il est livre dans le
+meme paquet que l'application Python. Si le binaire manque, Python journalise
+l'erreur et retombe sur pywebview puis le navigateur : ce repli protege d'un
+paquet incomplet, ce n'est pas un drapeau opt-in. L'empaquetage des installeurs
+est suivi dans
+[#235](https://github.com/MattiaPARRINELLO/autologin/issues/235).
+
+### Accessibilite
+
+GPUI 0.2.2 n'expose aucune API d'accessibilite : pas de role, pas de libelle
+de lecteur d'ecran. La coquille fournit donc une navigation clavier complete,
+un ordre de tabulation explicite, des raccourcis, la fermeture par Echap et des
+libelles internes verifiables par test. L'exposition aux lecteurs d'ecran est
+bloquee en amont et suivie dans
+[#163](https://github.com/MattiaPARRINELLO/autologin/issues/163).
+
+### Mode sans fenetre
+
+`checkmate-ui --headless` ou `CHECKMATE_HEADLESS=1` ne cree aucune fenetre : le
+binaire lit `runtime.json`, affiche un resume et sort. `--check` ajoute un code
+de sortie non nul si le service local est absent. Sans ces drapeaux, la fenetre
+est creee a la demande, detruite a la fermeture, et le processus rend le GPU en
+sortant ; le moteur Python continue de tourner, donc une nouvelle ouverture ne
+redemarre rien.
+
+GPUI 0.2.2 n'expose pas d'icone de fenetre. L'icone partagee reste
+`watcher/assets/checkmate.png`, referencee par l'installeur, et son integration
+systeme suit en T2 avec l'icone de barre d'etat.

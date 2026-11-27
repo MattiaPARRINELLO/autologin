@@ -1,0 +1,9 @@
+{
+  "username": "etudiant.exemple",
+  "base_url": "https://cesar.exemple.fr",
+  "has_signature": false,
+  "days": ["mon", "tue", "wed", "thu", "fri"],
+  "windows": ["08:00-12:30", "13:30-17:30"],
+  "notifications": true,
+  "keyring": true
+}

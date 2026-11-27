@@ -19,6 +19,14 @@ publish = false
 checkmate-core = { path = "crates/checkmate-core" }
 checkmate-platform = { path = "crates/checkmate-platform" }
 checkmate-ui = { path = "crates/checkmate-ui" }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+ureq = { version = "3.5.2", features = ["json"] }
+# GPUI est epingle a une version exacte, jamais une branche. Les features
+# plateforme sont ajoutees par crate : x11 et wayland sous Linux,
+# windows-manifest sous Windows, font-kit partout. Procedure de montee dans
+# watcher/docs/architecture.md.
+gpui = { version = "=0.2.2", default-features = false, features = ["font-kit"] }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

@@ -18,6 +18,15 @@ Les frontieres sont verifiees mecaniquement :
 python3 scripts/check-boundaries.py
 ```
 
+## Interface GPUI
+
+La crate `checkmate-ui` utilise `gpui =0.2.2`, epingle sans branche. La
+procedure de montee, les features par plateforme et les limites connues sont
+dans [`watcher/docs/architecture.md`](../watcher/docs/architecture.md#interface-native-gpui).
+
+Le binaire `checkmate-ui` lit `runtime.json` ecrit par Python et n'ecrit aucun
+fichier de donnees. `CHECKMATE_HEADLESS=1` interdit toute fenetre.
+
 ## Fixtures de parite
 
 `fixtures/parity/` contient les cas partages entre Python et Rust : `config`,

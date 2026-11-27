@@ -6,6 +6,7 @@ import asyncio
 import contextlib
 import json
 import logging
+import os
 import secrets
 import sys
 import tempfile
@@ -17,6 +18,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
+from . import native_ui
 from .autostart import (
     current_executable,
     enable_autostart,
@@ -31,10 +33,11 @@ from .config import (
     save_config,
 )
 from .credentials import keyring_available, prefer_keyring, set_password
+from .file_io import write_private_json
 from .local_http import LocalError, LocalHandler
 from .local_http import create_server as _create_server
 from .notifications import Notifier
-from .paths import default_env_path
+from .paths import data_dir, default_env_path
 from .remote_selectors import with_remote_selectors
 from .schedule import (
     DAY_NAMES,
@@ -58,6 +61,7 @@ logger = logging.getLogger(__name__)
 
 MAX_BODY = 1_000_000
 MAX_TIMEOUT = 1800
+SETUP_RUNTIME_NAME = "setup-runtime.json"
 DAY_LABELS = {
     "mon": "Lun",
     "tue": "Mar",
@@ -553,6 +557,43 @@ def create_server(session: SetupSession) -> ThreadingHTTPServer:
     return _create_server(session, _Handler)
 
 
+def setup_runtime_path() -> Path:
+    return data_dir() / SETUP_RUNTIME_NAME
+
+
+def write_setup_runtime(
+    session: SetupSession, server: ThreadingHTTPServer
+) -> None:
+    """Publie le port et le jeton de l'assistant pour la coquille Rust.
+
+    Fichier prive, comme `runtime.json`. Python reste proprietaire : Rust le
+    lit et ne l'ecrit jamais.
+    """
+    path = setup_runtime_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "pid": os.getpid(),
+        "port": server.server_address[1],
+        "token": session.token,
+        "url": _setup_url(server, session.token),
+    }
+    write_private_json(path, payload)
+
+
+def remove_setup_runtime() -> None:
+    path = setup_runtime_path()
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return
+    if not isinstance(data, dict) or data.get("pid") != os.getpid():
+        return
+    try:
+        path.unlink()
+    except FileNotFoundError:
+        pass
+
+
 def _afficher_config_invalide(exc: Exception) -> None:
     print(f"Configuration invalide : {exc}")
 
@@ -597,6 +638,7 @@ def _start_setup_server(
     server = create_server(session)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
+    write_setup_runtime(session, server)
     return session, server
 
 
@@ -606,6 +648,8 @@ def _setup_url(server: ThreadingHTTPServer, token: str) -> str:
 
 
 def _open_setup_browser(url: str, session: SetupSession) -> bool:
+    if native_ui.open_setup():
+        return False
     native = open_url(url, close_event=session.finished)
     if native and not session.finished.is_set():
         _afficher_fenetre_fermee()
@@ -614,8 +658,11 @@ def _open_setup_browser(url: str, session: SetupSession) -> bool:
 
 
 def _stop_setup_server(server: ThreadingHTTPServer) -> None:
-    server.shutdown()
-    server.server_close()
+    try:
+        server.shutdown()
+        server.server_close()
+    finally:
+        remove_setup_runtime()
 
 
 def _wait_for_setup(

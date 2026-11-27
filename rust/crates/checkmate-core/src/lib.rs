@@ -12,6 +12,11 @@ pub const NAME: &str = "CheckMate";
 /// Version du workspace Rust.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
+pub mod actions;
+pub mod setup;
+pub mod status;
+pub mod timefmt;
+
 #[cfg(test)]
 mod tests {
     use super::{NAME, VERSION};

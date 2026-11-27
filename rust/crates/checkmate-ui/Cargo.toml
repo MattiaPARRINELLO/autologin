@@ -10,6 +10,25 @@ description = "Interface native GPUI de CheckMate"
 
 [dependencies]
 checkmate-core.workspace = true
+checkmate-platform.workspace = true
+gpui.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+ureq.workspace = true
+# Import PNG et JPG de signature, decode localement avant l'envoi des points.
+image = { version = "0.25.9", default-features = false, features = ["png", "jpeg"] }
+
+[dev-dependencies]
+serde_json.workspace = true
+
+[target.'cfg(any(target_os = "linux", target_os = "freebsd"))'.dev-dependencies]
+gpui = { workspace = true, features = ["test-support"] }
+
+[target.'cfg(any(target_os = "linux", target_os = "freebsd"))'.dependencies]
+gpui = { workspace = true, features = ["x11", "wayland"] }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+gpui = { workspace = true, features = ["windows-manifest"] }
 
 [lints]
 workspace = true
