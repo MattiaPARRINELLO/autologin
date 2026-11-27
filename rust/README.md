@@ -37,3 +37,5 @@ python3 scripts/check-boundaries.py
 ## Suivi
 
 L'epic principal est [#144](https://github.com/MattiaPARRINELLO/autologin/issues/144).
+La repartition des responsabilites entre Python et Rust est decrite dans
+[`watcher/docs/migration-rust.md`](../watcher/docs/migration-rust.md).
