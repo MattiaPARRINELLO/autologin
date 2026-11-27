@@ -3,7 +3,10 @@
 //! Reprend exactement `autostart.py` : meme nom d'unite, meme commande, meme
 //! entree de registre et suppression de l'ancienne tache planifiee.
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
+
+#[cfg(not(target_os = "windows"))]
+use std::path::Path;
 use std::process::{Command, Output};
 
 /// Nom de l'unite systemd utilisateur.
@@ -35,11 +38,24 @@ impl AutostartSpec {
 
     /// Ligne `ExecStart` commune a Linux et Windows.
     #[must_use]
+    #[cfg(not(target_os = "windows"))]
     pub fn command(&self) -> String {
         format!(
             "{} --config {} run",
             quote(&self.executable),
             quote(&self.config)
+        )
+    }
+
+    /// Commande Windows : Python entoure toujours les deux chemins de
+    /// guillemets, meme sans espace, et `reg.exe` conserve ces guillemets.
+    #[must_use]
+    #[cfg(target_os = "windows")]
+    pub fn command(&self) -> String {
+        format!(
+            "\"{}\" --config \"{}\" run",
+            self.executable.display(),
+            self.config.display()
         )
     }
 }
@@ -139,6 +155,7 @@ pub fn restart() -> Result<(), AutostartError> {
     }
 }
 
+#[cfg(not(target_os = "windows"))]
 fn quote(path: &Path) -> String {
     let text = path.display().to_string();
     if text.contains(' ') {
