@@ -37,6 +37,10 @@ pub fn header(state: &AppState, theme: &Theme, cx: &mut Context<CheckmateApp>) -
         .status
         .ready()
         .map_or_else(String::new, |status| status.channel.clone());
+    let build = state.status.ready().map_or_else(
+        || checkmate_core::VERSION.to_owned(),
+        |status| status.build.clone(),
+    );
     div()
         .debug_selector(|| "header".to_owned())
         .flex()
@@ -59,7 +63,10 @@ pub fn header(state: &AppState, theme: &Theme, cx: &mut Context<CheckmateApp>) -
                         .font_weight(Theme::weight_bold())
                         .child(checkmate_core::NAME),
                 )
-                .child(components::muted(theme, format!("version {version}")))
+                .child(components::muted(
+                    theme,
+                    format!("version {version} · build {build}"),
+                ))
                 .when(!channel.is_empty(), |header| {
                     header.child(components::badge(
                         theme,
@@ -268,6 +275,16 @@ fn dashboard_ready(
                     "Mise a jour obligatoire : {}. {}",
                     blocked.tag,
                     blocked.reason.unwrap_or_default()
+                ),
+            ))
+        })
+        .when_some(status.migration.clone(), |column, migration| {
+            column.child(components::info_banner(
+                theme,
+                format!(
+                    "Migration requise : {}. {}",
+                    migration.tag,
+                    migration.reason.unwrap_or_default()
                 ),
             ))
         });
