@@ -343,6 +343,22 @@ Python fournit le chemin du binaire et de `config.toml` ; Rust ecrit l'unite ou
 l'entree de registre et l'active. L'ancienne tache planifiee Windows est retiree
 au passage.
 
+### Instance unique et arret propre
+
+`checkmate-platform` reserve un port de la plage derivee du dossier de donnees.
+Le port lie est le verrou : un second `checkmate-ui` le detecte, demande le
+premier plan a la fenetre existante et sort sans creer de seconde fenetre. Le
+verrou disparait avec le processus, donc aucun fichier perime apres un plantage.
+
+Le moteur Python prend un verrou `watcher.lock` dans le dossier de donnees. Un
+second `run` constate le runtime vivant, ouvre le tableau de bord et rend la
+main. Un verrou orphelin est remplace des que `/api/status` ne repond plus.
+
+SIGTERM et SIGINT demandent l'arret : la tache en cours est annulee, Playwright
+ferme Chromium, `runtime.json` est retire, l'icone native est arretee et l'etat
+est deja ecrit sur disque a chaque mutation. Un kill pendant une signature ne
+laisse donc ni navigateur ni icone orphelins.
+
 Si le binaire `checkmate-ui` manque, Python reprend l'icone `pystray`, les
 notifications et l'autostart historiques. Ce repli protege d'un paquet
 incomplet ; aucun drapeau ne permet de revenir en arriere une fois T2 livree.
