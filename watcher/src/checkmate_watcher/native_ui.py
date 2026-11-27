@@ -67,7 +67,7 @@ def available() -> bool:
     return locate() is not None
 
 
-def _spawn(binary: Path, args: tuple[str, ...]) -> bool:
+def _spawn(binary: Path, args: tuple[str, ...]) -> subprocess.Popen | None:
     command = [str(binary), *args]
     options: dict[str, object] = {
         "stdin": subprocess.DEVNULL,
@@ -80,20 +80,43 @@ def _spawn(binary: Path, args: tuple[str, ...]) -> bool:
     else:
         options["start_new_session"] = True
     try:
-        subprocess.Popen(command, **options)
+        return subprocess.Popen(command, **options)
     except OSError as exc:
         logger.warning("lancement de %s impossible : %s", binary, exc)
-        return False
-    return True
+        return None
+
+
+def spawn(*args: str) -> subprocess.Popen | None:
+    """Lance le binaire et rend le processus, ou None s'il est absent."""
+    binary = locate()
+    if binary is None:
+        logger.debug("coquille native absente")
+        return None
+    return _spawn(binary, args)
 
 
 def launch(*args: str) -> bool:
     """Lance le binaire s'il est present."""
+    return spawn(*args) is not None
+
+
+def run(*args: str, timeout: int = 30) -> subprocess.CompletedProcess | None:
+    """Execute le binaire et capture sa sortie, pour un resultat synchrone."""
     binary = locate()
     if binary is None:
         logger.debug("coquille native absente")
-        return False
-    return _spawn(binary, args)
+        return None
+    try:
+        return subprocess.run(
+            [str(binary), *args],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        logger.warning("execution de %s impossible : %s", binary, exc)
+        return None
 
 
 def open_dashboard() -> bool:

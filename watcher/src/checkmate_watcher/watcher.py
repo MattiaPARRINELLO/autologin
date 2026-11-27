@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from . import BUILD, __version__, analytics, broadcast
+from . import BUILD, __version__, analytics, broadcast, native_integrations
 from .cesar import (
     AttendanceSignal,
     CesarError,
@@ -534,11 +534,14 @@ async def run_loop(
     status_session: StatusSession | None = None
     status_server = None
     tray: TrayController | None = None
+    native_tray = None
     if not once:
         status_session = StatusSession(config, config_path, state, started_at)
         status_server = start_status_server(status_session)
-        tray = TrayController(status_session)
-        tray.start()
+        native_tray = native_integrations.start_tray()
+        if native_tray is None:
+            tray = TrayController(status_session)
+            tray.start()
     stop_event = status_session.stop_event if status_session else None
     broadcast_task: asyncio.Task | None = None
     if once:
@@ -785,5 +788,6 @@ async def run_loop(
                 await broadcast_task
         if tray is not None:
             tray.stop()
+        native_integrations.stop_tray(native_tray)
         if status_server is not None:
             stop_status_server(status_server)
