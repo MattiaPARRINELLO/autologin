@@ -60,7 +60,6 @@ struct TrayApp {
     menu_items: Vec<MenuItem>,
     #[allow(dead_code)]
     separator: Option<PredefinedMenuItem>,
-    ready: Option<std::sync::mpsc::Sender<Result<EventLoopProxy<UserEvent>, String>>>,
     proxy: EventLoopProxy<UserEvent>,
 }
 
@@ -93,7 +92,7 @@ impl TrayApp {
         menu
     }
 
-    fn create_tray(&mut self, event_loop: &ActiveEventLoop) -> Result<(), String> {
+    fn create_tray(&mut self) -> Result<(), String> {
         if self.tray.is_some() {
             return Ok(());
         }
@@ -114,7 +113,6 @@ impl TrayApp {
             .build()
             .map_err(|error| format!("zone de notification Windows : {error}"))?;
         self.tray = Some(tray);
-        event_loop.set_control_flow(winit::event_loop::ControlFlow::Wait);
         Ok(())
     }
 
@@ -136,19 +134,12 @@ impl TrayApp {
 
 impl ApplicationHandler<UserEvent> for TrayApp {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
-        if self.tray.is_some() {
-            return;
-        }
-        let result = self.create_tray(event_loop).map(|()| self.proxy.clone());
-        match (self.ready.take(), result) {
-            (Some(ready), result) => {
-                let _ = ready.send(result);
-            }
-            (None, Err(error)) => {
-                crate::log::warn(&error);
-                event_loop.exit();
-            }
-            (None, Ok(_)) => {}
+        event_loop.set_control_flow(winit::event_loop::ControlFlow::Wait);
+        if self.tray.is_none()
+            && let Err(error) = self.create_tray()
+        {
+            crate::log::warn(&error);
+            event_loop.exit();
         }
     }
 
@@ -234,11 +225,15 @@ fn run(
         tray: None,
         menu_items: Vec::new(),
         separator: None,
-        ready: Some(ready.clone()),
         proxy,
     };
+    if let Err(error) = app.create_tray() {
+        let _ = ready.send(Err(error));
+        return;
+    }
+    let _ = ready.send(Ok(app.proxy.clone()));
     if let Err(error) = event_loop.run_app(&mut app) {
-        let _ = ready.send(Err(format!("boucle Windows arretee : {error}")));
+        crate::log::warn(&format!("boucle Windows arretee : {error}"));
     }
 }
 
