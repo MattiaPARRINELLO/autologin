@@ -87,7 +87,7 @@ pub struct SetupResult {
 }
 
 /// Etapes de l'assistant, dans l'ordre.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum SetupStep {
     Presentation,
     Credentials,

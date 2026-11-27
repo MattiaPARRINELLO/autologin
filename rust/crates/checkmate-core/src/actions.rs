@@ -3,7 +3,7 @@
 use serde::Serialize;
 
 /// Action envoyee a `/api/action`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum ActionKind {
     Configure,
