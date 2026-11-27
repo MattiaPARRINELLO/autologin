@@ -6,3 +6,5 @@ secret:
       match: secret
     - name: dummy password used in support redaction tests
       match: secret-du-compte
+    - name: dummy password environment variable used in parity fixtures
+      match: CHECKMATE_PARITY_ABSENT
