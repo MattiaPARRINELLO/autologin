@@ -180,8 +180,11 @@ rules, which disables the manual approval gate. The full setup commands are in
 
 Release checklist:
 
-1. Bump `watcher/src/checkmate_watcher/__init__.py`, `watcher/pyproject.toml`
-   and `watcher/uv.lock` together.
+1. `VERSION` is the single source of truth: run
+   `python3 scripts/set_version.py X.Y.Z` to update
+   `watcher/src/checkmate_watcher/__init__.py`, `watcher/pyproject.toml`,
+   `watcher/uv.lock`, `rust/Cargo.toml` and `rust/Cargo.lock`, plus `BUILD`.
+   `python3 scripts/set_version.py --check` verifies alignment, as CI does.
 2. Set the two markers for this release.
 3. For a stable major or minor release, add its summary to
    `watcher/src/checkmate_watcher/release_notes.json`: title, overview, measured
