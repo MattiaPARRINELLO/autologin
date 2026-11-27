@@ -1,7 +1,9 @@
 //! Interface native de CheckMate.
 //!
-//! Les vues GPUI arrivent avec la tranche T1. Cette crate peut dependre de
-//! `checkmate-core` et de `checkmate-platform`, jamais de `checkmate-cli`.
+//! La coquille lit `runtime.json` et l'API locale ecrite par Python. Elle
+//! n'ecrit aucun fichier de donnees et ne depend jamais de `checkmate-cli`.
+
+pub mod client;
 
 /// Titre de la fenetre principale.
 #[must_use]
