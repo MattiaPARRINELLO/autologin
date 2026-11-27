@@ -100,6 +100,40 @@ jobs:
       - name: Tests
         run: cargo test
 
+  rust:
+    name: Rust (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: rust
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust -> target
+
+      - name: Toolchain epinglee
+        run: rustup show
+
+      - name: Format
+        run: cargo fmt --check
+
+      - name: Clippy
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: Tests
+        run: cargo test
+
+      - name: Frontieres des crates
+        if: runner.os == 'Linux'
+        run: python3 scripts/check-boundaries.py
+
   e2e:
     name: E2E emulateur
     runs-on: ubuntu-latest

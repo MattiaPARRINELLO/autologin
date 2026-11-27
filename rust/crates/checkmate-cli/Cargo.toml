@@ -1,0 +1,21 @@
+[package]
+name = "checkmate-cli"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+description = "Point d'entree du binaire CheckMate"
+
+[[bin]]
+name = "checkmate"
+path = "src/main.rs"
+
+[dependencies]
+checkmate-core.workspace = true
+checkmate-platform.workspace = true
+checkmate-ui.workspace = true
+
+[lints]
+workspace = true
