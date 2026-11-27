@@ -88,14 +88,16 @@ impl CheckmateApp {
                 .spawn(async move { backend.status() })
                 .await;
             let _ = this.update(cx, |app, cx| {
-                app.apply_status(result);
-                cx.notify();
+                if app.apply_status(result) {
+                    cx.notify();
+                }
             });
         })
         .detach();
     }
 
-    fn apply_status(&mut self, result: Result<StatusSnapshot, ApiError>) {
+    fn apply_status(&mut self, result: Result<StatusSnapshot, ApiError>) -> bool {
+        let previous = self.state.status.clone();
         self.state.status = match result {
             Ok(status) => {
                 self.state.error = None;
@@ -103,8 +105,16 @@ impl CheckmateApp {
             }
             Err(error) => Loadable::Failed(error),
         };
+        let overlay = self.state.overlay.clone();
         self.show_release_note();
         self.state.ensure_focus();
+        let redraw = match (&previous, &self.state.status) {
+            (Loadable::Ready(before), Loadable::Ready(after)) => status_changed(before, after),
+            (Loadable::Failed(before), Loadable::Failed(after)) => before != after,
+            (Loadable::Loading, Loadable::Loading) => false,
+            _ => true,
+        };
+        redraw || self.state.overlay != overlay
     }
 
     /// Ouvre les nouveautes une seule fois, au premier instantane qui les porte.
@@ -731,6 +741,25 @@ impl Render for CheckmateApp {
     }
 }
 
+/// Vrai si l'instantane change quelque chose a l'ecran.
+///
+/// `now` et `uptime_seconds` bougent a chaque lecture ; seul l'affichage
+/// formate de la duree compte, pour eviter un redessin toutes les 5 secondes.
+fn status_changed(before: &StatusSnapshot, after: &StatusSnapshot) -> bool {
+    if checkmate_core::timefmt::uptime(before.uptime_seconds)
+        != checkmate_core::timefmt::uptime(after.uptime_seconds)
+    {
+        return true;
+    }
+    let mut left = before.clone();
+    let mut right = after.clone();
+    left.now.clear();
+    right.now.clear();
+    left.uptime_seconds = 0;
+    right.uptime_seconds = 0;
+    left != right
+}
+
 /// Lance l'application en fenetre sur le tableau de bord.
 pub fn run() {
     run_screen(false);
@@ -931,5 +960,50 @@ mod tests {
         let summary = headless_summary(&Fake).unwrap();
         assert!(summary.contains("mode=signed"));
         assert!(summary.contains("creneau=08:00-12:30"));
+    }
+}
+
+#[cfg(test)]
+mod status_tests {
+    use super::status_changed;
+    use checkmate_core::status::StatusSnapshot;
+
+    fn instantane() -> StatusSnapshot {
+        let raw = include_str!("../../../fixtures/api/status.json");
+        serde_json::from_str(raw).expect("fixture")
+    }
+
+    #[test]
+    fn un_now_different_ne_redessine_pas() {
+        let before = instantane();
+        let mut after = before.clone();
+        after.now = "demain".to_owned();
+        assert!(!status_changed(&before, &after));
+    }
+
+    #[test]
+    fn un_label_different_redessine() {
+        let before = instantane();
+        let mut after = before.clone();
+        after.label.push_str(" !");
+        assert!(status_changed(&before, &after));
+    }
+
+    #[test]
+    fn une_duree_formatee_identique_ne_redessine_pas() {
+        let mut before = instantane();
+        before.uptime_seconds = 125;
+        let mut after = before.clone();
+        after.uptime_seconds = 130;
+        assert!(!status_changed(&before, &after));
+    }
+
+    #[test]
+    fn une_minute_de_plus_redessine() {
+        let mut before = instantane();
+        before.uptime_seconds = 119;
+        let mut after = before.clone();
+        after.uptime_seconds = 120;
+        assert!(status_changed(&before, &after));
     }
 }
