@@ -218,6 +218,13 @@ approbation humaine. Les valeurs `0`/`0` passent par `release-auto`. La
 configuration exacte des environnements est documentee dans
 [`CONTRIBUTING.md`](../../CONTRIBUTING.md#environnements-github-de-publication).
 
+## Migration Rust
+
+La reecriture 1.0 est suivie par tranches dans l'epic
+[#144](https://github.com/MattiaPARRINELLO/autologin/issues/144). La repartition
+des responsabilites entre Python et Rust, ressource par ressource et tranche par
+tranche, est fixee dans [migration-rust.md](migration-rust.md).
+
 ## Frontiere de securite
 
 - Le mot de passe ne passe jamais dans les logs ; il vient du trousseau ou de

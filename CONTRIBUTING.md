@@ -281,8 +281,11 @@ Points de vigilance :
 - Une correction urgente sur une version stable deja publiee reste un PATCH et
   ne saute pas de MINOR.
 - Le changement de version se fait dans un commit dedie
-  `chore: passe la version a X.Y.Z`, qui met a jour `__init__.py`,
-  `pyproject.toml` et `uv.lock` ensemble.
+  `chore: passe la version a X.Y.Z`. `VERSION` est l'unique source de verite :
+  `python3 scripts/set_version.py X.Y.Z` propage la version dans `__init__.py`,
+  `pyproject.toml`, `uv.lock`, `rust/Cargo.toml` et `rust/Cargo.lock`, et met a
+  jour `BUILD`. `python3 scripts/set_version.py --check` verifie l'alignement,
+  ce que la CI fait aussi.
 
 ## Format des tags
 

@@ -52,6 +52,16 @@ jobs:
       - name: Verifier uv.lock
         run: uv lock --check
 
+  version:
+    name: Version alignee
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Verifier VERSION et ses copies
+        run: python3 scripts/set_version.py --check
+
   docs:
     name: Docs versions
     runs-on: ubuntu-latest
@@ -133,6 +143,26 @@ jobs:
       - name: Frontieres des crates
         if: runner.os == 'Linux'
         run: python3 scripts/check-boundaries.py
+
+  rust-audit:
+    name: Audit Rust
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: rust
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-deny,cargo-audit
+
+      - name: Licences, bans et sources
+        run: cargo deny check
+
+      - name: Vulnerabilites
+        run: cargo audit
 
   e2e:
     name: E2E emulateur
