@@ -4,6 +4,8 @@
 //! n'ecrit aucun fichier de donnees et ne depend jamais de `checkmate-cli`.
 
 pub mod client;
+pub mod components;
+pub mod theme;
 
 /// Titre de la fenetre principale.
 #[must_use]
