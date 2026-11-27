@@ -14,7 +14,7 @@ except Exception:  # optionnel selon la plateforme
     Image = None
     ImageDraw = None
 
-from . import sni
+from . import native_ui, sni
 from .status_server import ACTIONS, StatusSession
 from .window import open_url
 
@@ -169,6 +169,8 @@ class TrayController:
         )
 
     def _open_status(self) -> None:
+        if native_ui.open_dashboard():
+            return
         if self.session.url:
             open_url(self.session.url)
 

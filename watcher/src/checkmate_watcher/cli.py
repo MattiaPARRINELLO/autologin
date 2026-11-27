@@ -14,7 +14,7 @@ import sys
 import time
 from pathlib import Path
 
-from . import BUILD, __version__
+from . import BUILD, __version__, native_ui
 from .autostart import (
     UNIT_NAME,
     autostart_enabled,
@@ -621,6 +621,8 @@ def _afficher_status_demarrage_echec() -> None:
 def _ouvrir_si_pret() -> bool:
     runtime = read_runtime()
     if runtime and status_alive(runtime):
+        if native_ui.open_dashboard():
+            return True
         open_url(str(runtime["url"]))
         return True
     return False
