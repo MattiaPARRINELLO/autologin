@@ -372,6 +372,22 @@ async def _open_session(
     return session
 
 
+async def _signature_landed(session: CesarSession | HttpCesarSession) -> bool:
+    """Verifie sur CESAR si la presence a fini par etre enregistree.
+
+    Couvre le cas ou l'utilisateur termine la signature a la main puis ferme
+    la fenetre : le navigateur pilote disparait, mais le pointage est valide.
+    """
+    try:
+        return await session.check() is None
+    except Exception:
+        logger.debug(
+            "verification apres echec de signature impossible",
+            exc_info=True,
+        )
+        return False
+
+
 async def sign_with_visibility(
     config: Config,
     session: CesarSession | HttpCesarSession,
@@ -653,32 +669,57 @@ async def run_loop(
                                 + config.watcher.prompt_retry
                             )
                         else:
+                            signed = False
+                            confirmation = ""
                             try:
                                 confirmation = await sign_with_visibility(
                                     config, session, points
                                 )
                             except CesarError as exc:
-                                logger.error("echec de la signature : %s", exc)
-                                state.increment("stats.errors")
-                                _record_error(state, exc)
-                                prompt_cooldowns[signal.key] = (
-                                    asyncio.get_running_loop().time()
-                                    + config.watcher.prompt_retry
-                                )
-                                await _send(
-                                    config,
-                                    "Echec du pointage",
-                                    f"{signal.label}\n{exc}",
-                                    icon="dialog-error",
-                                )
+                                if await _signature_landed(session):
+                                    signed = True
+                                    logger.info(
+                                        "presence deja enregistree apres "
+                                        "interruption de la signature : %s",
+                                        exc,
+                                    )
+                                else:
+                                    logger.error(
+                                        "echec de la signature : %s", exc
+                                    )
+                                    state.increment("stats.errors")
+                                    _record_error(state, exc)
+                                    prompt_cooldowns[signal.key] = (
+                                        asyncio.get_running_loop().time()
+                                        + config.watcher.prompt_retry
+                                    )
+                                    await _send(
+                                        config,
+                                        "Echec du pointage",
+                                        f"{signal.label}\n{exc}",
+                                        icon="dialog-error",
+                                    )
                             else:
+                                signed = True
+
+                            if signed:
                                 state.mark(signal.key)
                                 state.increment("stats.signed")
                                 analytics.record(config, "signature")
                                 state.set_meta("last_signed_at", _now_iso())
                                 if window_key:
                                     state.mark_window(window_key)
-                                if is_success_confirmation(confirmation):
+                                if not confirmation:
+                                    logger.info(
+                                        "presence enregistree sur CESAR"
+                                    )
+                                    await _send(
+                                        config,
+                                        "Presence pointee",
+                                        "Emargement enregistre sur CESAR.",
+                                        icon="dialog-information",
+                                    )
+                                elif is_success_confirmation(confirmation):
                                     logger.info(
                                         "presence signee : %s", confirmation
                                     )
